@@ -143,11 +143,9 @@ small{color:var(--dim)}
     <div id="sub-xianyu" style="display:none">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
         <button id="xy-refresh">🔄 刷新货源（¥20）</button>
-        <small id="xy-hint">每批 3~5 件，价格为市场价 50%~200%；可跨级别刷出高级桌游，偶见隐藏款！</small>
+        <small id="xy-hint">每批 3~5 件，价格为市场价 50%~200%；可跨级别刷出高级桌游，偶见隐藏款！每 5 分钟自动到货（<b id="xy-cd">--:--</b>）</small>
       </div>
       <div class="grid" id="xianyu-list"></div>
-      <h3 style="margin:16px 0 8px">我的挂卖</h3>
-      <div id="sell-list" class="mut">暂无挂卖。收藏架中库存 ≥2 的桌游可挂卖。</div>
     </div>
     <div id="sub-gacha" style="display:none">
       <div class="gacha-banner">
@@ -190,7 +188,7 @@ small{color:var(--dim)}
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🛒 四个获得渠道</h3>
-      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），库存 ≥2 的桌游可挂卖（市场价 80%~120%，受运筹加成）；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复款直接转牌套（N×5 / R×10 / SR×20 / SSR×40 包）。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
+      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），货源每 5 分钟自动刷新（也可花 ¥20 手动刷新），价格受运筹砍价加成；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复款直接转牌套（N×5 / R×10 / SR×20 / SSR×40 包）。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
     </div>
     <div class="panel">
       <h3>💼 职业阶梯</h3>
@@ -212,7 +210,7 @@ small{color:var(--dim)}
  *  - EXT: 标签共鸣套装加成          -> 见 computeSetBonus()（当前返回 1）
  *  - EXT: 并行游玩（多开桌位）      -> playSession 支持多实例化改造
  *  - EXT: 差异化小游戏（骰子/拼图） -> 时机条 timingBar 可替换为玩法模块
- *  - EXT: 某鱼真实玩家经济          -> sellListings 现为 NPC 定时收购
+ *  - EXT: 某鱼真实玩家经济          -> 当前仅 NPC 货源，无玩家间交易
  *  - EXT: 成就/称号系统            -> 见 achievements[]（空壳）
  * ========================================================================== */
 
@@ -223,6 +221,7 @@ const PLAY_CAP_MIN=60;                  // 单次游玩游戏内时长上限（�
 const GLOBAL_PER_KIND=0.015, GLOBAL_SOFTCAP=0.50;
 const FATIGUE_SOFTCAP=10;
 const GACHA_PITY=50;
+const XY_REFRESH_MS=5*60*1000; // 某鱼每 5 分钟自动刷新
 const ACHIEVEMENTS=[]; // EXT: 成就系统占位
 
 const ATTRS=['谋略','演算','应变','运筹','表达','魅力'];
@@ -324,7 +323,7 @@ function defaultSave(){
     attrs:{}, attrExp:{},
     owned:{},            // id -> {count,prof,fatigue,sleeved,stored,rulesRead}
     taobaoStock:{},      // id -> 剩余
-    xianyu:[], sellListings:[], pity:0,
+    xianyu:[], xyNext:0, pity:0,
     job:null, started:false, offlineBank:{t:0,money:0,log:[]},
     lastSeen:Date.now(), stats:{plays:0,pulls:0}};
 }
@@ -350,19 +349,19 @@ function hasAffix(type){return Object.keys(S.owned).some(id=>S.owned[id].count>0
 function computeSetBonus(){return 1;} // EXT: 标签共鸣套装
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
 // 谋略：游玩经验 +3%/级  演算：游玩时间 -2%/级（见 playDuration）
-// 应变：疲劳增长 -4%/级  运筹：挂卖售价 +3%/级
+// 应变：疲劳增长 -4%/级  运筹：某鱼砍价 -2%/级
 // 表达：工作/游玩收入 +4%/级  魅力：掉券率 +20%/级、主播波动下限上移
 const ATTR_EFFECT={
  '谋略':'每级使游玩经验 +3%（相乘）',
  '演算':'每级使游玩时间 -2%（相乘，下限 ×0.80）',
  '应变':'每级使游玩疲劳增长 -4%（相乘，下限 ×0.60）',
- '运筹':'每级使某鱼挂卖售价 +3%（相乘）',
+ '运筹':'每级使某鱼购物价格 -2%（相乘砍价，下限 ×0.80）',
  '表达':'每级使工作与游玩收入 +4%（相乘）',
  '魅力':'每级使抽赏券掉落率 +20%，并提高主播带货的收入下限',
 };
 function expMult(){return (1+globalBonus())*(1+0.03*attrLevel('谋略'))*(hasAffix('expAll')?1.05:1)*computeSetBonus();}
 function fatigueIncMult(){return Math.max(0.60,1-0.04*attrLevel('应变'));}
-function sellPriceMult(){return 1+0.03*attrLevel('运筹');}
+function xyPriceMult(){return Math.max(0.80,1-0.02*attrLevel('运筹'));}
 function incomeMult(){return 1+0.04*attrLevel('表达');}
 function ticketRateMult(){return (1+0.20*attrLevel('魅力'))*(hasAffix('ticketUp')?1.25:1);}
 function attrProgress(a){let e=S.attrExp[a],need=60,lv=0;while(e>=need){e-=need;lv++;need=Math.round(60*Math.pow(lv+1,1.5));}return{lv,cur:Math.floor(e),need};}
@@ -729,17 +728,20 @@ function renderTaobao(){
   html+=tierGames(cur).map(g=>{
     const left=S.taobaoStock[g.id]||0, price=taobaoBase(g);
     const owned=S.owned[g.id]&&S.owned[g.id].count>0;
-    const act=left>0
+    const act=owned
+      ?`<div class="mut" style="margin-top:6px">✓ 已收藏</div>`
+      :left>0
       ?`<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
         <span class="price">¥${price}</span>
         <button class="primary" ${S.money<price?'disabled':''} onclick="buyTaobao('${g.id}')">购买</button></div>`
-      :`<div class="mut" style="margin-top:6px">${owned?'✓ 已收藏':'已售罄'}</div>`;
+      :`<div class="mut" style="margin-top:6px">已售罄</div>`;
     return gameCardHTML(g,`<div class="tagline">${g.tags.join(' · ')} · ${g.playTime}分钟</div>`,act);
   }).join('');
   $('#taobao-list').innerHTML=html;
 }
 window.buyTaobao=function(id){
   const g=GMAP[id], price=taobaoBase(g);
+  if(S.owned[id]&&S.owned[id].count>0){toast('已收藏过这款桌游');return;} // 已拥有不可再购
   if(S.money<price||(S.taobaoStock[id]||0)<=0||!tierUnlocked(g.rarity))return;
   S.money-=price; S.taobaoStock[id]--;
   const bonus=acquireGame(id,'某宝');
@@ -752,7 +754,7 @@ window.buyTaobao=function(id){
   renderAll();
 };
 
-// ---- 某鱼：二手浮动价（唯一跨级别高级货源）+ 隐藏款 + 挂卖 ----
+// ---- 某鱼：二手浮动价（唯一跨级别高级货源）+ 隐藏款，每 5 分钟自动刷新 ----
 function refreshXianyu(free){
   if(!free&&S.money<20){toast('钱不够刷新');return;}
   if(!free)S.money-=20;
@@ -763,10 +765,23 @@ function refreshXianyu(free){
     let g;
     if(Math.random()<0.08){g=HIDDEN[Math.floor(Math.random()*HIDDEN.length)];} // 隐藏款
     else g=REGULAR_GAMES[Math.floor(Math.random()*REGULAR_GAMES.length)];      // 任意级别常规款
-    const mul=0.5+Math.random()*1.5;
+    const mul=(0.5+Math.random()*1.5)*xyPriceMult(); // 运筹砍价
     S.xianyu.push({id:g.id,price:Math.max(10,Math.round(g.marketPrice*mul))});
   }
+  S.xyNext=Date.now()+XY_REFRESH_MS;
   save();
+}
+// 某鱼自动刷新：每 5 分钟到货一批
+function tickXianyu(){
+  if(!S.xyNext)return;
+  if(Date.now()>=S.xyNext){
+    refreshXianyu(true);
+    toast('🔄 某鱼自动到货一批新货源');
+    renderXianyu(); renderStatus();
+  }
+  const cd=document.querySelector('#xy-cd');
+  if(cd){const r=Math.max(0,S.xyNext-Date.now());
+    cd.textContent=`${Math.floor(r/60000)}:${String(Math.floor(r/1000)%60).padStart(2,'0')}`;}
 }
 function renderXianyu(){
   $('#xianyu-list').innerHTML=S.xianyu.length?S.xianyu.map((it,i)=>{
@@ -780,14 +795,6 @@ function renderXianyu(){
         <span class="price ${cls}">¥${it.price}</span>
         <button class="primary" ${S.money<it.price?'disabled':''} onclick="buyXianyu(${i})">拿下</button></div>`);
   }).join(''):'<div class="mut">货架空空，点上方按钮刷新一批货源。</div>';
-  // 挂卖列表
-  $('#sell-list').innerHTML=S.sellListings.length?S.sellListings.map((l,i)=>{
-    const g=GMAP[l.id];
-    const remain=Math.max(0,l.sellAt-Date.now());
-    return `<div class="panel" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-      <span>${g.icon} 《${g.name}》 挂价 ¥${l.price}</span>
-      <span class="mut">${remain>0?'约 '+Math.ceil(remain/60000)+' 分钟后售出':'等待收购…'}</span></div>`;
-  }).join(''):'暂无挂卖。收藏架中库存 ≥2 的桌游可挂卖。';
 }
 $('#xy-refresh').addEventListener('click',()=>{refreshXianyu(false);renderXianyu();renderStatus();});
 window.buyXianyu=function(i){
@@ -797,22 +804,6 @@ window.buyXianyu=function(i){
   toast(`淘到《${GMAP[it.id].name}》！${bonus}`);
   renderAll();
 };
-window.listSell=function(id){
-  const o=S.owned[id]; if(!o||o.count<2)return;
-  const price=Math.round(GMAP[id].marketPrice*(0.8+Math.random()*0.4)*sellPriceMult());
-  o.count--;
-  if(o.count<=0){ /* 保留条目数据 */ }
-  S.sellListings.push({id,price,sellAt:Date.now()+ (10+Math.random()*20)*60000}); // 原型：10~30分钟（正式版为数小时）
-  save();renderAll();toast(`《${GMAP[id].name}》已挂卖 ¥${price}，等待买家…`);
-};
-function tickSell(){
-  const now=Date.now();let changed=false;
-  S.sellListings=S.sellListings.filter(l=>{
-    if(now>=l.sellAt){S.money+=l.price;toast(`💰 挂卖的《${GMAP[l.id].name}》已售出 +¥${l.price}`);changed=true;return false;}
-    return true;
-  });
-  if(changed){save();renderAll();}
-}
 
 // ---- 某赏 ----
 const GACHA_RATES=[['SSR',0.02],['SR',0.08],['R',0.28],['N',0.62]];
@@ -857,7 +848,6 @@ function renderShelf(){
     let actions='<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">';
     if(g.cards>0&&!o.sleeved)actions+=`<button ${S.sleeves<g.cards?'disabled':''} onclick="applySleeve('${id}')">套牌套 ${g.cards}张</button>`;
     if(canStore(g)&&!o.stored)actions+=`<button ${S.money<storeCost?'disabled':''} onclick="applyStorage('${id}')">收纳 ¥${storeCost}</button>`;
-    if(o.count>=2)actions+=`<button onclick="listSell('${id}')">挂卖</button>`;
     actions+='</div>';
     const extra=`<div>熟练 ${o.prof} · 疲劳 ${o.fatigue} · ×${o.count}</div>
       <div class="tagline">${g.cards>0?(o.sleeved?'🎴已套牌套(×0.85)':`🎴未套（需 ${g.cards} 张）`):'🎴无卡牌·无需牌套'}
@@ -921,7 +911,7 @@ function mainLoop(now){
   secAcc+=dt;
   if(secAcc>=1000){
     secAcc-=1000;
-    tickWork(); tickSell();
+    tickWork(); tickXianyu();
     renderStatus();
     if(Math.random()<0.2)save(); // 定期存档
   }
@@ -935,6 +925,8 @@ function mainLoop(now){
   if(!S.started){initTaobao();refreshXianyu(true);save();showStarterChoice();}
   else{
     initTaobao();
+    if(!S.xyNext)S.xyNext=Date.now()+XY_REFRESH_MS; // 旧存档兜底：排定下次某鱼到货
+    if(!S.xianyu.length)refreshXianyu(true);
     const away=Date.now()-(S.lastSeen||Date.now());
     if(away>60000){accumulateOffline(away);} // 离线累积（上限1h）
   }
