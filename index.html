@@ -640,6 +640,7 @@ function acquireGame(id,src){
     bonusStr=`开箱奖励：${g.attrs.map(a=>ATTR_ICON[a]+a).join('、')}经验 +${fb}`;
   }
   save(); renderStatus();
+  renderTaobao(); renderXianyu(); // 收藏更新 → 商店/二手同步把该桌游标为不可购买
   return bonusStr;
 }
 
@@ -775,12 +776,13 @@ function refreshXianyu(free){
   if(!free&&S.money<20){toast('钱不够刷新');return;}
   if(!free)S.money-=20;
   const n=3+Math.floor(Math.random()*3);
-  const HIDDEN=GAMES.filter(g=>g.hidden);
+  const HIDDEN=GAMES.filter(g=>g.hidden&&!isMastered(g.id));
+  const NORMAL=REGULAR_GAMES.filter(g=>!isMastered(g.id)); // 已精通的桌游不再刷出
   S.xianyu=[];
   for(let i=0;i<n;i++){
     let g;
-    if(Math.random()<0.08){g=HIDDEN[Math.floor(Math.random()*HIDDEN.length)];} // 隐藏款
-    else g=REGULAR_GAMES[Math.floor(Math.random()*REGULAR_GAMES.length)];      // 任意级别常规款
+    if(HIDDEN.length&&Math.random()<0.08){g=HIDDEN[Math.floor(Math.random()*HIDDEN.length)];} // 隐藏款
+    else g=NORMAL[Math.floor(Math.random()*NORMAL.length)];   // 任意级别常规款
     const mul=(0.5+Math.random()*1.5)*xyPriceMult(); // 运筹砍价
     S.xianyu.push({id:g.id,price:Math.max(10,Math.round(g.marketPrice*mul))});
   }
@@ -799,22 +801,28 @@ function tickXianyu(){
   if(cd){const r=Math.max(0,S.xyNext-Date.now());
     cd.textContent=`${Math.floor(r/60000)}:${String(Math.floor(r/1000)%60).padStart(2,'0')}`;}
 }
+function isMastered(id){const o=S.owned[id],g=GMAP[id];return !!(o&&g&&o.prof>=MASTERY[g.rarity]);}
+// 收藏更新后调用：让某鱼货架上已拥有的桌游立即变为不可购买（渲染与购买时双重校验）
 function renderXianyu(){
   $('#xianyu-list').innerHTML=S.xianyu.length?S.xianyu.map((it,i)=>{
     const g=GMAP[it.id];
     const pct=Math.round(it.price/g.marketPrice*100);
     const cls=pct<90?'ok':pct>130?'bad2':'';
+    const owned=S.owned[it.id]&&S.owned[it.id].count>0;
+    const act=owned
+      ?`<div class="mut" style="margin-top:6px">✓ 已收藏（不可购买）</div>`
+      :`<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+        <span class="price ${cls}">¥${it.price}</span>
+        <button class="primary" ${S.money<it.price?'disabled':''} onclick="buyXianyu(${i})">拿下</button></div>`;
     return gameCardHTML(g,
       `${g.hidden?`<span class="oop-tag">隐藏款 · ${g.affix.desc}</span>`:''}
-       <div class="tagline">市场价 ¥${g.marketPrice}（本件 ${pct}%）· 每局 ${gainText(g)}</div>`,
-      `<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-        <span class="price ${cls}">¥${it.price}</span>
-        <button class="primary" ${S.money<it.price?'disabled':''} onclick="buyXianyu(${i})">拿下</button></div>`);
+       <div class="tagline">市场价 ¥${g.marketPrice}（本件 ${pct}%）· 每局 ${gainText(g)}</div>`,act);
   }).join(''):'<div class="mut">货架空空，点上方按钮刷新一批货源。</div>';
 }
 $('#xy-refresh').addEventListener('click',()=>{refreshXianyu(false);renderXianyu();renderStatus();});
 window.buyXianyu=function(i){
   const it=S.xianyu[i]; if(!it||S.money<it.price)return;
+  if(S.owned[it.id]&&S.owned[it.id].count>0){toast('已收藏过这款桌游');renderXianyu();return;} // 收藏更新后不可购买
   S.money-=it.price; S.xianyu.splice(i,1);
   const bonus=acquireGame(it.id,'某鱼');
   toast(`淘到《${GMAP[it.id].name}》！${bonus}`);
