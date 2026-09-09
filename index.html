@@ -112,6 +112,7 @@ small{color:var(--dim)}
 <div id="content">
   <div id="tab-play" class="tabpage active">
     <h2>选择一款桌游开玩</h2>
+    <div id="play-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="grid" id="play-list"></div>
     <div id="play-panel" style="display:none">
       <h3 id="pp-title"></h3>
@@ -156,13 +157,14 @@ small{color:var(--dim)}
           <button class="primary" id="gacha-1">单抽（¥<span id="gacha-price1">0</span>）</button>
           <button class="primary" id="gacha-t">用抽赏券 ×1 抽</button>
         </div>
-        <small>重复桌游不再给库存，直接转牌套：N ×5 包 / R ×10 包 / SR ×20 包 / SSR ×40 包（每包 50 张）。</small>
+        <small>重复桌游不再给库存，直接转牌套（N ×5 包 / R ×10 包 / SR ×20 包 / SSR ×40 包，每包 50 张）并叠加该桌游熟练度（N+4 / R+8 / SR+16 / SSR+32）。</small>
       </div>
       <div class="logbox" id="gacha-log" style="height:120px"></div>
     </div>
   </div>
   <div id="tab-shelf" class="tabpage">
     <h2>收藏架 <small id="shelf-count"></small></h2>
+    <div id="shelf-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="grid" id="shelf-grid"></div>
   </div>
   <div id="tab-guide" class="tabpage">
@@ -179,7 +181,7 @@ small{color:var(--dim)}
     <div class="panel" style="margin-bottom:12px">
       <h3>🧭 六维属性（全部效果均为相乘）</h3>
       <table style="width:100%;font-size:13px;line-height:2" id="guide-attr-table"></table>
-      <p class="mut" style="margin-top:6px">经验来源：① 游玩对应机制的桌游（主属性分 65%、副属性 35%）；② 首次入手新桌游的一次性开箱经验（N 15 / R 30 / SR 60 / SSR 120）。升级所需经验逐级递增（60、170、312……）。属性同时是高级工作的门槛。</p>
+      <p class="mut" style="margin-top:6px">经验来源：① 游玩对应机制的桌游（多属性按比例分摊：双属性 65/35，三属性 50/30/20，四属性 40/30/20/10）；② 首次入手新桌游的一次性开箱经验（N 15 / R 30 / SR 60 / SSR 120）。升级所需经验逐级递增（60、170、312……）。属性同时是高级工作的门槛。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🎲 游玩流程</h3>
@@ -188,12 +190,12 @@ small{color:var(--dim)}
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🛒 四个获得渠道</h3>
-      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），货源每 5 分钟自动刷新（也可花 ¥20 手动刷新），价格受运筹砍价加成；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复款直接转牌套（N×5 / R×10 / SR×20 / SSR×40 包）。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
+      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），货源每 5 分钟自动刷新（也可花 ¥20 手动刷新），价格受运筹砍价加成；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复款转牌套（N×5 / R×10 / SR×20 / SSR×40 包）并叠加熟练度（N+4 / R+8 / SR+16 / SSR+32）。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
     </div>
     <div class="panel">
       <h3>💼 职业阶梯</h3>
       <table style="width:100%;font-size:13px;line-height:2" id="guide-job-table"></table>
-      <p class="mut" style="margin-top:4px">高级工作自动进行并累积离线收益；打工与游玩均有概率掉落某赏抽赏券（魅力越高掉率越高）。主播带货收入波动大，魅力可提高下限。</p>
+      <p class="mut" style="margin-top:4px">高级工作自动进行并累积离线收益；打工与游玩均有概率掉落某赏抽赏券（洞察越高掉率越高）。主播带货收入波动大，沉浸可提高下限。</p>
     </div>
   </div>
 </div>
@@ -215,7 +217,7 @@ small{color:var(--dim)}
  * ========================================================================== */
 
 // ---------- 常量 ----------
-const SAVE_KEY='bgcollector_save', SAVE_VERSION=2;
+const SAVE_KEY='bgcollector_save', SAVE_VERSION=3;
 const OFFLINE_CAP_MS=3600*1000;         // 离线收益累积上限 1 小时
 const PLAY_CAP_MIN=60;                  // 单次游玩游戏内时长上限（分钟）
 const GLOBAL_PER_KIND=0.015, GLOBAL_SOFTCAP=0.50;
@@ -224,59 +226,62 @@ const GACHA_PITY=50;
 const XY_REFRESH_MS=5*60*1000; // 某鱼每 5 分钟自动刷新
 const ACHIEVEMENTS=[]; // EXT: 成就系统占位
 
-const ATTRS=['谋略','演算','应变','运筹','表达','魅力'];
-const ATTR_ICON={'谋略':'🧠','演算':'📐','应变':'🎲','运筹':'🧰','表达':'📖','魅力':'✨'};
+const ATTRS=['谋略','演算','应变','运筹','洞察','沉浸'];
+const ATTR_ICON={'谋略':'🧠','演算':'📐','应变':'🎲','运筹':'🧰','洞察':'🔍','沉浸':'📖'};
+// 每局属性经验分配比例（按游戏属性个数）：主属性占大头
+const EXP_SHARES={1:[1],2:[0.65,0.35],3:[0.5,0.3,0.2],4:[0.4,0.3,0.2,0.1],6:[0.2,0.2,0.15,0.15,0.15,0.15]};
+function attrShares(g){const n=g.attrs.length;return EXP_SHARES[n]||g.attrs.map(()=>1/n);}
 const ROMAN=['0','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ'];
 
 // ---------- 桌游数据集（源自 solo 提名表；稀有度按提名票数分段映射） ----------
 // attrs: 主加成属性(1~2个)  en/bgg: 英文原名与 BGG 编号  sleeves: 牌套规格（待 BGG 抓取，查不到置空）
 // hidden: 隐藏款——商店不卖、某赏不出，仅某鱼小概率刷出；不计入解锁下一级的收集要求
 const GAMES=[
- // ===== N（提名 ≤4 票，毛线 / 入门） =====
+ // ===== N（提名 ≤4 票，毛线 / 入门）：单属性为主 =====
  {id:'guoyuan',name:'果园',en:'Orchard',bgg:245654,rarity:'N',marketPrice:88,weight:1.2,playTime:15,setupTime:2,tags:['小盒','德式'],attrs:['演算'],baseExp:12,icon:'🍎',sleeves:null},
  {id:'zongming',name:'绝顶聪明',en:"That's Pretty Clever",bgg:244522,rarity:'N',marketPrice:98,weight:1.9,playTime:30,setupTime:3,tags:['纸笔','骰子'],attrs:['应变'],baseExp:16,icon:'🎲',sleeves:null},
  {id:'kafei',name:'咖啡烘焙师',en:'Coffee Roaster',bgg:196680,rarity:'N',marketPrice:78,weight:1.9,playTime:30,setupTime:4,tags:['小盒','袋bg'],attrs:['运筹'],baseExp:15,icon:'☕',sleeves:null},
- {id:'zhitu',name:'王国制图师',en:'Cartographers',bgg:263918,rarity:'N',marketPrice:98,weight:1.9,playTime:45,setupTime:3,tags:['纸笔','德式'],attrs:['演算','谋略'],baseExp:18,icon:'🗺️',sleeves:null},
+ {id:'zhitu',name:'王国制图师',en:'Cartographers',bgg:263918,rarity:'N',marketPrice:98,weight:1.9,playTime:45,setupTime:3,tags:['纸笔','德式'],attrs:['演算'],baseExp:18,icon:'🗺️',sleeves:null},
  {id:'kaska',name:'卡斯卡迪亚之旅',en:'Cascadia',bgg:295947,rarity:'N',marketPrice:138,weight:1.8,playTime:30,setupTime:4,tags:['纸笔','德式'],attrs:['演算'],baseExp:16,icon:'🌲',sleeves:null},
- {id:'shikong',name:'时空神探',en:'Kronologic: Paris 1920',bgg:402111,rarity:'N',marketPrice:128,weight:2.3,playTime:30,setupTime:2,tags:['解谜'],attrs:['演算','表达'],baseExp:17,icon:'🕵️',sleeves:null},
- {id:'boendi',name:'勃艮第城堡',en:'The Castles of Burgundy',bgg:84876,rarity:'N',marketPrice:288,weight:3.0,playTime:70,setupTime:7,tags:['德式'],attrs:['谋略','演算'],baseExp:28,icon:'🏰',sleeves:null},
- {id:'xueyuan',name:'血源诅咒',en:'Bloodborne: The Board Game',bgg:273330,rarity:'N',marketPrice:899,weight:3.5,playTime:90,setupTime:12,tags:['大盒','美式'],attrs:['表达','应变'],baseExp:41,icon:'🩸',sleeves:null},
+ {id:'shikong',name:'时空神探',en:'Kronologic: Paris 1920',bgg:402111,rarity:'N',marketPrice:128,weight:2.3,playTime:30,setupTime:2,tags:['解谜'],attrs:['洞察'],baseExp:17,icon:'🕵️',sleeves:null},
+ {id:'boendi',name:'勃艮第城堡',en:'The Castles of Burgundy',bgg:84876,rarity:'N',marketPrice:288,weight:3.0,playTime:70,setupTime:7,tags:['德式'],attrs:['谋略','应变'],baseExp:28,icon:'🏰',sleeves:null}, // N 档唯一双属性例外（骰子缓冲）
+ {id:'xueyuan',name:'血源诅咒',en:'Bloodborne: The Board Game',bgg:273330,rarity:'N',marketPrice:899,weight:3.5,playTime:90,setupTime:12,tags:['大盒','美式'],attrs:['沉浸'],baseExp:41,icon:'🩸',sleeves:null},
  {id:'xuankong',name:'虚空降临',en:'Voidfall',bgg:357627,rarity:'N',marketPrice:598,weight:4.5,playTime:120,setupTime:15,tags:['德式'],attrs:['谋略'],baseExp:40,icon:'🌌',sleeves:null},
- {id:'jilu',name:'姬路城',en:'The White Castle',bgg:371942,rarity:'N',marketPrice:218,weight:2.6,playTime:45,setupTime:5,tags:['德式'],attrs:['谋略','运筹'],baseExp:24,icon:'🏯',sleeves:null},
- {id:'anake',name:'阿纳克遗迹',en:'Lost Ruins of Arnak',bgg:312484,rarity:'N',marketPrice:328,weight:3.1,playTime:90,setupTime:10,tags:['德式'],attrs:['谋略','运筹'],baseExp:31,icon:'🗿',sleeves:null},
- {id:'xingkong',name:'星空觅迹',en:'SETI: Search for Extraterrestrial Intelligence',bgg:418059,rarity:'N',marketPrice:288,weight:2.9,playTime:90,setupTime:6,tags:['德式'],attrs:['演算'],baseExp:30,icon:'🔭',sleeves:null},
+ {id:'jilu',name:'姬路城',en:'The White Castle',bgg:371942,rarity:'N',marketPrice:218,weight:2.6,playTime:45,setupTime:5,tags:['德式'],attrs:['运筹'],baseExp:24,icon:'🏯',sleeves:null},
+ {id:'anake',name:'阿纳克遗迹',en:'Lost Ruins of Arnak',bgg:312484,rarity:'N',marketPrice:328,weight:3.1,playTime:90,setupTime:10,tags:['德式'],attrs:['运筹'],baseExp:31,icon:'🗿',sleeves:null},
+ {id:'xingkong',name:'星空觅迹',en:'SETI: Search for Extraterrestrial Intelligence',bgg:418059,rarity:'N',marketPrice:288,weight:2.9,playTime:90,setupTime:6,tags:['德式'],attrs:['谋略'],baseExp:30,icon:'🔭',sleeves:null},
  // N 隐藏款
- {id:'hezou',name:'黑色奏鸣曲',en:'Black Sonata',bgg:249259,rarity:'N',marketPrice:198,weight:2.2,playTime:45,setupTime:5,tags:['小盒','解谜'],attrs:['演算','表达'],baseExp:22,icon:'🎻',hidden:true,sleeves:null,affix:{type:'ticketUp',val:0.25,desc:'抽赏券掉率 +25%'}},
- // ===== R（提名 5~9 票） =====
- {id:'yueliang',name:'欢迎来到月球',en:'Welcome to the Moon',bgg:339789,rarity:'R',marketPrice:128,weight:2.1,playTime:25,setupTime:3,tags:['纸笔'],attrs:['演算'],baseExp:20,icon:'🌕',sleeves:null},
- {id:'manwei',name:'漫威LCG',en:'Marvel Champions: The Card Game',bgg:285774,rarity:'R',marketPrice:298,weight:2.9,playTime:60,setupTime:10,tags:['lcg'],attrs:['表达','运筹'],baseExp:27,icon:'🦸',sleeves:null},
- {id:'toumi',name:'骰谜奇境',en:'Roll Player Adventures',bgg:331787,rarity:'R',marketPrice:488,weight:3.4,playTime:120,setupTime:10,tags:['大盒','美式','传承'],attrs:['应变','表达'],baseExp:44,icon:'📜',sleeves:null},
- {id:'zonglvdao',name:'棕榈岛',en:'Palm Island',bgg:239464,rarity:'R',marketPrice:68,weight:1.6,playTime:15,setupTime:1,tags:['小盒'],attrs:['运筹'],baseExp:18,icon:'🏝️',sleeves:null},
- {id:'fende',name:'奋进号：深海',en:'Endeavor: Deep Sea',bgg:367966,rarity:'R',marketPrice:368,weight:2.8,playTime:75,setupTime:8,tags:['德式'],attrs:['谋略','运筹'],baseExp:30,icon:'🚢',sleeves:null},
+ {id:'hezou',name:'黑色奏鸣曲',en:'Black Sonata',bgg:249259,rarity:'N',marketPrice:198,weight:2.2,playTime:45,setupTime:5,tags:['小盒','解谜'],attrs:['洞察'],baseExp:22,icon:'🎻',hidden:true,sleeves:null,affix:{type:'ticketUp',val:0.25,desc:'抽赏券掉率 +25%'}},
+ // ===== R（提名 5~9 票）：双属性为主 =====
+ {id:'yueliang',name:'欢迎来到月球',en:'Welcome to the Moon',bgg:339789,rarity:'R',marketPrice:128,weight:2.1,playTime:25,setupTime:3,tags:['纸笔'],attrs:['演算','谋略'],baseExp:20,icon:'🌕',sleeves:null},
+ {id:'manwei',name:'漫威LCG',en:'Marvel Champions: The Card Game',bgg:285774,rarity:'R',marketPrice:298,weight:2.9,playTime:60,setupTime:10,tags:['lcg'],attrs:['沉浸','运筹'],baseExp:27,icon:'🦸',sleeves:null},
+ {id:'toumi',name:'骰谜奇境',en:'Roll Player Adventures',bgg:331787,rarity:'R',marketPrice:488,weight:3.4,playTime:120,setupTime:10,tags:['大盒','美式','传承'],attrs:['应变','沉浸'],baseExp:44,icon:'📜',sleeves:null},
+ {id:'zonglvdao',name:'棕榈岛',en:'Palm Island',bgg:239464,rarity:'R',marketPrice:68,weight:1.6,playTime:15,setupTime:1,tags:['小盒'],attrs:['运筹','应变'],baseExp:18,icon:'🏝️',sleeves:null},
+ {id:'fende',name:'奋进号：深海',en:'Endeavor: Deep Sea',bgg:367966,rarity:'R',marketPrice:368,weight:2.8,playTime:75,setupTime:8,tags:['德式'],attrs:['谋略','演算'],baseExp:30,icon:'🚢',sleeves:null},
  {id:'guyong',name:'孤勇英豪',en:'Unstoppable',bgg:420498,rarity:'R',marketPrice:268,weight:2.8,playTime:45,setupTime:6,tags:['美式','dbg'],attrs:['应变','运筹'],baseExp:28,icon:'⚔️',sleeves:null},
  {id:'mori',name:'末日决战',en:"Aeon's End",bgg:191189,rarity:'R',marketPrice:328,weight:3.1,playTime:60,setupTime:8,tags:['美式','dbg'],attrs:['运筹','应变'],baseExp:35,icon:'🌀',sleeves:null},
- {id:'dasoucha',name:'大搜查系列',en:'Unlock!',bgg:213460,rarity:'R',marketPrice:158,weight:2.5,playTime:60,setupTime:2,tags:['解谜'],attrs:['演算','表达'],baseExp:24,icon:'🔍',sleeves:null},
+ {id:'dasoucha',name:'大搜查系列',en:'Unlock!',bgg:213460,rarity:'R',marketPrice:158,weight:2.5,playTime:60,setupTime:2,tags:['解谜'],attrs:['洞察','演算'],baseExp:24,icon:'🔍',sleeves:null},
  // R 隐藏款
- {id:'diguo',name:'帝国：经典',en:'Imperium: Classics',bgg:318184,rarity:'R',marketPrice:388,weight:3.4,playTime:90,setupTime:8,tags:['德式','dbg'],attrs:['运筹','谋略'],baseExp:38,icon:'🏺',hidden:true,sleeves:null,affix:{type:'timeCut',val:0.10,desc:'游玩时长 -10%'}},
- // ===== SR（提名 10~20 票） =====
- {id:'tigemei',name:'提戈梅公会',en:'The Guild of Merchant Explorers',bgg:350933,rarity:'SR',marketPrice:258,weight:2.7,playTime:45,setupTime:6,tags:['纸笔','德式'],attrs:['演算','运筹'],baseExp:34,icon:'🧭',sleeves:null},
- {id:'haigu',name:'骸骨险境',en:'Too Many Bones',bgg:192135,rarity:'SR',marketPrice:1099,weight:3.9,playTime:90,setupTime:10,tags:['美式'],attrs:['应变','表达'],baseExp:42,icon:'💀',sleeves:null},
- {id:'jueming',name:'绝命少女',en:'Final Girl',bgg:329591,rarity:'SR',marketPrice:268,weight:2.9,playTime:60,setupTime:8,tags:['美式','骰子'],attrs:['应变','表达'],baseExp:32,icon:'🔪',sleeves:null},
- {id:'ziran',name:'自然和弦',en:'Harmonies',bgg:343147,rarity:'SR',marketPrice:228,weight:2.1,playTime:40,setupTime:4,tags:['德式'],attrs:['谋略'],baseExp:30,icon:'🍂',sleeves:null},
- {id:'luoma',name:'罗马：帝国的命运',en:'Rome: Fate of an Empire',bgg:303873,rarity:'SR',marketPrice:298,weight:3.2,playTime:75,setupTime:8,tags:['德式','dbg'],attrs:['运筹','谋略'],baseExp:36,icon:'🏛️',sleeves:null},
- {id:'hadeliang',name:'哈德良长城',en:"Hadrian's Wall",bgg:304783,rarity:'SR',marketPrice:268,weight:3.2,playTime:60,setupTime:6,tags:['纸笔','德式'],attrs:['演算','谋略'],baseExp:33,icon:'🧱',sleeves:null},
- {id:'moling',name:'魔戒LCG',en:'The Lord of the Rings: The Card Game',bgg:77423,rarity:'SR',marketPrice:328,weight:3.1,playTime:60,setupTime:12,tags:['lcg'],attrs:['表达','运筹'],baseExp:34,icon:'💍',sleeves:null},
- {id:'aleb',name:'阿勒农场',en:'Fields of Arle',bgg:159675,rarity:'SR',marketPrice:498,weight:3.9,playTime:100,setupTime:12,tags:['德式'],attrs:['谋略','运筹'],baseExp:43,icon:'🚜',sleeves:null},
- {id:'beijing',name:'为了北境森林',en:'For Northwood! A Solo Trick-Taking Game',bgg:334590,rarity:'SR',marketPrice:108,weight:1.8,playTime:20,setupTime:3,tags:['小盒','吃墩'],attrs:['应变'],baseExp:26,icon:'🦊',sleeves:null},
+ {id:'diguo',name:'帝国：经典',en:'Imperium: Classics',bgg:318184,rarity:'R',marketPrice:388,weight:3.4,playTime:90,setupTime:8,tags:['德式','dbg'],attrs:['谋略','运筹'],baseExp:38,icon:'🏺',hidden:true,sleeves:null,affix:{type:'timeCut',val:0.10,desc:'游玩时长 -10%'}},
+ // ===== SR（提名 10~20 票）：三属性为主 =====
+ {id:'tigemei',name:'提戈梅公会',en:'The Guild of Merchant Explorers',bgg:350933,rarity:'SR',marketPrice:258,weight:2.7,playTime:45,setupTime:6,tags:['纸笔','德式'],attrs:['演算','运筹','洞察'],baseExp:34,icon:'🧭',sleeves:null},
+ {id:'haigu',name:'骸骨险境',en:'Too Many Bones',bgg:192135,rarity:'SR',marketPrice:1099,weight:3.9,playTime:90,setupTime:10,tags:['美式'],attrs:['应变','沉浸','运筹'],baseExp:42,icon:'💀',sleeves:null},
+ {id:'jueming',name:'绝命少女',en:'Final Girl',bgg:329591,rarity:'SR',marketPrice:268,weight:2.9,playTime:60,setupTime:8,tags:['美式','骰子'],attrs:['应变','沉浸','洞察'],baseExp:32,icon:'🔪',sleeves:null},
+ {id:'ziran',name:'自然和弦',en:'Harmonies',bgg:343147,rarity:'SR',marketPrice:228,weight:2.1,playTime:40,setupTime:4,tags:['德式'],attrs:['演算','谋略','应变'],baseExp:30,icon:'🍂',sleeves:null},
+ {id:'luoma',name:'罗马：帝国的命运',en:'Rome: Fate of an Empire',bgg:303873,rarity:'SR',marketPrice:298,weight:3.2,playTime:75,setupTime:8,tags:['德式','dbg'],attrs:['运筹','谋略','洞察'],baseExp:36,icon:'🏛️',sleeves:null},
+ {id:'hadeliang',name:'哈德良长城',en:"Hadrian's Wall",bgg:304783,rarity:'SR',marketPrice:268,weight:3.2,playTime:60,setupTime:6,tags:['纸笔','德式'],attrs:['演算','谋略','运筹'],baseExp:33,icon:'🧱',sleeves:null},
+ {id:'moling',name:'魔戒LCG',en:'The Lord of the Rings: The Card Game',bgg:77423,rarity:'SR',marketPrice:328,weight:3.1,playTime:60,setupTime:12,tags:['lcg'],attrs:['沉浸','运筹','谋略'],baseExp:34,icon:'💍',sleeves:null},
+ {id:'aleb',name:'阿勒农场',en:'Fields of Arle',bgg:159675,rarity:'SR',marketPrice:498,weight:3.9,playTime:100,setupTime:12,tags:['德式'],attrs:['谋略','运筹','演算'],baseExp:43,icon:'🚜',sleeves:null},
+ {id:'beijing',name:'为了北境森林',en:'For Northwood! A Solo Trick-Taking Game',bgg:334590,rarity:'SR',marketPrice:108,weight:1.8,playTime:20,setupTime:3,tags:['小盒','吃墩'],attrs:['应变','谋略','沉浸'],baseExp:26,icon:'🦊',sleeves:null},
  // SR 隐藏款
- {id:'ershiqiang',name:'20强',en:'20 Strong',bgg:373167,rarity:'SR',marketPrice:298,weight:2.5,playTime:30,setupTime:4,tags:['小盒','美式','骰子'],attrs:['应变','谋略'],baseExp:34,icon:'🎯',hidden:true,sleeves:null,affix:{type:'fatHalf',val:1,desc:'游玩疲劳增长减半'}},
- // ===== SSR（提名 ≥21 票） =====
- {id:'lingji',name:'灵迹岛',en:'Spirit Island',bgg:162886,rarity:'SSR',marketPrice:598,weight:4.1,playTime:120,setupTime:12,tags:['美式'],attrs:['谋略','表达'],baseExp:55,icon:'🌋',sleeves:null},
- {id:'aoding',name:'奥丁的盛宴',en:'A Feast for Odin',bgg:177736,rarity:'SSR',marketPrice:698,weight:3.9,playTime:90,setupTime:12,tags:['德式'],attrs:['谋略','运筹'],baseExp:52,icon:'🍖',sleeves:null},
- {id:'fangzhou',name:'方舟动物园',en:'Ark Nova',bgg:342942,rarity:'SSR',marketPrice:688,weight:3.7,playTime:120,setupTime:10,tags:['德式'],attrs:['谋略','运筹'],baseExp:52,icon:'🦁',sleeves:null},
- {id:'guizhen',name:'诡镇奇谈LCG',en:'Arkham Horror: The Card Game',bgg:205637,rarity:'SSR',marketPrice:358,weight:3.4,playTime:90,setupTime:15,tags:['lcg'],attrs:['表达','运筹'],baseExp:48,icon:'🐙',sleeves:null},
- // SSR 隐藏款
- {id:'mofa',name:'魔法骑士：终极版',en:'Mage Knight: Ultimate Edition',bgg:248562,rarity:'SSR',marketPrice:999,weight:4.4,playTime:150,setupTime:15,tags:['德式','dbg'],attrs:['谋略','运筹'],baseExp:65,icon:'🐉',hidden:true,sleeves:null,affix:{type:'expAll',val:0.05,desc:'全属性经验 +5%'}},
+ {id:'ershiqiang',name:'20强',en:'20 Strong',bgg:373167,rarity:'SR',marketPrice:298,weight:2.5,playTime:30,setupTime:4,tags:['小盒','美式','骰子'],attrs:['应变','谋略','洞察'],baseExp:34,icon:'🎯',hidden:true,sleeves:null,affix:{type:'fatHalf',val:1,desc:'游玩疲劳增长减半'}},
+ // ===== SSR（提名 ≥21 票）：四属性为主 =====
+ {id:'lingji',name:'灵迹岛',en:'Spirit Island',bgg:162886,rarity:'SSR',marketPrice:598,weight:4.1,playTime:120,setupTime:12,tags:['美式'],attrs:['谋略','沉浸','应变','运筹'],baseExp:55,icon:'🌋',sleeves:null},
+ {id:'aoding',name:'奥丁的盛宴',en:'A Feast for Odin',bgg:177736,rarity:'SSR',marketPrice:698,weight:3.9,playTime:90,setupTime:12,tags:['德式'],attrs:['演算','运筹','谋略','应变'],baseExp:52,icon:'🍖',sleeves:null},
+ {id:'fangzhou',name:'方舟动物园',en:'Ark Nova',bgg:342942,rarity:'SSR',marketPrice:688,weight:3.7,playTime:120,setupTime:10,tags:['德式'],attrs:['谋略','运筹','演算','洞察'],baseExp:52,icon:'🦁',sleeves:null},
+ {id:'guizhen',name:'诡镇奇谈LCG',en:'Arkham Horror: The Card Game',bgg:205637,rarity:'SSR',marketPrice:358,weight:3.4,playTime:90,setupTime:15,tags:['lcg'],attrs:['沉浸','洞察','应变','运筹'],baseExp:48,icon:'🐙',sleeves:null},
+ // SSR 隐藏款（唯一六维全修——什么机制都有）
+ {id:'mofa',name:'魔法骑士：终极版',en:'Mage Knight: Ultimate Edition',bgg:248562,rarity:'SSR',marketPrice:999,weight:4.4,playTime:150,setupTime:15,tags:['德式','dbg'],attrs:['谋略','演算','应变','运筹','洞察','沉浸'],baseExp:65,icon:'🐉',hidden:true,sleeves:null,affix:{type:'expAll',val:0.05,desc:'全属性经验 +5%'}},
 ];
 const ALL_GAMES=GAMES;
 const REGULAR_GAMES=GAMES.filter(g=>!g.hidden);
@@ -307,15 +312,15 @@ const GACHA_PRICE=Math.round(REGULAR_GAMES.reduce((s,g)=>s+taobaoBase(g),0)/REGU
 // ---------- 职业阶梯（覆盖全部六维，终点需全属性 Ⅳ） ----------
 const JOBS=[
  {id:'tryout',name:'桌游试玩员',req:{},auto:false,rate:0,desc:'手动玩桌游本身产出微薄收入（每次游玩结算给钱）'},
- {id:'calc',name:'计分陪练',req:{'演算':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
- {id:'dicehost',name:'骰子活动主持',req:{'应变':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
- {id:'stockboy',name:'库房理货员',req:{'运筹':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
- {id:'teacher',name:'规则讲解员',req:{'表达':2},auto:true,rate:0.5,desc:'自动收入 ¥0.5/游戏分'},
- {id:'clerk',name:'桌游店店员',req:{'魅力':2,'运筹':1},auto:true,rate:1.0,desc:'自动收入 ¥1.0/游戏分'},
- {id:'streamer',name:'主播带货',req:{'魅力':3,'应变':2},auto:true,rate:2.2,volatile:true,desc:'自动收入 ¥2.2/游戏分，波动 ±50%，触发直播事件'},
- {id:'editor',name:'评测编辑',req:{'表达':3,'谋略':2,'演算':1},auto:true,rate:3.2,desc:'自动收入 ¥3.2/游戏分'},
- {id:'designer',name:'设计师助理',req:{'谋略':3,'演算':3,'运筹':2},auto:true,rate:4.5,desc:'自动收入 ¥4.5/游戏分'},
- {id:'master',name:'桌游设计师',req:{'谋略':4,'演算':4,'应变':4,'运筹':4,'表达':4,'魅力':4},auto:true,rate:8,desc:'全属性 Ⅳ 方可胜任 · 自动收入 ¥8/游戏分'},
+ {id:'calc',name:'计分陪练',req:{'演算':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/秒'},
+ {id:'dicehost',name:'骰子活动主持',req:{'应变':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/秒'},
+ {id:'stockboy',name:'库房理货员',req:{'运筹':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/秒'},
+ {id:'teacher',name:'规则讲解员',req:{'沉浸':2},auto:true,rate:0.5,desc:'自动收入 ¥0.5/秒'},
+ {id:'clerk',name:'桌游店店员',req:{'沉浸':2,'运筹':1},auto:true,rate:1.0,desc:'自动收入 ¥1.0/秒'},
+ {id:'streamer',name:'主播带货',req:{'沉浸':3,'应变':2},auto:true,rate:2.2,volatile:true,desc:'自动收入 ¥2.2/秒，波动 ±50%，触发直播事件'},
+ {id:'editor',name:'评测编辑',req:{'沉浸':3,'谋略':2,'演算':1},auto:true,rate:3.2,desc:'自动收入 ¥3.2/秒'},
+ {id:'designer',name:'设计师助理',req:{'谋略':3,'演算':3,'运筹':2},auto:true,rate:4.5,desc:'自动收入 ¥4.5/秒'},
+ {id:'master',name:'桌游设计师',req:{'谋略':4,'演算':4,'应变':4,'运筹':4,'洞察':4,'沉浸':4},auto:true,rate:8,desc:'全属性 Ⅳ 方可胜任 · 自动收入 ¥8/秒'},
 ];
 const STREAM_EVENTS=['观众刷了一波「买买买」！带货效果拔群','直播间翻车：规则讲错被弹幕纠正','金主爸爸送来火箭，本场收入暴涨','连麦嘉宾迟到，干聊了十分钟','某款桌游突然爆单，佣金翻倍','网络卡顿掉线五分钟，心态小崩'];
 
@@ -353,20 +358,21 @@ function computeSetBonus(){return 1;} // EXT: 标签共鸣套装
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
 // 谋略：游玩经验 +3%/级  演算：游玩时间 -2%/级（见 playDuration）
 // 应变：疲劳增长 -4%/级  运筹：某鱼砍价 -2%/级
-// 表达：工作/游玩收入 +4%/级  魅力：掉券率 +20%/级、主播波动下限上移
+// 洞察：掉券率 +20%/级、时机条金区 +1%宽/级  沉浸：工作/游玩收入 +4%/级、主播下限上移
 const ATTR_EFFECT={
  '谋略':'每级使游玩经验 +3%（相乘）',
  '演算':'每级使游玩时间 -2%（相乘，下限 ×0.80）',
  '应变':'每级使游玩疲劳增长 -4%（相乘，下限 ×0.60）',
  '运筹':'每级使某鱼购物价格 -2%（相乘砍价，下限 ×0.80）',
- '表达':'每级使工作与游玩收入 +4%（相乘）',
- '魅力':'每级使抽赏券掉落率 +20%，并提高主播带货的收入下限',
+ '洞察':'每级使抽赏券掉落率 +20%，时机条金色区宽度 +1%',
+ '沉浸':'每级使工作与游玩收入 +4%（相乘），并提高主播带货的收入下限',
 };
 function expMult(){return (1+globalBonus())*(1+0.03*attrLevel('谋略'))*(hasAffix('expAll')?1.05:1)*computeSetBonus();}
 function fatigueIncMult(){return Math.max(0.60,1-0.04*attrLevel('应变'));}
 function xyPriceMult(){return Math.max(0.80,1-0.02*attrLevel('运筹'));}
-function incomeMult(){return 1+0.04*attrLevel('表达');}
-function ticketRateMult(){return (1+0.20*attrLevel('魅力'))*(hasAffix('ticketUp')?1.25:1);}
+function incomeMult(){return 1+0.04*attrLevel('沉浸');}
+function ticketRateMult(){return (1+0.20*attrLevel('洞察'))*(hasAffix('ticketUp')?1.25:1);}
+function goldZoneWidth(){return 14+attrLevel('洞察');} // 时机条金区基础宽 14%
 function attrProgress(a){let e=S.attrExp[a],need=60,lv=0;while(e>=need){e-=need;lv++;need=Math.round(60*Math.pow(lv+1,1.5));}return{lv,cur:Math.floor(e),need};}
 function attrLevel(a){return attrProgress(a).lv;}
 function fatigueMod(g){const o=S.owned[g.id];const f=o?o.fatigue:0;return 1/(1+Math.min(f,FATIGUE_SOFTCAP*2)*0.15);}
@@ -388,8 +394,8 @@ function masteryText(g){const o=S.owned[g.id];if(!o)return '';
 }
 // 每局预计属性增益（直接展示在卡片上，稀有度越高基础经验越多）
 function gainText(g){
-  const base=g.baseExp;
-  return g.attrs.map((a,i)=>`${ATTR_ICON[a]}${a}+${Math.round(base*(i===0?0.65:0.35))}`).join(' ');
+  const shares=attrShares(g);
+  return g.attrs.map((a,i)=>`${ATTR_ICON[a]}${a}+${Math.round(g.baseExp*shares[i])}`).join(' ');
 }
 function setupDuration(g){const o=S.owned[g.id];return g.setupTime*(o&&o.stored?0.5:1);}
 function ruleDuration(g){const o=S.owned[g.id];return (o&&o.rulesRead)?0:g.weight*8;}
@@ -426,9 +432,20 @@ function renderStatus(){
 <script>
 'use strict';
 // ================= 游玩页 =================
+// 六属性筛选（游玩页 / 收藏架共用逻辑）
+const filterState={play:null,shelf:null};
+function renderFilterBar(key){
+  const el=$('#'+key+'-filter'); if(!el)return;
+  const cur=filterState[key];
+  const btn=(label,attr)=>`<button style="padding:3px 10px;font-size:12px;${cur===attr?'border-color:var(--gold);color:var(--gold)':''}" onclick="setFilter('${key}',${attr?`'${attr}'`:'null'})">${label}</button>`;
+  el.innerHTML=btn('全部',null)+ATTRS.map(a=>btn(`${ATTR_ICON[a]}${a}`,a)).join('');
+}
+window.setFilter=function(key,attr){filterState[key]=attr;renderAll();};
+function passFilter(id,key){return !filterState[key]||GMAP[id].attrs.includes(filterState[key]);}
 function renderPlayList(){
-  const ids=Object.keys(S.owned).filter(id=>S.owned[id].count>0);
-  if(!ids.length){$('#play-list').innerHTML='<div class="mut">还没有桌游，先去商店看看吧。</div>';return;}
+  renderFilterBar('play');
+  const ids=Object.keys(S.owned).filter(id=>S.owned[id].count>0&&passFilter(id,'play'));
+  if(!ids.length){$('#play-list').innerHTML='<div class="mut">'+(filterState.play?'该属性下没有桌游，换个筛选看看。':'还没有桌游，先去商店看看吧。')+'</div>';return;}
   $('#play-list').innerHTML=ids.map(id=>{
     const g=GMAP[id],o=S.owned[id];
     const extra=`<div>复杂度 ${g.weight} · ${g.playTime}分钟 · 每局 ${gainText(g)}</div>
@@ -508,7 +525,7 @@ function runTimingBar(phaseIdx,durationMs,onDone){
   // EXT: 差异化小游戏——此处可替换为骰子检定 / 拼图 /  DBG 抽牌等玩法模块
   const bar=$('#pb-'+phaseIdx),gz=$('#gz-'+phaseIdx),cur=$('#cur-'+phaseIdx);
   bar.classList.add('active');
-  const zl=15+Math.random()*50, zw=14;
+  const zl=15+Math.random()*50, zw=goldZoneWidth(); // 洞察每级使金区 +1% 宽
   gz.style.left=zl+'%'; gz.style.width=zw+'%';
   const t0=performance.now(); let hitResult=null, clicked=false;
   function judge(){
@@ -584,8 +601,8 @@ function finishPlay(){
   o.prof+=1; o.rulesRead=true; S.stats.plays++;
   // 经验结算：baseExp × 疲劳修正 × 全局/隐藏款词条/套装（全部相乘）
   const base=g.baseExp*fatigueMod(g)*expMult();
-  const gains={};
-  g.attrs.forEach((a,i)=>{const v=base*(i===0?0.65:0.35);
+  const gains={},shares=attrShares(g);
+  g.attrs.forEach((a,i)=>{const v=base*shares[i];
     S.attrExp[a]+=v; gains[a]=(gains[a]||0)+v;});
   // 试玩员微薄收入：与体量/稀有度挂钩（baseExp 综合反映）
   const pay=Math.round((8+g.baseExp*0.8)*fatigueMod(g)*(1+globalBonus())*incomeMult());
@@ -672,8 +689,8 @@ function currentJobRate(){
   const j=JOBS.find(x=>x.id===S.job);
   if(!j||!j.auto)return 0;
   let r=j.rate*(1+globalBonus())*incomeMult();
-  if(j.volatile){ // 主播波动：魅力每级提高下限 5%（0.5→最高0.9），上限1.5不变
-    const lb=Math.min(0.9,0.5+0.05*attrLevel('魅力'));
+  if(j.volatile){ // 主播波动：沉浸每级提高下限 5%（0.5→最高0.9），上限1.5不变
+    const lb=Math.min(0.9,0.5+0.05*attrLevel('沉浸'));
     r*=lb+Math.random()*(1.5-lb);
   }
   return r;
@@ -778,11 +795,16 @@ function refreshXianyu(free){
   const n=3+Math.floor(Math.random()*3);
   const HIDDEN=GAMES.filter(g=>g.hidden&&!isMastered(g.id));
   const NORMAL=REGULAR_GAMES.filter(g=>!isMastered(g.id)); // 已精通的桌游不再刷出
-  S.xianyu=[];
+  S.xianyu=[]; const used=new Set();
   for(let i=0;i<n;i++){
-    let g;
-    if(HIDDEN.length&&Math.random()<0.08){g=HIDDEN[Math.floor(Math.random()*HIDDEN.length)];} // 隐藏款
-    else g=NORMAL[Math.floor(Math.random()*NORMAL.length)];   // 任意级别常规款
+    let g,tries=0;
+    do{ // 每批货源内不重复
+      if(HIDDEN.length&&Math.random()<0.08){g=HIDDEN[Math.floor(Math.random()*HIDDEN.length)];} // 隐藏款
+      else g=NORMAL[Math.floor(Math.random()*NORMAL.length)];   // 任意级别常规款
+      tries++;
+    }while(used.has(g.id)&&tries<30);
+    if(used.has(g.id))continue;
+    used.add(g.id);
     const mul=(0.5+Math.random()*1.5)*xyPriceMult(); // 运筹砍价
     S.xianyu.push({id:g.id,price:Math.max(10,Math.round(g.marketPrice*mul))});
   }
@@ -847,10 +869,12 @@ function gachaDraw(useTicket){
   const owned=S.owned[g.id]&&S.owned[g.id].count>0;
   let resultHTML,logCls='';
   if(rar==='SSR')S.pity=0;else S.pity++;
-  if(owned){ // 重复不再给桌游，直接转化为牌套包：N 5 / R 10 / SR 20 / SSR 40（每包 50 张）
+  if(owned){ // 重复不再给桌游：转牌套（N5/R10/SR20/SSR40 包）+ 叠加熟练度（N4/R8/SR16/SSR32）
     const packs={N:5,R:10,SR:20,SSR:40}[rar];
+    const profGain={N:4,R:8,SR:16,SSR:32}[rar];
     S.sleeves+=packs*SLEEVE_PACK;
-    resultHTML=`重复 ${rar}《${g.name}》→ 转化 <b>牌套 ×${packs} 包</b>（${packs*SLEEVE_PACK} 张）`;
+    S.owned[g.id].prof+=profGain;
+    resultHTML=`重复 ${rar}《${g.name}》→ 转化 <b>牌套 ×${packs} 包</b>（${packs*SLEEVE_PACK} 张）+ <b>熟练度 +${profGain}</b>`;
     logCls=rar==='N'?'':'hit';
   }
   else{const bonus=acquireGame(g.id,'某赏');resultHTML=`<b style="color:${rarityColor(rar)}">${rar}</b>《${g.name}》！${bonus}`;if(rar!=='N')logCls='hit';}
@@ -864,7 +888,8 @@ $('#gacha-t').addEventListener('click',()=>gachaDraw(true));
 
 // ================= 收藏架 =================
 function renderShelf(){
-  const ids=Object.keys(S.owned).filter(id=>S.owned[id].count>0);
+  renderFilterBar('shelf');
+  const ids=Object.keys(S.owned).filter(id=>S.owned[id].count>0&&passFilter(id,'shelf'));
   $('#shelf-count').textContent=`${kindCount()} 种 / ${ALL_GAMES.length} · 全局加成 +${(globalBonus()*100).toFixed(1)}%`;
   $('#shelf-grid').innerHTML=ids.map(id=>{
     const g=GMAP[id],o=S.owned[id];
@@ -914,12 +939,12 @@ document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('clic
 // ================= 教程页 =================
 function renderGuide(){
   $('#guide-attr-table').innerHTML='<tr class="mut"><td>属性</td><td>对应机制</td><td>实际效果</td></tr>'+
-    [['谋略','策略 / 重策'],['演算','拼图 / 计算'],['应变','骰子 / 运气管理'],['运筹','DBG / 资源管理'],['表达','叙事 / 冒险'],['魅力','聚会 / 互动']]
+    [['谋略','策略 / 长线规划'],['演算','拼图 / 计算'],['应变','骰子 / 运气管理'],['运筹','DBG / 资源调度'],['洞察','推理 / 解谜'],['沉浸','叙事 / 冒险代入']]
     .map(([a,m])=>`<tr><td>${ATTR_ICON[a]} ${a}</td><td class="mut">${m}</td><td>${ATTR_EFFECT[a]}</td></tr>`).join('');
   $('#guide-job-table').innerHTML='<tr class="mut"><td>职业</td><td>门槛</td><td>收入</td></tr>'+
     JOBS.map(j=>{
       const req=Object.keys(j.req).length?Object.entries(j.req).map(([a,lv])=>`${ATTR_ICON[a]}${a} ${ROMAN[lv]}`).join(' + '):'无门槛';
-      return `<tr><td>${j.name}</td><td class="mut">${req}</td><td class="mut">${j.auto?'¥'+j.rate+'/游戏分'+(j.volatile?'（波动）':''):'游玩结算给钱'}</td></tr>`;
+      return `<tr><td>${j.name}</td><td class="mut">${req}</td><td class="mut">${j.auto?'¥'+j.rate+'/秒'+(j.volatile?'（波动）':''):'游玩结算给钱'}</td></tr>`;
     }).join('');
 }
 
