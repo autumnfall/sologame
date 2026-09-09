@@ -184,7 +184,7 @@ small{color:var(--dim)}
     <div class="panel" style="margin-bottom:12px">
       <h3>🎲 游玩流程</h3>
       <p class="mut">每局分「读规则 → Setup → 游玩 → 结算」四段（读过规则后自动跳过第一段）。每段出现时机条，点击（或空格）命中金色区则<b>该段进度立即 +50%（封顶 80%）</b>——眼疾手快直接省时间。同一游戏默认自动连刷，可在列表中「下轮换它」。</p>
-      <p class="mut" style="margin-top:4px">减速乘区：<b>熟练度</b>（每局 +1，时长最多降至 ×0.65）、<b>牌套</b>（有卡牌的游戏才可套，按实际卡牌数消耗牌套张数——1 包 = 50 张，时长 ×0.85）、<b>收纳</b>（仅市场价 >¥200 或大盒游戏可做，费用 = 基础价 ×0.2，Setup ×0.5）、<b>演算属性</b>（每级 -2%）。<b>疲劳</b>：玩一盒该盒 +2、其余 -1，收益 = 1/(1+疲劳×0.15)——封面变灰挂「玩腻了」时就该换游戏了。</p>
+      <p class="mut" style="margin-top:4px">减速乘区：<b>熟练度</b>（每局 +1，时长最多降至 ×0.65）、<b>牌套</b>（有卡牌的游戏才可套，按实际卡牌数消耗牌套张数——1 包 = 50 张，时长 ×0.85）、<b>收纳</b>（仅市场价 >¥200 或大盒游戏可做，费用 = 基础价 ×0.2，Setup ×0.5）、<b>演算属性</b>（每级 -2%）。<b>精通</b>：同一款游玩达 N20 / R40 / SR80 / SSR160 局后基础时长再减半（⭐）。<b>疲劳</b>：玩一盒该盒 +2、其余 -1，收益 = 1/(1+疲劳×0.15)——封面变灰挂「玩腻了」时就该换游戏了。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🛒 四个获得渠道</h3>
@@ -234,7 +234,7 @@ const ROMAN=['0','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ'];
 const GAMES=[
  // ===== N（提名 ≤4 票，毛线 / 入门） =====
  {id:'guoyuan',name:'果园',en:'Orchard',bgg:245654,rarity:'N',marketPrice:88,weight:1.2,playTime:15,setupTime:2,tags:['小盒','德式'],attrs:['演算'],baseExp:12,icon:'🍎',sleeves:null},
- {id:'zongming',name:'绝顶聪明',en:"That's Pretty Clever",bgg:244522,rarity:'N',marketPrice:98,weight:1.9,playTime:30,setupTime:3,tags:['纸笔','骰子'],attrs:['应变','演算'],baseExp:16,icon:'🎲',sleeves:null},
+ {id:'zongming',name:'绝顶聪明',en:"That's Pretty Clever",bgg:244522,rarity:'N',marketPrice:98,weight:1.9,playTime:30,setupTime:3,tags:['纸笔','骰子'],attrs:['应变'],baseExp:16,icon:'🎲',sleeves:null},
  {id:'kafei',name:'咖啡烘焙师',en:'Coffee Roaster',bgg:196680,rarity:'N',marketPrice:78,weight:1.9,playTime:30,setupTime:4,tags:['小盒','袋bg'],attrs:['运筹'],baseExp:15,icon:'☕',sleeves:null},
  {id:'zhitu',name:'王国制图师',en:'Cartographers',bgg:263918,rarity:'N',marketPrice:98,weight:1.9,playTime:45,setupTime:3,tags:['纸笔','德式'],attrs:['演算','谋略'],baseExp:18,icon:'🗺️',sleeves:null},
  {id:'kaska',name:'卡斯卡迪亚之旅',en:'Cascadia',bgg:295947,rarity:'N',marketPrice:138,weight:1.8,playTime:30,setupTime:4,tags:['纸笔','德式'],attrs:['演算'],baseExp:16,icon:'🌲',sleeves:null},
@@ -307,6 +307,9 @@ const GACHA_PRICE=Math.round(REGULAR_GAMES.reduce((s,g)=>s+taobaoBase(g),0)/REGU
 // ---------- 职业阶梯（覆盖全部六维，终点需全属性 Ⅳ） ----------
 const JOBS=[
  {id:'tryout',name:'桌游试玩员',req:{},auto:false,rate:0,desc:'手动玩桌游本身产出微薄收入（每次游玩结算给钱）'},
+ {id:'calc',name:'计分陪练',req:{'演算':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
+ {id:'dicehost',name:'骰子活动主持',req:{'应变':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
+ {id:'stockboy',name:'库房理货员',req:{'运筹':1},auto:true,rate:0.2,desc:'入门岗 · 自动收入 ¥0.2/游戏分'},
  {id:'teacher',name:'规则讲解员',req:{'表达':2},auto:true,rate:0.5,desc:'自动收入 ¥0.5/游戏分'},
  {id:'clerk',name:'桌游店店员',req:{'魅力':2,'运筹':1},auto:true,rate:1.0,desc:'自动收入 ¥1.0/游戏分'},
  {id:'streamer',name:'主播带货',req:{'魅力':3,'应变':2},auto:true,rate:2.2,volatile:true,desc:'自动收入 ¥2.2/游戏分，波动 ±50%，触发直播事件'},
@@ -319,7 +322,7 @@ const STREAM_EVENTS=['观众刷了一波「买买买」！带货效果拔群','�
 // ---------- 存档 ----------
 let S;
 function defaultSave(){
-  return {saveVersion:SAVE_VERSION, money:100, sleeves:100, tickets:0,
+  return {saveVersion:SAVE_VERSION, money:200, sleeves:100, tickets:0,
     attrs:{}, attrExp:{},
     owned:{},            // id -> {count,prof,fatigue,sleeved,stored,rulesRead}
     taobaoStock:{},      // id -> 剩余
@@ -371,10 +374,22 @@ function playDuration(g){ // 游玩段游戏内分钟
   const o=S.owned[g.id];const prof=o?o.prof:0;
   let m=Math.min(g.playTime,PLAY_CAP_MIN);
   m*= prof===0?1.8:Math.max(0.65,1-0.02*prof);   // 首次1.8x → 熟练度递减，下限0.65
+  if(prof>=MASTERY[g.rarity])m*=0.5;              // 精通：基础游玩时间再减半
   if(o&&o.sleeved)m*=0.85;
   if(hasAffix('timeCut'))m*=0.90;
   m*=Math.max(0.80,1-0.02*attrLevel('演算'));    // 演算每级使游玩时间-2%（相乘），下限0.80
   return Math.max(3,m);
+}
+// 精通门槛：游玩次数达标后基础游玩时间再减半
+const MASTERY={N:20,R:40,SR:80,SSR:160};
+function masteryText(g){const o=S.owned[g.id];if(!o)return '';
+  const need=MASTERY[g.rarity];
+  return o.prof>=need?'⭐已精通（时长×0.5）':`熟练 ${o.prof}/${need}`;
+}
+// 每局预计属性增益（直接展示在卡片上，稀有度越高基础经验越多）
+function gainText(g){
+  const base=g.baseExp;
+  return g.attrs.map((a,i)=>`${ATTR_ICON[a]}${a}+${Math.round(base*(i===0?0.65:0.35))}`).join(' ');
 }
 function setupDuration(g){const o=S.owned[g.id];return g.setupTime*(o&&o.stored?0.5:1);}
 function ruleDuration(g){const o=S.owned[g.id];return (o&&o.rulesRead)?0:g.weight*8;}
@@ -416,8 +431,8 @@ function renderPlayList(){
   if(!ids.length){$('#play-list').innerHTML='<div class="mut">还没有桌游，先去商店看看吧。</div>';return;}
   $('#play-list').innerHTML=ids.map(id=>{
     const g=GMAP[id],o=S.owned[id];
-    const extra=`<div>复杂度 ${g.weight} · ${g.playTime}分钟 · ${g.attrs.join('/')}</div>
-      <div class="tagline">熟练 ${o.prof} · 疲劳 ${o.fatigue}${o.sleeved?' · 🎴已套':''}${o.stored?' · 📦收纳':''} · ×${o.count}</div>`;
+    const extra=`<div>复杂度 ${g.weight} · ${g.playTime}分钟 · 每局 ${gainText(g)}</div>
+      <div class="tagline">${masteryText(g)} · 疲劳 ${o.fatigue}${o.sleeved?' · 🎴已套':''}${o.stored?' · 📦收纳':''} · ×${o.count}</div>`;
     let act;
     if(!playSession){
       act=`<div style="margin-top:6px"><button class="primary" style="width:100%" onclick="startPlay('${id}')">▶ 开玩（自动连刷）</button></div>`;
@@ -572,8 +587,8 @@ function finishPlay(){
   const gains={};
   g.attrs.forEach((a,i)=>{const v=base*(i===0?0.65:0.35);
     S.attrExp[a]+=v; gains[a]=(gains[a]||0)+v;});
-  // 试玩员微薄收入
-  const pay=Math.round((5+g.weight*4)*fatigueMod(g)*(1+globalBonus())*incomeMult());
+  // 试玩员微薄收入：与体量/稀有度挂钩（baseExp 综合反映）
+  const pay=Math.round((8+g.baseExp*0.8)*fatigueMod(g)*(1+globalBonus())*incomeMult());
   S.money+=pay;
   // 游玩概率掉抽赏券（连接工作与抽赏的副通道）
   let ticketDrop=false;
@@ -635,7 +650,7 @@ function showStarterChoice(){
     <p class="mut" style="margin-bottom:12px">从朋友留下的三盒毛线桌游中选一盒作为你的起点——它将决定你前期的成长方向。</p>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">`+
     STARTER_IDS.map(id=>{const g=GMAP[id];
-      return gameCardHTML(g,`<div>${g.tags.join(' · ')}</div><div class="tagline">主属性：${g.attrs.join('、')}</div>`,
+      return gameCardHTML(g,`<div>${g.tags.join(' · ')}</div><div class="tagline">每局 ${gainText(g)}</div>`,
         `<div style="margin-top:6px"><button class="primary" style="width:100%" onclick="pickStarter('${id}')">就选它</button></div>`);
     }).join('')+`</div>`;
   openModal(html);
@@ -791,7 +806,7 @@ function renderXianyu(){
     const cls=pct<90?'ok':pct>130?'bad2':'';
     return gameCardHTML(g,
       `${g.hidden?`<span class="oop-tag">隐藏款 · ${g.affix.desc}</span>`:''}
-       <div class="tagline">市场价 ¥${g.marketPrice}（本件 ${pct}%）</div>`,
+       <div class="tagline">市场价 ¥${g.marketPrice}（本件 ${pct}%）· 每局 ${gainText(g)}</div>`,
       `<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
         <span class="price ${cls}">¥${it.price}</span>
         <button class="primary" ${S.money<it.price?'disabled':''} onclick="buyXianyu(${i})">拿下</button></div>`);
@@ -850,7 +865,8 @@ function renderShelf(){
     if(g.cards>0&&!o.sleeved)actions+=`<button ${S.sleeves<g.cards?'disabled':''} onclick="applySleeve('${id}')">套牌套 ${g.cards}张</button>`;
     if(canStore(g)&&!o.stored)actions+=`<button ${S.money<storeCost?'disabled':''} onclick="applyStorage('${id}')">收纳 ¥${storeCost}</button>`;
     actions+='</div>';
-    const extra=`<div>熟练 ${o.prof} · 疲劳 ${o.fatigue} · ×${o.count}</div>
+    const extra=`<div>${masteryText(g)} · 疲劳 ${o.fatigue} · ×${o.count}</div>
+      <div class="tagline">每局 ${gainText(g)}</div>
       <div class="tagline">${g.cards>0?(o.sleeved?'🎴已套牌套(×0.85)':`🎴未套（需 ${g.cards} 张）`):'🎴无卡牌·无需牌套'}
       ${canStore(g)?(o.stored?'📦已收纳(Setup×0.5)':`📦未收纳（¥${storeCost}）`):'📦小盒·无需收纳'}</div>
       ${g.affix?`<div class="tagline" style="color:#d9a5f5">✦ ${g.affix.desc}</div>`:''}
