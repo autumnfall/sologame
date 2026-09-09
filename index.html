@@ -717,25 +717,26 @@ function initTaobao(){
   REGULAR_GAMES.forEach(g=>{S.taobaoStock[g.id]=1;});
 }
 function renderTaobao(){
-  $('#taobao-list').innerHTML=TIER_ORDER.map(t=>{
-    const unlocked=tierUnlocked(t);
-    const total=tierGames(t).length, ownedN=tierOwned(t);
-    const header=`<div style="grid-column:1/-1;margin-top:6px">
-      <b style="color:${rarityColor(t)}">${t} 级</b>
-      <small class="mut">${unlocked?`收集进度 ${ownedN}/${total}`:`🔒 集齐上一级全部常规款后解锁`}</small></div>`;
-    if(!unlocked)return header;
-    return header+tierGames(t).map(g=>{
-      const left=S.taobaoStock[g.id]||0, price=taobaoBase(g);
-      const owned=S.owned[g.id]&&S.owned[g.id].count>0;
-      const act=left>0
-        ?`<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-          <span class="price">¥${price}</span>
-          <button class="primary" ${S.money<price?'disabled':''} onclick="buyTaobao('${g.id}')">购买</button></div>
-          <div class="tagline">限购 1 件 · 售完不补</div>`
-        :`<div class="mut" style="margin-top:6px">${owned?'✓ 已收藏':'已售罄'}</div>`;
-      return gameCardHTML(g,`<div class="tagline">${g.tags.join(' · ')} · ${g.playTime}分钟</div>`,act);
-    }).join('');
+  // 仅显示当前可购买的最高级别货架；集齐后自动翻到下一级
+  let cur='N';
+  for(const t of TIER_ORDER){if(tierUnlocked(t))cur=t;}
+  const total=tierGames(cur).length, ownedN=tierOwned(cur);
+  const done=ownedN>=total;
+  const next=TIER_ORDER[TIER_ORDER.indexOf(cur)+1];
+  let html=`<div style="grid-column:1/-1;margin-bottom:2px">
+    <b style="color:${rarityColor(cur)}">${cur} 级货架</b>
+    <small class="mut">收集进度 ${ownedN}/${total} · 每款限购 1 件${done&&next?` · 🎉 已集齐，即将解锁 ${next} 级`:(next?' · 集齐后解锁 '+next+' 级':' · 已是最高级别')}</small></div>`;
+  html+=tierGames(cur).map(g=>{
+    const left=S.taobaoStock[g.id]||0, price=taobaoBase(g);
+    const owned=S.owned[g.id]&&S.owned[g.id].count>0;
+    const act=left>0
+      ?`<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+        <span class="price">¥${price}</span>
+        <button class="primary" ${S.money<price?'disabled':''} onclick="buyTaobao('${g.id}')">购买</button></div>`
+      :`<div class="mut" style="margin-top:6px">${owned?'✓ 已收藏':'已售罄'}</div>`;
+    return gameCardHTML(g,`<div class="tagline">${g.tags.join(' · ')} · ${g.playTime}分钟</div>`,act);
   }).join('');
+  $('#taobao-list').innerHTML=html;
 }
 window.buyTaobao=function(id){
   const g=GMAP[id], price=taobaoBase(g);
