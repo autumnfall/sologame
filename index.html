@@ -94,7 +94,7 @@ small{color:var(--dim)}
 <div id="topbar">
 <div id="statusbar">
   <span>💰 <span class="res" id="sb-money">0</span> 元</span>
-  <span>🎴 牌套 <b id="sb-sleeve">0</b></span>
+  <span>🎴 牌套 <b id="sb-sleeve">0</b> 张</span>
   <span>🎫 抽赏券 <b id="sb-ticket">0</b></span>
   <span class="attrs" id="sb-attrs"></span>
   <span class="gbonus" id="sb-bonus"></span>
@@ -158,7 +158,7 @@ small{color:var(--dim)}
           <button class="primary" id="gacha-1">单抽（¥<span id="gacha-price1">0</span>）</button>
           <button class="primary" id="gacha-t">用抽赏券 ×1 抽</button>
         </div>
-        <small>R 及以上重复转化为牌套 ×3，N 重复转化为牌套 ×1。</small>
+        <small>重复桌游不再给库存，直接转牌套：N ×5 包 / R ×10 包 / SR ×20 包 / SSR ×40 包（每包 50 张）。</small>
       </div>
       <div class="logbox" id="gacha-log" style="height:120px"></div>
     </div>
@@ -186,11 +186,11 @@ small{color:var(--dim)}
     <div class="panel" style="margin-bottom:12px">
       <h3>🎲 游玩流程</h3>
       <p class="mut">每局分「读规则 → Setup → 游玩 → 结算」四段（读过规则后自动跳过第一段）。每段出现时机条，点击（或空格）命中金色区：结算段命中经验 ×1.5，其余段命中各 ×1.25。同一游戏默认自动连刷，可在列表中「下轮换它」。</p>
-      <p class="mut" style="margin-top:4px">减速乘区：<b>熟练度</b>（每局 +1，时长最多降至 ×0.65）、<b>牌套</b>（消耗牌套 ×1，时长 ×0.85）、<b>收纳</b>（花费基础价 20%~40%，Setup ×0.5）、<b>演算属性</b>（每级 -2%）。<b>疲劳</b>：玩一盒该盒 +2、其余 -1，收益 = 1/(1+疲劳×0.15)——封面变灰挂「玩腻了」时就该换游戏了。</p>
+      <p class="mut" style="margin-top:4px">减速乘区：<b>熟练度</b>（每局 +1，时长最多降至 ×0.65）、<b>牌套</b>（有卡牌的游戏才可套，按实际卡牌数消耗牌套张数——1 包 = 50 张，时长 ×0.85）、<b>收纳</b>（仅市场价 >¥200 或大盒游戏可做，费用 = 基础价 ×0.2，Setup ×0.5）、<b>演算属性</b>（每级 -2%）。<b>疲劳</b>：玩一盒该盒 +2、其余 -1，收益 = 1/(1+疲劳×0.15)——封面变灰挂「玩腻了」时就该换游戏了。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🛒 四个获得渠道</h3>
-      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），库存 ≥2 的桌游可挂卖（市场价 80%~120%，受运筹加成）；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复 R 及以上转牌套 ×3。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
+      <p class="mut">① <b>开局三选一</b>：决定前期 build 方向；② <b>某宝</b>：基础价、每款限购 1 件售完不补，且按稀有度逐级解锁——集齐当前级全部常规款才能买下一级；③ <b>某鱼</b>：市场价 50%~200% 浮动，<b>唯一能跨级别刷出高级桌游的渠道</b>，还有小概率刷出「隐藏款」（魔法骑士：终极版 / 20强 / 帝国：经典 / 黑色奏鸣曲，各带独特词条，商店与某赏均不出），库存 ≥2 的桌游可挂卖（市场价 80%~120%，受运筹加成）；④ <b>某赏</b>：单抽约为某宝均价的 1/3，概率 N62/R28/SR8/SSR2，<b>不受级别解锁限制</b>，50 抽硬保底 SSR，重复款直接转牌套（N×5 / R×10 / SR×20 / SSR×40 包）。每多一种桌游（去重，含隐藏款），全属性经验 +1.5%（软上限 +50%）。</p>
     </div>
     <div class="panel">
       <h3>💼 职业阶梯</h3>
@@ -282,6 +282,13 @@ const GAMES=[
 const ALL_GAMES=GAMES;
 const REGULAR_GAMES=GAMES.filter(g=>!g.hidden);
 const GMAP={}; ALL_GAMES.forEach(g=>GMAP[g.id]=g);
+// 各桌游卡牌张数（估算值，后续用 BGG sleeves 页真值替换；0 = 无卡牌，不可套牌套）
+const CARDS={guoyuan:36,zongming:0,kafei:0,zhitu:33,kaska:0,shikong:0,boendi:0,xueyuan:200,xuankong:300,
+ jilu:90,anake:150,xingkong:200,hezou:30,yueliang:0,manwei:350,toumi:200,zonglvdao:48,fende:150,
+ guyong:120,mori:400,dasoucha:60,diguo:280,tigemei:50,haigu:100,jueming:200,ziran:0,luoma:100,
+ hadeliang:0,moling:350,aleb:180,beijing:80,ershiqiang:30,lingji:200,aoding:180,fangzhou:250,guizhen:300,mofa:400};
+GAMES.forEach(g=>g.cards=CARDS[g.id]??null);
+const SLEEVE_PACK=50; // 一包牌套 = 50 张
 // 稀有度阶梯：集齐某级全部常规款 → 解锁下一级某宝购买（隐藏款不计入）
 const TIER_ORDER=['N','R','SR','SSR'];
 function tierGames(t){return REGULAR_GAMES.filter(g=>g.rarity===t);}
@@ -313,7 +320,7 @@ const STREAM_EVENTS=['观众刷了一波「买买买」！带货效果拔群','�
 // ---------- 存档 ----------
 let S;
 function defaultSave(){
-  return {saveVersion:SAVE_VERSION, money:100, sleeves:2, tickets:0,
+  return {saveVersion:SAVE_VERSION, money:100, sleeves:100, tickets:0,
     attrs:{}, attrExp:{},
     owned:{},            // id -> {count,prof,fatigue,sleeved,stored,rulesRead}
     taobaoStock:{},      // id -> 剩余
@@ -824,8 +831,12 @@ function gachaDraw(useTicket){
   const owned=S.owned[g.id]&&S.owned[g.id].count>0;
   let resultHTML,logCls='';
   if(rar==='SSR')S.pity=0;else S.pity++;
-  if(owned&&rar!=='N'){S.sleeves+=3;resultHTML=`重复 ${rar}《${g.name}》→ 转化 <b>牌套 ×3</b>`;logCls='hit';}
-  else if(owned){S.owned[g.id].count++;S.sleeves+=1;resultHTML=`重复 N《${g.name}》→ 库存+1，附赠牌套 ×1`;}
+  if(owned){ // 重复不再给桌游，直接转化为牌套包：N 5 / R 10 / SR 20 / SSR 40（每包 50 张）
+    const packs={N:5,R:10,SR:20,SSR:40}[rar];
+    S.sleeves+=packs*SLEEVE_PACK;
+    resultHTML=`重复 ${rar}《${g.name}》→ 转化 <b>牌套 ×${packs} 包</b>（${packs*SLEEVE_PACK} 张）`;
+    logCls=rar==='N'?'':'hit';
+  }
   else{const bonus=acquireGame(g.id,'某赏');resultHTML=`<b style="color:${rarityColor(rar)}">${rar}</b>《${g.name}》！${bonus}`;if(rar!=='N')logCls='hit';}
   const el=$('#gacha-log');
   el.innerHTML=`<div class="${logCls}">[${rar}] ${resultHTML}</div>`+el.innerHTML;
@@ -843,21 +854,26 @@ function renderShelf(){
     const g=GMAP[id],o=S.owned[id];
     const storeCost=storageCost(g);
     let actions='<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">';
-    if(!o.sleeved)actions+=`<button ${S.sleeves<1?'disabled':''} onclick="applySleeve('${id}')">套牌套</button>`;
-    if(!o.stored)actions+=`<button ${S.money<storeCost?'disabled':''} onclick="applyStorage('${id}')">收纳 ¥${storeCost}</button>`;
+    if(g.cards>0&&!o.sleeved)actions+=`<button ${S.sleeves<g.cards?'disabled':''} onclick="applySleeve('${id}')">套牌套 ${g.cards}张</button>`;
+    if(canStore(g)&&!o.stored)actions+=`<button ${S.money<storeCost?'disabled':''} onclick="applyStorage('${id}')">收纳 ¥${storeCost}</button>`;
     if(o.count>=2)actions+=`<button onclick="listSell('${id}')">挂卖</button>`;
     actions+='</div>';
     const extra=`<div>熟练 ${o.prof} · 疲劳 ${o.fatigue} · ×${o.count}</div>
-      <div class="tagline">${o.sleeved?'🎴已套牌套(×0.85) ':'🎴未套 '}${o.stored?'📦已收纳(×0.5)':'📦未收纳'}</div>
+      <div class="tagline">${g.cards>0?(o.sleeved?'🎴已套牌套(×0.85)':`🎴未套（需 ${g.cards} 张）`):'🎴无卡牌·无需牌套'}
+      ${canStore(g)?(o.stored?'📦已收纳(Setup×0.5)':`📦未收纳（¥${storeCost}）`):'📦小盒·无需收纳'}</div>
       ${g.affix?`<div class="tagline" style="color:#d9a5f5">✦ ${g.affix.desc}</div>`:''}
       <div class="bar" title="疲劳"><i style="width:${Math.min(100,o.fatigue*10)}%;background:${o.fatigue>=7?'var(--red)':'var(--green)'}"></i></div>`;
     return gameCardHTML(g,extra,actions);
   }).join('')||'<div class="mut">收藏架空空的。</div>';
 }
-function storageCost(g){return Math.round(taobaoBase(g)*(0.2+ (g.weight-1)/4*0.2));} // 基础价20%~40% 按盒体（用复杂度近似）
+function canStore(g){return g.marketPrice>200||g.tags.includes('大盒');} // 收纳仅对贵价/大盒有效
+function storageCost(g){return Math.round(taobaoBase(g)*0.2);} // 收纳成本 = 基础价 ×0.2
 window.applySleeve=function(id){
-  if(S.sleeves<1)return;S.sleeves--;S.owned[id].sleeved=true;
-  save();renderAll();toast(`《${GMAP[id].name}》已套牌套，游玩时长 ×0.85`);
+  const g=GMAP[id];
+  if(!g.cards||g.cards<=0){toast('这款桌游没有卡牌，无需牌套');return;}
+  if(S.sleeves<g.cards){toast(`牌套不够，需要 ${g.cards} 张`);return;}
+  S.sleeves-=g.cards;S.owned[id].sleeved=true;
+  save();renderAll();toast(`《${g.name}》已套牌套（消耗 ${g.cards} 张），游玩时长 ×0.85`);
 };
 window.applyStorage=function(id){
   const c=storageCost(GMAP[id]);if(S.money<c)return;
