@@ -183,7 +183,7 @@ small{color:var(--dim)}
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🎲 游玩流程</h3>
-      <p class="mut">每局分「读规则 → Setup → 游玩 → 结算」四段（读过规则后自动跳过第一段）。每段出现时机条，点击（或空格）命中金色区：结算段命中经验 ×1.5，其余段命中各 ×1.25。同一游戏默认自动连刷，可在列表中「下轮换它」。</p>
+      <p class="mut">每局分「读规则 → Setup → 游玩 → 结算」四段（读过规则后自动跳过第一段）。每段出现时机条，点击（或空格）命中金色区则<b>该段进度立即 +50%（封顶 80%）</b>——眼疾手快直接省时间。同一游戏默认自动连刷，可在列表中「下轮换它」。</p>
       <p class="mut" style="margin-top:4px">减速乘区：<b>熟练度</b>（每局 +1，时长最多降至 ×0.65）、<b>牌套</b>（有卡牌的游戏才可套，按实际卡牌数消耗牌套张数——1 包 = 50 张，时长 ×0.85）、<b>收纳</b>（仅市场价 >¥200 或大盒游戏可做，费用 = 基础价 ×0.2，Setup ×0.5）、<b>演算属性</b>（每级 -2%）。<b>疲劳</b>：玩一盒该盒 +2、其余 -1，收益 = 1/(1+疲劳×0.15)——封面变灰挂「玩腻了」时就该换游戏了。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
@@ -482,7 +482,7 @@ function renderPhases(){
   ps.phases.forEach((p,i)=>{
     if(p.total<=0){const bar=$('#pb-'+i);bar.classList.add('done');$('#pr-'+i).innerHTML='<span class="mut">跳过</span>';}
     else if(p.done){$('#pb-'+i).classList.add('done');
-      $('#pr-'+i).innerHTML=p.hit===true?'<span class="ok">命中×1.5</span>':p.hit===false?'<span class="mut">普通</span>':'';}
+      $('#pr-'+i).innerHTML=p.hit===true?'<span class="ok">命中+50%</span>':p.hit===false?'<span class="mut">普通</span>':'';}
   });
 }
 function logP(msg,cls){const el=$('#pp-log');el.innerHTML+=`<div class="${cls||''}">${msg}</div>`;el.scrollTop=el.scrollHeight;}
@@ -538,10 +538,11 @@ function advancePlay(dtMs){
     const durMs=Math.max(1200,p.total*1000); // 游戏内1分=现实1秒
     runTimingBar(ps.idx,durMs,hit=>{
       p.hit=hit;
-      if(p.key==='settle'&&hit)ps.expMult*=1.5;
-      else if(hit)ps.expMult*=1.25;      // 前段命中：准备充分，小幅加成
-      $('#pr-'+ps.idx).innerHTML=hit?'<span class="ok">命中!</span>':'<span class="mut">普通</span>';
-      if(hit)logP(`${p.name}：时机完美！`,'hit');
+      if(hit){ // 命中：该段进度立即 +50%（封顶 80%），直接省时间
+        p.t=Math.min((p.t||0)+0.5*durMs,0.8*durMs);
+        logP(`${p.name}：时机完美！进度猛增至 ${Math.round(p.t/durMs*100)}%`,'hit');
+      }
+      $('#pr-'+ps.idx).innerHTML=hit?'<span class="ok">命中+50%</span>':'<span class="mut">普通</span>';
     });
   }
   // 进度填充（只在没有命中等待时推进）
@@ -566,8 +567,8 @@ function finishPlay(){
     else S.owned[id].fatigue=Math.max(0,S.owned[id].fatigue-1);
   });
   o.prof+=1; o.rulesRead=true; S.stats.plays++;
-  // 经验结算：baseExp × 时机加成 × 疲劳修正 × 全局/隐藏款词条/套装（全部相乘）
-  const base=g.baseExp*ps.expMult*fatigueMod(g)*expMult();
+  // 经验结算：baseExp × 疲劳修正 × 全局/隐藏款词条/套装（全部相乘）
+  const base=g.baseExp*fatigueMod(g)*expMult();
   const gains={};
   g.attrs.forEach((a,i)=>{const v=base*(i===0?0.65:0.35);
     S.attrExp[a]+=v; gains[a]=(gains[a]||0)+v;});
