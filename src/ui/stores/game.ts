@@ -641,6 +641,7 @@ export const useGameStore = defineStore('game', {
         this.toast('存档文件无效或版本高于当前游戏');
         return;
       }
+      this.s = s; // 先换内存态：否则 reload 触发的 beforeunload 自动保存会把旧档写回，覆盖导入的存档
       save(s);
       window.location.reload();
     },
@@ -649,6 +650,7 @@ export const useGameStore = defineStore('game', {
     resetGame() {
       if (!window.confirm('确定要清空当前存档、从头开始吗？此操作不可恢复！')) return;
       if (!window.confirm('再确认一次：所有收藏、实体、金钱、属性进度都将被删除。')) return;
+      this.s = defaultState(); // 先换内存态：否则 reload 触发的 beforeunload 自动保存会把旧档写回，清档失效
       wipeSave();
       window.location.reload();
     },
