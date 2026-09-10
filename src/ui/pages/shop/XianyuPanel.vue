@@ -104,7 +104,7 @@ const listingRows = computed(() =>
     <div v-if="!store.s.xianyuBuys.length" class="mut">货架空空，点上方按钮刷新一批货源。</div>
     <div v-else class="grid">
       <!-- 一口价盲买：只看名字，隐藏成色/牌套/收纳 -->
-      <GameCard v-for="(it, i) in store.s.xianyuBuys.filter(x => x.blind)" :key="'blind' + it.gameId + i" :game="gameById(it.gameId)">
+      <GameCard v-for="(it, i) in store.s.xianyuBuys.filter(x => x.blind)" :key="'blind' + it.gameId + i" :game="gameById(it.gameId)" own-badge>
         <span class="oop-tag">🔒 一口价 · 成色未知</span>
         <div class="tagline">只看名字不看货：成色、牌套、收纳全隐藏</div>
         <div class="tagline">价格为总价值 80%~120%，每局 {{ gainText(gameById(it.gameId)) }}</div>
@@ -115,7 +115,7 @@ const listingRows = computed(() =>
           </div>
         </template>
       </GameCard>
-      <GameCard v-for="(it, i) in store.s.xianyuBuys.filter(x => !x.blind)" :key="it.gameId + i" :game="gameById(it.gameId)">
+      <GameCard v-for="(it, i) in store.s.xianyuBuys.filter(x => !x.blind)" :key="it.gameId + i" :game="gameById(it.gameId)" own-badge>
         <span v-if="gameById(it.gameId).hidden" class="oop-tag">隐藏款 · {{ gameById(it.gameId).affix?.desc }}</span>
         <div class="tagline">
           {{ conditionText(it.durability, gameById(it.gameId).rarity) }}{{ it.sleeved ? ' · 🎴已套牌套' : ''

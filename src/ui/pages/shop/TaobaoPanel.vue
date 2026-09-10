@@ -34,7 +34,7 @@ const headerText = computed(() => {
       <b :style="{ color: `var(--${cur})` }">{{ cur }} 级货架</b>
       <small class="mut">{{ headerText }}</small>
     </div>
-    <GameCard v-for="g in gamesByRarity(cur)" :key="g.id" :game="g">
+    <GameCard v-for="g in gamesByRarity(cur)" :key="g.id" :game="g" own-badge>
       <div class="tagline">{{ g.tags.join(' · ') }} · {{ g.playTime }}分钟</div>
       <div class="tagline mut">库存 {{ stockLeft(g.id) }}/{{ TAOBAO_STOCK[g.rarity] }}</div>
       <template #actions>
