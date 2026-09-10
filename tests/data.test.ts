@@ -78,14 +78,14 @@ describe('价格派生', () => {
     expect(GACHA_PRICE).toBe(100);
   });
 
-  it('某赏奖池表（牌套 46/15/5 + 桌游 N20/R10/SR3/SSR1）/保底/某宝库存上限', () => {
+  it('某赏奖池表（牌套 30/15/5 + 桌游 N30/R15/SR4/SSR1）/保底/某宝库存上限', () => {
     expect(GACHA_TABLE).toEqual([
-      { kind: 'sleeves', packs: 4, p: 0.46 },
+      { kind: 'sleeves', packs: 4, p: 0.30 },
       { kind: 'sleeves', packs: 10, p: 0.15 },
       { kind: 'sleeves', packs: 20, p: 0.05 },
-      { kind: 'game', rarity: 'N', p: 0.20 },
-      { kind: 'game', rarity: 'R', p: 0.10 },
-      { kind: 'game', rarity: 'SR', p: 0.03 },
+      { kind: 'game', rarity: 'N', p: 0.30 },
+      { kind: 'game', rarity: 'R', p: 0.15 },
+      { kind: 'game', rarity: 'SR', p: 0.04 },
       { kind: 'game', rarity: 'SSR', p: 0.01 },
     ]);
     expect(GACHA_PITY).toBe(50);

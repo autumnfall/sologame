@@ -39,7 +39,7 @@ const exValid = computed(() => Number.isInteger(exN.value) && exN.value >= 1 && 
     <!-- ========== 常驻池 ========== -->
     <div v-if="sub === 'perm'" class="gacha-banner">
       <div style="font-size:18px;font-weight:800;color:var(--gold)">🎁 某赏 · 常驻一番抽</div>
-      <div class="mut" style="margin:6px 0">牌套 46%（4包）/ 15%（10包）/ 5%（20包）· 桌游 N20 / R10 / SR3 / SSR1 · 50 抽保底 SR 及以上</div>
+      <div class="mut" style="margin:6px 0">牌套 30%（4包）/ 15%（10包）/ 5%（20包）· 桌游 N30 / R15 / SR4 / SSR1 · 50 抽保底 SR 及以上</div>
       <div>SR+ 保底进度：<b class="warn">{{ store.s.pity }} / {{ GACHA_PITY }}</b></div>
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center">
         <button class="primary" @click="store.pullGacha('perm', 'money')">单抽（¥{{ GACHA_PRICE }}）</button>

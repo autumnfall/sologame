@@ -195,10 +195,10 @@ describe('某鱼：购买与出售', () => {
 });
 
 describe('某赏（常驻池 + 轮换池）', () => {
-  it('奖池表命中区间：0.2→4包 / 0.5→10包 / 0.63→20包 / 0.7→N / 0.9→R / 0.97→SR / 0.995→SSR', () => {
+  it('奖池表命中区间：0.2→4包 / 0.4→10包 / 0.48→20包 / 0.7→N / 0.9→R / 0.97→SR / 0.995→SSR', () => {
     expect(rollGachaOutcome(() => 0.2, false)).toEqual({ kind: 'sleeves', packs: 4 });
-    expect(rollGachaOutcome(() => 0.5, false)).toEqual({ kind: 'sleeves', packs: 10 });
-    expect(rollGachaOutcome(() => 0.63, false)).toEqual({ kind: 'sleeves', packs: 20 });
+    expect(rollGachaOutcome(() => 0.4, false)).toEqual({ kind: 'sleeves', packs: 10 });
+    expect(rollGachaOutcome(() => 0.48, false)).toEqual({ kind: 'sleeves', packs: 20 });
     expect(rollGachaOutcome(() => 0.7, false)).toEqual({ kind: 'game', rarity: 'N' });
     expect(rollGachaOutcome(() => 0.9, false)).toEqual({ kind: 'game', rarity: 'R' });
     expect(rollGachaOutcome(() => 0.97, false)).toEqual({ kind: 'game', rarity: 'SR' });

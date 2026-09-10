@@ -20,18 +20,18 @@ export const TAOBAO_STOCK: Record<Rarity, number> = { N: 4, R: 3, SR: 2, SSR: 1 
 
 /**
  * 某赏奖池（常驻/轮换统一）：累加判定，顺序即优先级。
- * 牌套 4/10/20 包 = 46/15/5%；桌游 N/R/SR/SSR = 20/10/3/1%。
+ * 牌套 4/10/20 包 = 30/15/5%；桌游 N/R/SR/SSR = 30/15/4/1%。
  */
 export const GACHA_TABLE: readonly (
   | { kind: 'sleeves'; packs: number; p: number }
   | { kind: 'game'; rarity: Rarity; p: number }
 )[] = [
-  { kind: 'sleeves', packs: 4, p: 0.46 },
+  { kind: 'sleeves', packs: 4, p: 0.30 },
   { kind: 'sleeves', packs: 10, p: 0.15 },
   { kind: 'sleeves', packs: 20, p: 0.05 },
-  { kind: 'game', rarity: 'N', p: 0.20 },
-  { kind: 'game', rarity: 'R', p: 0.10 },
-  { kind: 'game', rarity: 'SR', p: 0.03 },
+  { kind: 'game', rarity: 'N', p: 0.30 },
+  { kind: 'game', rarity: 'R', p: 0.15 },
+  { kind: 'game', rarity: 'SR', p: 0.04 },
   { kind: 'game', rarity: 'SSR', p: 0.01 },
 ];
 
