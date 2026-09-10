@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { ATTR_EFFECT, ATTR_ICON, ATTRS, ROMAN, attrProgress, fmt, globalBonus } from '../../core';
 import { useGameStore } from '../stores/game';
 
@@ -12,10 +13,19 @@ const TABS = [
   { key: 'guide', label: '📖 教程' },
 ] as const;
 
-function chipTitle(a: (typeof ATTRS)[number]): string {
-  const p = attrProgress(store.s, a);
-  return `经验 ${p.cur} / ${p.need}（游玩对应机制的桌游获得经验；首次入手新桌游有一次性开箱经验）\n效果：${ATTR_EFFECT[a]}`;
-}
+/** 属性徽章：等级 0 时只显示图标与名称（无等级罗马字、无 0/60 进度），有经验后再展开 */
+const attrChips = computed(() =>
+  ATTRS.map(a => {
+    const p = attrProgress(store.s, a);
+    return {
+      a,
+      lv: p.lv,
+      roman: p.lv > 0 ? ROMAN[p.lv] : '',
+      prog: p.lv > 0 ? `${p.cur}/${p.need}` : '',
+      title: `经验 ${p.cur} / ${p.need}（游玩对应机制的桌游获得经验；首次入手新桌游有一次性开箱经验）\n效果：${ATTR_EFFECT[a]}`,
+    };
+  }),
+);
 </script>
 
 <template>
@@ -26,9 +36,9 @@ function chipTitle(a: (typeof ATTRS)[number]): string {
       <span>🎫 抽赏券 <b>{{ store.s.tickets }}</b></span>
       <span v-if="store.s.hiTickets > 0">🎟️ 高级券 <b>{{ store.s.hiTickets }}</b></span>
       <span class="attrs">
-        <span v-for="a in ATTRS" :key="a" class="attr-chip" :title="chipTitle(a)">
-          {{ ATTR_ICON[a] }}{{ a }} <b>{{ ROMAN[attrProgress(store.s, a).lv] }}</b>
-          <span class="prog">{{ attrProgress(store.s, a).cur }}/{{ attrProgress(store.s, a).need }}</span>
+        <span v-for="c in attrChips" :key="c.a" class="attr-chip" :class="{ virgin: c.lv === 0 }" :title="c.title">
+          {{ ATTR_ICON[c.a] }}{{ c.a }}<template v-if="c.roman">&nbsp;<b>{{ c.roman }}</b>
+          <span class="prog">{{ c.prog }}</span></template>
         </span>
       </span>
       <span class="gbonus">图鉴加成 +{{ (globalBonus(store.s) * 100).toFixed(1) }}%</span>

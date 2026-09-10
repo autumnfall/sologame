@@ -20,7 +20,8 @@ small{color:var(--dim)}
 #statusbar{background:linear-gradient(180deg,#2b241b,#221d16);border-bottom:2px solid var(--line);padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:13px}
 #statusbar .res{font-weight:700;color:var(--gold)}
 #statusbar .attrs{display:flex;gap:10px;flex-wrap:wrap}
-.attr-chip{background:#191510;border:1px solid var(--line);border-radius:12px;padding:2px 9px;font-size:12px;cursor:default}
+.attr-chip{background:#191510;border:1px solid var(--line);border-radius:12px;padding:2px 9px;font-size:12px;cursor:default;white-space:nowrap}
+.attr-chip.virgin{border-style:dashed;color:var(--dim)}
 .attr-chip b{color:#7fb8e0}
 .attr-chip .prog{color:var(--dim);font-size:11px}
 #statusbar .gbonus{color:var(--green);font-weight:700}
