@@ -100,10 +100,13 @@ export function copyValue(
 }
 
 /**
- * 某鱼出售成交概率：clamp01((1.5 − 定价倍率) × (0.5 + 0.5×成色比))。
- * 全新 ×50% 定价 = 1.0 必卖；0 耐久 ×200% 定价 = 0 必不卖。
+ * 某鱼出售成交概率：p = clamp01(a − b×定价倍率)，a/b 随成色比线性过渡。
+ * 锚点：全新 50% 价必卖（100%）、200% 价 2%（极低但非零）；
+ *       5成新 50% 价 90%、200% 价 0（真零）。
  */
 export function sellChance(priceMult: number, durability: number, rarity: Rarity): number {
-  const p = (1.5 - priceMult) * (0.5 + 0.5 * durabilityRatio(durability, rarity));
-  return Math.max(0, Math.min(1, p));
+  const r = durabilityRatio(durability, rarity);
+  const a = 1.2 + 0.127 * r; // 截距：1.2（5成新）→ 1.327（全新）
+  const b = 0.6 + 0.053 * r; // 斜率：0.6（5成新）→ 0.653（全新）
+  return Math.max(0, Math.min(1, a - b * priceMult));
 }

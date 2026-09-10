@@ -262,11 +262,12 @@ describe('成色 / 耐久 / 价值', () => {
       .toBe(Math.round(899 + 899 * 0.2 + Math.ceil(200 / 50) * 10));
   });
 
-  it('出售概率：全新×50% 必卖，0耐久×200% 必不卖，中间线性', () => {
+  it('出售概率：全新×50% 必卖、×200% 保留2%，5成新×50% 90%、×200% 真零', () => {
     expect(sellChance(0.5, 10, 'N')).toBe(1);
-    expect(sellChance(2.0, 0, 'N')).toBe(0);
-    expect(sellChance(1.0, 5, 'N')).toBeCloseTo(0.5 * 0.75, 10); // (1.5-1)×(0.5+0.25)
-    expect(sellChance(1.5, 10, 'N')).toBeCloseTo(0, 10);
+    expect(sellChance(2.0, 10, 'N')).toBeCloseTo(1.327 - 0.653 * 2, 10); // 全新×200% = 0.021
+    expect(sellChance(0.5, 0, 'N')).toBeCloseTo(0.9, 10); // 5成新×50%
+    expect(sellChance(2.0, 0, 'N')).toBe(0); // 5成新×200% 真零
+    expect(sellChance(1.0, 5, 'N')).toBeCloseTo(0.637, 3); // 中间成色≈64%
   });
 });
 
