@@ -6,9 +6,10 @@ import type { Rarity } from './types';
  * 存档版本；变更存档结构时必须 +1 并在 engine/save.ts 的 MIGRATIONS 里补迁移函数。
  * v3 = 原型最终版；v4 = 正式版（去掉死字段 attrs）；
  * v5 = 收藏/实体分离（owned→collections+copies、某鱼市场、某宝多次购买、某赏轮换池）；
- * v6 = 职业改周期制（rate→cycleSec/cyclePay、jobProgress；旧 clerk/editor/designer 映射新职业）。
+ * v6 = 职业改周期制（rate→cycleSec/cyclePay、jobProgress；旧 clerk/editor/designer 映射新职业）；
+ * v7 = 转生系统（新增 prestige：阅历/天赋/周目数）。
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */

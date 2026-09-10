@@ -1,5 +1,5 @@
 import { OFFLINE_CAP_MS, ATTRS } from '../data/constants';
-import { OFFLINE_RATE, WORN_PENALTY, playWear, ROTATION_MS } from '../data/balance';
+import { WORN_PENALTY, OFFLINE_RATE, playWear, ROTATION_MS } from '../data/balance';
 import { STREAM_EVENTS } from '../data/jobs';
 import type { Attr } from '../data/constants';
 import { gameById } from '../data/games';
@@ -9,6 +9,7 @@ import { attrShares } from '../mechanics/attrs';
 import { globalBonus, hasAffix } from '../mechanics/collection';
 import { currentJob, expMult, fatigueIncMult, incomeMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
 import { fatigueMod } from '../mechanics/play';
+import { perkLv } from '../mechanics/prestige';
 
 export interface TickResult {
   /** 本 tick 完成的工作周期数（0 或 1） */
@@ -58,7 +59,8 @@ export function accumulateOffline(state: GameState, elapsedMs: number): void {
   const total = state.jobProgress + addT / 1000;
   const cycles = Math.floor(total / j.cycleSec);
   state.jobProgress = total - cycles * j.cycleSec;
-  state.offlineBank.money += cycles * jobCyclePayExpected(state, j) * OFFLINE_RATE;
+  const rate = OFFLINE_RATE + 0.15 * perkLv(state, 'offlineUp'); // 挂机心得：离线折算提升
+  state.offlineBank.money += cycles * jobCyclePayExpected(state, j) * rate;
 }
 
 export function claimOffline(state: GameState): number {

@@ -1,5 +1,6 @@
 import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY } from '../data/balance';
+import { PERKS } from '../data/prestige';
 import { gameById } from '../data/games';
 import { defaultState } from '../state';
 import type { CollectionEntry, Copy, GameState, Listing, MarketItem } from '../state';
@@ -49,6 +50,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     void _rate;
     return { ...rest, job, jobProgress: 0 };
   },
+  // v6 → v7（转生系统）：新增 prestige 元进度（阅历/天赋/周目数）
+  6: raw => ({ ...raw, prestige: { insight: 0, perks: {}, runs: 0, lastGain: 0 } }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -203,10 +206,25 @@ function normalize(data: Record<string, unknown>): GameState {
   const attrExp = { ...s.attrExp, ...(isRecord(data.attrExp) ? data.attrExp : {}) };
   const stats = isRecord(data.stats) ? data.stats : {};
   const bank = isRecord(data.offlineBank) ? data.offlineBank : {};
+  const presRaw = isRecord(data.prestige) ? data.prestige : {};
+  const perksRaw = isRecord(presRaw.perks) ? presRaw.perks : {};
+  const perks: Record<string, number> = {};
+  const knownPerks = new Set(PERKS.map(p => p.id));
+  for (const [id, lv] of Object.entries(perksRaw)) {
+    if (!knownPerks.has(id)) continue; // 未知天赋（旧档脏数据/已下线天赋）剔除
+    const n = typeof lv === 'number' && Number.isFinite(lv) ? Math.floor(lv) : 0;
+    if (n > 0) perks[id] = n;
+  }
   return {
     ...s,
     ...data,
     saveVersion: SAVE_VERSION,
+    prestige: {
+      insight: num(presRaw.insight, 0),
+      perks,
+      runs: Math.floor(num(presRaw.runs, 0)),
+      lastGain: num(presRaw.lastGain, 0),
+    },
     money: num(data.money, s.money),
     sleeves: num(data.sleeves, s.sleeves),
     tickets: num(data.tickets, s.tickets),

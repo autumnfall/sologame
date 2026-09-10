@@ -1,0 +1,57 @@
+import { SELL_SLOTS_MAX } from '../data/balance';
+import { perkDefById } from '../data/prestige';
+import { defaultState } from '../state';
+import type { GameState } from '../state';
+import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, perkLv, prestigeUnlockCount } from '../mechanics/prestige';
+
+export interface PrestigeResult {
+  ok: boolean;
+  reason?: string;
+  /** 本次获得的阅历 */
+  gain?: number;
+}
+
+/**
+ * 退坑转生：清仓本周目的一切（金钱/收藏/实体/属性/槽位/保底/职业），
+ * 保留阅历、天赋、生涯统计；获得阅历 = insightGain。
+ * 返回全新开局状态（started=false，由 UI 重新走三选一与上架流程）。
+ */
+export function doPrestige(state: GameState): PrestigeResult {
+  if (!canPrestige(state)) {
+    return { ok: false, reason: `需要精通至少 ${prestigeUnlockCount()} 款桌游才能退坑` };
+  }
+  const gain = insightGain(state);
+  const { insight, perks, runs } = state.prestige;
+  const stats = state.stats;
+  const fresh = defaultState();
+  Object.assign(state, fresh, {
+    prestige: { insight: insight + gain, perks: { ...perks }, runs: runs + 1, lastGain: gain },
+    stats,
+    lastSeen: Date.now(),
+  });
+  // 天赋的开局加成
+  state.money += 300 * perkLv(state, 'fund');
+  state.sellSlots = Math.min(SELL_SLOTS_MAX, 1 + perkLv(state, 'sellSlot'));
+  return { ok: true, gain };
+}
+
+/** 购买天赋（阅历支付；老主顾当周目立即 +1 出售槽位） */
+export function buyPerk(state: GameState, id: string): { ok: boolean; reason?: string } {
+  const def = perkDefById(id);
+  const lv = perkLevel(state, id);
+  if (lv >= def.max) return { ok: false, reason: '已满级' };
+  const cost = perkCost(def, lv);
+  if (state.prestige.insight < cost) return { ok: false, reason: `阅历不够（需要 ${cost}）` };
+  state.prestige.insight -= cost;
+  state.prestige.perks[id] = lv + 1;
+  if (def.key === 'sellSlot') state.sellSlots = Math.min(SELL_SLOTS_MAX, state.sellSlots + 1);
+  return { ok: true };
+}
+
+/** 洗点：全额退还已投入阅历（当周目已获得的出售槽位不回收，下周目按等级重算） */
+export function respecPerks(state: GameState): { ok: boolean; reason?: string } {
+  if (!Object.keys(state.prestige.perks).length) return { ok: false, reason: '尚未投资天赋' };
+  state.prestige.insight += insightSpent(state);
+  state.prestige.perks = {};
+  return { ok: true };
+}

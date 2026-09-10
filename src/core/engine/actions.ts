@@ -1,11 +1,11 @@
 import { TAOBAO_STOCK, SELL_SLOT_COSTS, MARKET_SLOT_COSTS, SELL_SLOTS_MAX, MARKET_SLOTS_MAX, SELL_PRICE_MIN, SELL_PRICE_MAX, STORE_WEAR_ONCE, copyValue } from '../data/balance';
-import { gameById, gamesByRarity, nextTier } from '../data/games';
-import { taobaoBase } from '../data/prices';
+import { gameById, gamesByRarity, nextTier, REGULAR_GAMES } from '../data/games';
 import type { GameState } from '../state';
 import { copyByUid } from '../state';
 import { tierOwned, tierUnlocked } from '../mechanics/collection';
 import { storageCost, canStore } from '../mechanics/play';
-import { sellFeeRate } from '../mechanics/economy';
+import { sellFeeRate, taobaoPrice } from '../mechanics/economy';
+import { perkLevel } from '../mechanics/prestige';
 import { acquireGame } from './acquire';
 import { buyXianyu } from './xianyu';
 
@@ -21,22 +21,35 @@ function fail(reason: string): ActionResult {
   return { ok: false, reason };
 }
 
-/** 开局三选一 */
-export function pickStarter(state: GameState, id: string): ActionResult {
+/** 开局三选一；老友馈赠天赋：额外随机获得尚未收藏的常规款桌游 */
+export function pickStarter(state: GameState, id: string, rng: () => number = Math.random): ActionResult {
   if (state.started) return fail('已完成开局选择');
   const r = acquireGame(state, id);
   state.started = true;
-  return ok(`获得了《${gameById(id).name}》！${firstBonusText(r)}`);
+  const gifts: string[] = [];
+  for (let i = 0; i < perkLevel(state, 'gift'); i++) {
+    const pool = REGULAR_GAMES.filter(g => !state.collections[g.id]?.firstOpened);
+    if (!pool.length) break;
+    // 80% 抽 N 档 / 20% 抽 R 档；目标档已集齐则任取剩余
+    const wantN = rng() < 0.8;
+    const cand = pool.filter(g => (g.rarity === 'N') === wantN);
+    const src = cand.length ? cand : pool;
+    const pick = src[Math.floor(rng() * src.length)];
+    acquireGame(state, pick.id);
+    gifts.push(pick.name);
+  }
+  const giftText = gifts.length ? ` 老友馈赠：${gifts.map(n => `《${n}》`).join('、')}` : '';
+  return ok(`获得了《${gameById(id).name}》！${firstBonusText(r)}${giftText}`);
 }
 
 function firstBonusText(r: { first: boolean; bonusExp: number }): string {
   return r.first ? `开箱奖励：全属性经验 +${Math.round(r.bonusExp)}` : '';
 }
 
-/** 某宝购买：每款限量 N4/R3/SR2/SSR1 次，售完不补；按稀有度逐级解锁；购入为全新实体 */
+/** 某宝购买：每款限量 N4/R3/SR2/SSR1 次，售完不补；按稀有度逐级解锁；购入为全新实体（会员折扣天赋生效） */
 export function buyTaobao(state: GameState, id: string): ActionResult {
   const g = gameById(id);
-  const price = taobaoBase(g);
+  const price = taobaoPrice(state, g);
   if (state.money < price) return fail('钱不够');
   const left = state.taobaoStock[id] ?? TAOBAO_STOCK[g.rarity];
   if (left <= 0) return fail('已售罄');

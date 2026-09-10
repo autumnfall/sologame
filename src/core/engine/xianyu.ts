@@ -8,6 +8,7 @@ import { copyByUid } from '../state';
 import { isMastered } from '../mechanics/collection';
 import { canStore } from '../mechanics/play';
 import { sellFeeRate, xyPriceMult } from '../mechanics/economy';
+import { perkLv } from '../mechanics/prestige';
 import { acquireGame } from './acquire';
 
 export interface RefreshResult {
@@ -131,7 +132,7 @@ export function tickXianyu(
     }
     const g = gameById(copy.gameId);
     const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
-    const chance = sellChance(l.price / value, copy.durability, g.rarity);
+    const chance = Math.min(1, sellChance(l.price / value, copy.durability, g.rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
     if (rng() < chance) {
       const gain = Math.round(l.price * (1 - sellFeeRate(state)));
       state.money += gain;

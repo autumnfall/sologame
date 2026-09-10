@@ -10,6 +10,7 @@ const TABS = [
   { key: 'work', label: '💼 工作' },
   { key: 'shop', label: '🛒 商店' },
   { key: 'shelf', label: '📚 收藏架' },
+  { key: 'prestige', label: '🌅 转生' },
   { key: 'guide', label: '📖 教程' },
 ] as const;
 
@@ -35,6 +36,7 @@ const attrChips = computed(() =>
       <span>🎴 牌套 <b>{{ store.s.sleeves }}</b> 张</span>
       <span>🎫 抽赏券 <b>{{ store.s.tickets }}</b></span>
       <span v-if="store.s.hiTickets > 0">🎟️ 高级券 <b>{{ store.s.hiTickets }}</b></span>
+      <span v-if="store.s.prestige.runs > 0" :title="`已完成 ${store.s.prestige.runs} 周目；退坑转生获得阅历，可投资永久天赋`">🌅 阅历 <b>{{ store.s.prestige.insight }}</b> · 第 {{ store.s.prestige.runs + 1 }} 周目</span>
       <span class="attrs">
         <span v-for="c in attrChips" :key="c.a" class="attr-chip" :class="{ virgin: c.lv === 0 }" :title="c.title">
           {{ ATTR_ICON[c.a] }}{{ c.a }}<template v-if="c.roman">&nbsp;<b>{{ c.roman }}</b>

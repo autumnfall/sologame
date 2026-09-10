@@ -39,9 +39,22 @@ export interface Listing {
   price: number;
 }
 
+/** 转生「退坑」：跨周目保留的元进度 */
+export interface PrestigeState {
+  /** 桌游阅历（转生货币） */
+  insight: number;
+  /** 天赋：id -> 等级 */
+  perks: Record<string, number>;
+  /** 已完成周目数 */
+  runs: number;
+  /** 上周目获得的阅历（保底递增用） */
+  lastGain: number;
+}
+
 /** 游戏存档 */
 export interface GameState {
   saveVersion: number;
+  prestige: PrestigeState;
   money: number;
   /** 牌套（张） */
   sleeves: number;
@@ -89,9 +102,14 @@ export interface GameState {
   stats: { plays: number; pulls: number };
 }
 
+export function defaultPrestige(): PrestigeState {
+  return { insight: 0, perks: {}, runs: 0, lastGain: 0 };
+}
+
 export function defaultState(): GameState {
   return {
     saveVersion: SAVE_VERSION,
+    prestige: defaultPrestige(),
     money: 200,
     sleeves: 100,
     tickets: 0,

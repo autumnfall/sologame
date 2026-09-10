@@ -1,25 +1,28 @@
 import type { Attr } from '../data/constants';
 import { SELL_FEE } from '../data/balance';
 import { jobById } from '../data/jobs';
-import type { Job } from '../data/types';
+import { taobaoBase } from '../data/prices';
+import type { Game, Job } from '../data/types';
 import type { GameState } from '../state';
 import { attrLevel } from './attrs';
 import { computeSetBonus, globalBonus, hasAffix } from './collection';
+import { perkLv } from './prestige';
 
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
 // 谋略：游玩经验 +2.5%/级  演算：游玩时间 -2%/级（下限 ×0.80）
 // 应变：疲劳增长 -4%/级（下限 ×0.60）  运筹：某鱼砍价 -2%/级（下限 ×0.80）、手续费 -0.5%/级（10 级全免）
 // 洞察：掉券率 +10%/级、时机条金区 +2%/级宽（上限 40%）  沉浸：游玩收入 +4%/级、主播下限上移
 
-/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 */
+/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 × 触类旁通 */
 export function expMult(state: GameState): number {
   return (1 + globalBonus(state)) * (1 + 0.025 * attrLevel(state, '谋略'))
-    * (hasAffix(state, 'expAll') ? 1.05 : 1) * computeSetBonus();
+    * (hasAffix(state, 'expAll') ? 1.05 : 1) * computeSetBonus()
+    * Math.pow(1.1, perkLv(state, 'expAll'));
 }
 
-/** 疲劳增长倍率（应变，下限 ×0.60） */
+/** 疲劳增长倍率（应变 × 科学作息，下限 ×0.60） */
 export function fatigueIncMult(state: GameState): number {
-  return Math.max(0.60, 1 - 0.04 * attrLevel(state, '应变' as Attr));
+  return Math.max(0.60, (1 - 0.04 * attrLevel(state, '应变' as Attr)) * Math.pow(0.9, perkLv(state, 'fatigueCut')));
 }
 
 /** 某鱼价格倍率（运筹砍价，下限 ×0.80） */
@@ -37,9 +40,15 @@ export function incomeMult(state: GameState): number {
   return 1 + 0.04 * attrLevel(state, '沉浸');
 }
 
-/** 抽赏券掉率倍率（洞察 +10%/级 × 隐藏款词条） */
+/** 抽赏券掉率倍率（洞察 × 隐藏款词条 × 欧气满满） */
 export function ticketRateMult(state: GameState): number {
-  return (1 + 0.10 * attrLevel(state, '洞察')) * (hasAffix(state, 'ticketUp') ? 1.25 : 1);
+  return (1 + 0.10 * attrLevel(state, '洞察')) * (hasAffix(state, 'ticketUp') ? 1.25 : 1)
+    * (1 + 0.25 * perkLv(state, 'ticketUp'));
+}
+
+/** 某宝实付价（基础价 × 会员折扣） */
+export function taobaoPrice(state: GameState, g: Game): number {
+  return Math.max(1, Math.round(taobaoBase(g) * (1 - 0.05 * perkLv(state, 'tbDiscount'))));
 }
 
 /** 时机条金色区宽度（基础 14%，洞察每级 +2%，上限 40%） */

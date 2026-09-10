@@ -7,11 +7,13 @@ import {
   applyStorage,
   buyTaobao,
   buyXianyu,
+  buyPerk,
   claimOffline,
   conditionText,
   copyByUid,
   copiesOf,
   defaultState,
+  doPrestige,
   exchangeHiTickets,
   expandMarketSlots,
   expandSellSlots,
@@ -28,6 +30,7 @@ import {
   playDuration,
   quitJob,
   refreshXianyu,
+  respecPerks,
   rotatingThemeText,
   ruleDuration,
   save,
@@ -39,11 +42,13 @@ import {
   tickSecond,
   tickXianyu,
   unlistCopy,
+  canPrestige,
+  insightGain,
   wipeSave,
 } from '../../core';
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 
-export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'guide';
+export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'prestige' | 'guide';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
 
 /** 一局中的一个阶段（读规则/Setup/游玩/结算） */
@@ -616,6 +621,42 @@ export const useGameStore = defineStore('game', {
       const amount = claimOffline(this.s);
       this.toast(`领取离线收益 ¥${fmt(amount)}`);
       this.saveGame();
+    },
+
+    // ---------- 转生 ----------
+
+    /** 退坑转生：确认弹窗后重置本周目，保留阅历/天赋/统计 */
+    prestige() {
+      const gain = insightGain(this.s);
+      if (!canPrestige(this.s)) return;
+      if (!window.confirm(`确定退坑出清吗？本周目的收藏、实体、金钱、属性、职业都将重置，获得 ${gain} 点桌游阅历。`)) return;
+      if (!window.confirm('再确认一次：阅历和天赋会保留，但本周目的一切进度将消失。')) return;
+      const r = doPrestige(this.s);
+      if (!r.ok) {
+        this.toast(r.reason ?? '无法退坑');
+        return;
+      }
+      this.clearSession();
+      // 与 boot 的新开局分支一致：刷首批货源、补开轮换池、弹三选一
+      refreshXianyu(this.s, false);
+      tickRotation(this.s);
+      this.showStarter = true;
+      this.tab = 'play';
+      this.toast(`🌅 第 ${this.s.prestige.runs + 1} 周目开启！阅历 +${r.gain}`);
+      this.saveGame();
+    },
+
+    buyPerk(id: string) {
+      const r = buyPerk(this.s, id);
+      this.toast(r.ok ? `已习得天赋（剩余阅历 ${this.s.prestige.insight}）` : (r.reason ?? '购买失败'));
+      if (r.ok) this.saveGame();
+    },
+
+    respec() {
+      if (!window.confirm('洗点将退还全部已投入的阅历（本周目已获得的出售槽位不回收），确定吗？')) return;
+      const r = respecPerks(this.s);
+      this.toast(r.ok ? `已洗点，阅历全额退还（现有 ${this.s.prestige.insight}）` : (r.reason ?? '洗点失败'));
+      if (r.ok) this.saveGame();
     },
 
     // ---------- 存档管理：导出 / 导入 / 重新开始 ----------

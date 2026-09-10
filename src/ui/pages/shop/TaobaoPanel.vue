@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TAOBAO_STOCK, currentTier, gameById, gamesByRarity, nextTier, taobaoBase, tierOwned } from '../../../core';
+import { TAOBAO_STOCK, currentTier, gameById, gamesByRarity, nextTier, taobaoPrice, tierOwned } from '../../../core';
 import { useGameStore } from '../../stores/game';
 import GameCard from '../../components/GameCard.vue';
 
@@ -42,10 +42,10 @@ const headerText = computed(() => {
           v-if="stockLeft(g.id) > 0"
           style="margin-top:6px;display:flex;justify-content:space-between;align-items:center"
         >
-          <span class="price">¥{{ taobaoBase(g) }}</span>
+          <span class="price">¥{{ taobaoPrice(store.s, g) }}</span>
           <button
             class="primary"
-            :disabled="store.s.money < taobaoBase(g)"
+            :disabled="store.s.money < taobaoPrice(store.s, g)"
             @click="store.buyTb(g.id)"
           >
             购买

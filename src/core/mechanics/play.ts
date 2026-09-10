@@ -4,6 +4,7 @@ import type { Game } from '../data/types';
 import type { Copy, GameState } from '../state';
 import { attrLevel } from './attrs';
 import { hasAffix } from './collection';
+import { perkLv } from './prestige';
 
 /** 疲劳收益修正 = 1/(1+疲劳×0.15)（软上限外不再加重）；疲劳为收藏级 */
 export function fatigueMod(state: GameState, g: Game): number {
@@ -14,7 +15,8 @@ export function fatigueMod(state: GameState, g: Game): number {
 /**
  * 游玩段游戏内分钟数。
  * 熟练度：首局 ×1.8，之后每局 -2%（下限 ×0.65）；精通后再 ×0.5；
- * 牌套（实体级）×0.85；隐藏款 timeCut 词条 ×0.90；演算每级 -2%（下限 ×0.80）；最低 3 分钟。
+ * 牌套（实体级）×0.85；隐藏款 timeCut 词条 ×0.90；演算每级 -2%（下限 ×0.80）；
+ * 熟门熟路天赋每级 -5%；最低 3 分钟。
  */
 export function playDuration(state: GameState, g: Game, copy?: Copy): number {
   const c = state.collections[g.id];
@@ -25,6 +27,7 @@ export function playDuration(state: GameState, g: Game, copy?: Copy): number {
   if (copy?.sleeved) m *= 0.85;
   if (hasAffix(state, 'timeCut')) m *= 0.90;
   m *= Math.max(0.80, 1 - 0.02 * attrLevel(state, '演算'));
+  m *= Math.pow(0.95, perkLv(state, 'timeCut'));
   return Math.max(3, m);
 }
 
