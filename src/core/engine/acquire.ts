@@ -1,7 +1,8 @@
 import { FIRST_BONUS } from '../data/constants';
+import { DURABILITY } from '../data/balance';
 import { gameById } from '../data/games';
 import type { Attr } from '../data/constants';
-import type { GameState } from '../state';
+import type { Copy, GameState } from '../state';
 import { globalBonus } from '../mechanics/collection';
 
 export interface AcquireResult {
@@ -10,21 +11,35 @@ export interface AcquireResult {
   /** 开箱奖励：受影响的属性与每属性经验值 */
   bonusAttrs: Attr[];
   bonusExp: number;
+  /** 本次获得的实体（全新满耐久） */
+  copy: Copy;
 }
 
 /**
- * 获得一款桌游：count+1；首次获得时按稀有度发放一次性开箱属性奖励
- * （N15 / R30 / SR60 / SSR120，吃图鉴加成）。
+ * 获得一款桌游的实体：push 一个全新满耐久副本；
+ * 首次收藏（firstOpened）时按稀有度发放一次性开箱属性奖励（N15/R30/SR60/SSR120，吃图鉴加成）。
+ * 熟练度/疲劳/读规则在收藏级保留，卖光重买不重复给开箱奖励。
  */
 export function acquireGame(state: GameState, id: string): AcquireResult {
   const g = gameById(id);
-  if (!state.owned[id]) {
-    state.owned[id] = { count: 0, prof: 0, fatigue: 0, sleeved: false, stored: false, rulesRead: false };
+  let c = state.collections[id];
+  const first = !c || !c.firstOpened;
+  if (!c) {
+    c = { firstOpened: true, prof: 0, fatigue: 0, rulesRead: false };
+    state.collections[id] = c;
+  } else {
+    c.firstOpened = true;
   }
-  const o = state.owned[id];
-  o.count++;
-  const result: AcquireResult = { first: o.count === 1, bonusAttrs: [], bonusExp: 0 };
-  if (result.first) {
+  const copy: Copy = {
+    uid: state.nextUid++,
+    gameId: id,
+    durability: DURABILITY[g.rarity],
+    sleeved: false,
+    stored: false,
+  };
+  state.copies.push(copy);
+  const result: AcquireResult = { first, bonusAttrs: [], bonusExp: 0, copy };
+  if (first) {
     const fb = FIRST_BONUS[g.rarity] * (1 + globalBonus(state));
     result.bonusExp = fb;
     for (const a of g.attrs) {

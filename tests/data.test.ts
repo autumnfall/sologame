@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ATTRS, FIRST_BONUS, GACHA_PITY, GACHA_PRICE, GACHA_PROF_GAIN, GACHA_RATES,
-  GACHA_SLEEVE_PACKS, GAMES, JOBS, MASTERY, REGULAR_GAMES,
+  ATTRS, FIRST_BONUS, GACHA_PITY, GACHA_PRICE, GACHA_TABLE,
+  GAMES, JOBS, MARKET_SLOT_COSTS, MASTERY, REGULAR_GAMES,
+  SELL_SLOT_COSTS, TAOBAO_STOCK,
   XY_REFRESH_COST, gameById, gamesByRarity, jobById, nextTier, taobaoBase,
 } from '../src/core';
 
@@ -48,10 +49,20 @@ describe('数据集完整性', () => {
     expect(gameById('kafei').cards).toBeNull();
   });
 
-  it('职业阶梯：10 个职业、终点全属性 Ⅳ、id 唯一', () => {
-    expect(JOBS).toHaveLength(10);
+  it('职业阶梯：12 个职业、六维均衡各属性有岗、终点全属性 Ⅳ、id 唯一', () => {
+    expect(JOBS).toHaveLength(12);
     const master = jobById('master');
     expect(master?.req).toEqual({ 谋略: 4, 演算: 4, 应变: 4, 运筹: 4, 洞察: 4, 沉浸: 4 });
+    // 周期制：自动职业都有正周期与酬劳，最长 5 分钟
+    for (const j of JOBS.filter(j => j.auto)) {
+      expect(j.cycleSec).toBeGreaterThan(0);
+      expect(j.cycleSec).toBeLessThanOrEqual(300);
+      expect(j.cyclePay).toBeGreaterThan(0);
+    }
+    // 六维均衡：每个属性都至少是一个非终岗的门槛
+    for (const a of ATTRS) {
+      expect(JOBS.some(j => j.id !== 'master' && (j.req[a as keyof typeof j.req] ?? 0) > 0)).toBe(true);
+    }
     expect(new Set(JOBS.map(j => j.id)).size).toBe(JOBS.length);
   });
 });
@@ -67,12 +78,21 @@ describe('价格派生', () => {
     expect(GACHA_PRICE).toBe(100);
   });
 
-  it('某赏概率/保底/重复转化表与原型一致', () => {
-    expect(GACHA_RATES).toEqual([['SSR', 0.02], ['SR', 0.08], ['R', 0.28], ['N', 0.62]]);
+  it('某赏奖池表（牌套 46/15/5 + 桌游 N20/R10/SR3/SSR1）/保底/某宝库存上限', () => {
+    expect(GACHA_TABLE).toEqual([
+      { kind: 'sleeves', packs: 4, p: 0.46 },
+      { kind: 'sleeves', packs: 10, p: 0.15 },
+      { kind: 'sleeves', packs: 20, p: 0.05 },
+      { kind: 'game', rarity: 'N', p: 0.20 },
+      { kind: 'game', rarity: 'R', p: 0.10 },
+      { kind: 'game', rarity: 'SR', p: 0.03 },
+      { kind: 'game', rarity: 'SSR', p: 0.01 },
+    ]);
     expect(GACHA_PITY).toBe(50);
-    expect(GACHA_SLEEVE_PACKS).toEqual({ N: 5, R: 10, SR: 20, SSR: 40 });
-    expect(GACHA_PROF_GAIN).toEqual({ N: 4, R: 8, SR: 16, SSR: 32 });
+    expect(TAOBAO_STOCK).toEqual({ N: 4, R: 3, SR: 2, SSR: 1 });
     expect(XY_REFRESH_COST).toBe(20);
+    expect(SELL_SLOT_COSTS).toEqual([500, 1500, 4000, 10000]);
+    expect(MARKET_SLOT_COSTS).toEqual([200, 600, 1500, 3500]);
   });
 
   it('开箱奖励与精通门槛表与原型一致', () => {

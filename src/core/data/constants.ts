@@ -4,9 +4,11 @@ import type { Rarity } from './types';
 
 /**
  * 存档版本；变更存档结构时必须 +1 并在 engine/save.ts 的 MIGRATIONS 里补迁移函数。
- * v3 = 原型最终版；v4 = 正式版（去掉原型遗留的死字段 attrs）。
+ * v3 = 原型最终版；v4 = 正式版（去掉死字段 attrs）；
+ * v5 = 收藏/实体分离（owned→collections+copies、某鱼市场、某宝多次购买、某赏轮换池）；
+ * v6 = 职业改周期制（rate→cycleSec/cyclePay、jobProgress；旧 clerk/editor/designer 映射新职业）。
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 6;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */
@@ -21,7 +23,7 @@ export const GLOBAL_SOFTCAP = 0.50;
 /** 疲劳软上限（超过后收益惩罚不再加重） */
 export const FATIGUE_SOFTCAP = 10;
 
-/** 某赏 50 抽硬保底 SSR */
+/** 某赏 50 抽硬保底 SR 及以上（SR/SSR 按 3:1 掷） */
 export const GACHA_PITY = 50;
 
 /** 某鱼每 5 分钟自动刷新一批货源 */
@@ -38,12 +40,12 @@ export const ATTR_ICON: Record<Attr, string> = {
 
 /** 六维属性效果说明（教程/悬浮提示共用，全部为乘区） */
 export const ATTR_EFFECT: Record<Attr, string> = {
-  谋略: '每级使游玩经验 +3%（相乘）',
+  谋略: '每级使游玩经验 +2.5%（相乘）',
   演算: '每级使游玩时间 -2%（相乘，下限 ×0.80）',
   应变: '每级使游玩疲劳增长 -4%（相乘，下限 ×0.60）',
-  运筹: '每级使某鱼购物价格 -2%（相乘砍价，下限 ×0.80）',
-  洞察: '每级使抽赏券掉落率 +20%，时机条金色区宽度 +1%',
-  沉浸: '每级使工作与游玩收入 +4%（相乘），并提高主播带货的收入下限',
+  运筹: '每级使某鱼购物价格 -2%（下限 ×0.80）、成交手续费 -0.5%（10 级全免）',
+  洞察: '每级使抽赏券掉落率 +10%，时机条金色区宽度 +2%（上限 40%）',
+  沉浸: '每级使游玩收入 +4%（相乘），并提高主播带货的酬劳下限',
 };
 
 /** 每局属性经验分配比例（按游戏属性个数）：主属性占大头 */

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import {
+  DURABILITY,
   GAMES,
   canStore,
+  conditionText,
+  copiesOf,
   gainText,
   gameById,
   globalBonus,
@@ -21,10 +24,25 @@ const shelfCount = computed(
 );
 
 const ownedIds = computed(() =>
-  Object.keys(store.s.owned).filter(
-    id => store.s.owned[id].count > 0 && (!store.shelfFilter || gameById(id).attrs.includes(store.shelfFilter)),
+  Object.keys(store.s.collections).filter(
+    id =>
+      store.s.collections[id].firstOpened &&
+      (!store.shelfFilter || gameById(id).attrs.includes(store.shelfFilter)),
   ),
 );
+
+/** 实体序号：①②③…（超过 10 用 (11) 兜底） */
+function circled(i: number): string {
+  return i < 10 ? String.fromCharCode(0x2460 + i) : `(${i + 1})`;
+}
+
+function durText(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function copies(id: string) {
+  return copiesOf(store.s, id);
+}
 </script>
 
 <template>
@@ -34,43 +52,64 @@ const ownedIds = computed(() =>
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
     <div v-else class="grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
-        <div>{{ masteryText(store.s, gameById(id)) }} · 疲劳 {{ store.s.owned[id].fatigue }} · ×{{ store.s.owned[id].count }}</div>
+        <div>{{ masteryText(store.s, gameById(id)) }} · 疲劳 {{ store.s.collections[id].fatigue }}</div>
         <div class="tagline">每局 {{ gainText(gameById(id)) }}</div>
-        <div class="tagline">
-          {{ gameById(id).cards
-            ? (store.s.owned[id].sleeved ? '🎴已套牌套(×0.85)' : `🎴未套（需 ${gameById(id).cards} 张）`)
-            : '🎴无卡牌·无需牌套' }}
-          {{ canStore(gameById(id))
-            ? (store.s.owned[id].stored ? '📦已收纳(Setup×0.5)' : `📦未收纳（¥${storageCost(gameById(id))}）`)
-            : '📦小盒·无需收纳' }}
-        </div>
         <div v-if="gameById(id).affix" class="tagline" style="color:#d9a5f5">✦ {{ gameById(id).affix?.desc }}</div>
         <div class="bar" title="疲劳">
           <i
             :style="{
-              width: Math.min(100, store.s.owned[id].fatigue * 10) + '%',
-              background: store.s.owned[id].fatigue >= 7 ? 'var(--red)' : 'var(--green)',
+              width: Math.min(100, store.s.collections[id].fatigue * 10) + '%',
+              background: store.s.collections[id].fatigue >= 7 ? 'var(--red)' : 'var(--green)',
             }"
           ></i>
         </div>
-        <template #actions>
-          <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
-            <button
-              v-if="gameById(id).cards && gameById(id).cards! > 0 && !store.s.owned[id].sleeved"
-              :disabled="store.s.sleeves < (gameById(id).cards ?? 0)"
-              @click="store.sleeve(id)"
-            >
-              套牌套 {{ gameById(id).cards }}张
-            </button>
-            <button
-              v-if="canStore(gameById(id)) && !store.s.owned[id].stored"
-              :disabled="store.s.money < storageCost(gameById(id))"
-              @click="store.storage(id)"
-            >
-              收纳 ¥{{ storageCost(gameById(id)) }}
-            </button>
+        <!-- 实体列表：成色 / 耐久 / 牌套 / 收纳 / 某鱼上架 -->
+        <div v-if="copies(id).length" style="margin-top:6px">
+          <div
+            v-for="(c, i) in copies(id)"
+            :key="c.uid"
+            class="panel"
+            style="padding:8px;margin-bottom:6px"
+          >
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+              <span>
+                <b>实体{{ circled(i) }}</b> · {{ conditionText(c.durability, gameById(id).rarity) }}
+                {{ c.sleeved ? '🎴已套(×0.85)' : (gameById(id).cards ? `🎴未套（需 ${gameById(id).cards} 张）` : '🎴无卡牌') }}
+                {{ canStore(gameById(id)) ? (c.stored ? '📦已收纳(Setup×0.5·磨损×0.75)' : '📦未收纳') : '' }}
+              </span>
+              <span style="display:flex;gap:4px;flex-wrap:wrap">
+                <button
+                  v-if="gameById(id).cards && gameById(id).cards! > 0 && !c.sleeved"
+                  :disabled="store.s.sleeves < (gameById(id).cards ?? 0)"
+                  @click="store.sleeve(c.uid)"
+                >
+                  套牌套 {{ gameById(id).cards }}张
+                </button>
+                <button
+                  v-if="canStore(gameById(id)) && !c.stored"
+                  :disabled="store.s.money < storageCost(gameById(id))"
+                  @click="store.storage(c.uid)"
+                >
+                  收纳 ¥{{ storageCost(gameById(id)) }}
+                </button>
+                <button @click="store.gotoSell(c.uid)">某鱼上架</button>
+              </span>
+            </div>
+            <div class="bar" title="耐久">
+              <i
+                :style="{
+                  width: Math.min(100, (c.durability / DURABILITY[gameById(id).rarity]) * 100) + '%',
+                  background: c.durability <= 0 ? 'var(--red)' : 'var(--green)',
+                }"
+              ></i>
+            </div>
+            <small class="mut">
+              耐久 {{ durText(c.durability) }}/{{ DURABILITY[gameById(id).rarity]
+              }}{{ c.durability <= 0 ? '（已磨光，收益 ×0.5）' : '' }}
+            </small>
           </div>
-        </template>
+        </div>
+        <div v-else class="mut" style="margin-top:6px">实体已全部售出（收藏进度保留）。</div>
       </GameCard>
     </div>
   </div>

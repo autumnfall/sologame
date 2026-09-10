@@ -1,49 +1,86 @@
 import { ATTRS, SAVE_VERSION } from './data/constants';
 import type { Attr } from './data/constants';
 
-/** 单款桌游的收藏状态 */
-export interface OwnedGame {
-  /** 拥有盒数（原型期每款最多 1） */
-  count: number;
-  /** 熟练度：已玩局数（某赏重复可叠加） */
+/** 收藏级属性：一款桌游的「账号进度」，与实体无关，卖光重买依然保留 */
+export interface CollectionEntry {
+  /** 是否已获一次性开箱奖励（原型的 owned.count>0 语义） */
+  firstOpened: boolean;
+  /** 熟练度：已玩局数（仅游玩 +1） */
   prof: number;
-  /** 疲劳：该盒 +2 / 其余 -1，收益 = 1/(1+疲劳×0.15)，≥7 显示「玩腻了」 */
+  /** 疲劳：游玩目标 +2 / 其余收藏 -1，收益 = 1/(1+疲劳×0.15)，≥7「玩腻了」 */
   fatigue: number;
-  /** 已套牌套（游玩时长 ×0.85） */
-  sleeved: boolean;
-  /** 已收纳（Setup ×0.5） */
-  stored: boolean;
   /** 规则已读（跳过读规则阶段） */
   rulesRead: boolean;
 }
 
-/** 某鱼货架上的一件货源 */
-export interface XianyuItem {
-  id: string;
+/** 桌游实体：每个副本有自己的成色/牌套/收纳 */
+export interface Copy {
+  uid: number;
+  gameId: string;
+  /** 当前耐久（牌套磨损减半会产生 .5 小数），0 可玩但收益 ×0.5 */
+  durability: number;
+  sleeved: boolean;
+  stored: boolean;
+}
+
+/** 某鱼在售货源（一件 = 一个实体）；blind = 一口价盲买：UI 只显示名称，隐藏成色/牌套/收纳 */
+export interface MarketItem {
+  gameId: string;
+  price: number;
+  durability: number;
+  sleeved: boolean;
+  stored: boolean;
+  blind?: boolean;
+}
+
+/** 某鱼出售上架：引用实体 uid（实体在此期间不可游玩/再上架） */
+export interface Listing {
+  copyUid: number;
   price: number;
 }
 
-/** 游戏存档（对应原型 localStorage 中的 JSON） */
+/** 游戏存档 */
 export interface GameState {
   saveVersion: number;
   money: number;
   /** 牌套（张） */
   sleeves: number;
-  /** 某赏抽赏券 */
+  /** 某赏普通券 */
   tickets: number;
+  /** 某赏高级券（普通券+50牌套兑换） */
+  hiTickets: number;
   /** 六维属性经验 */
   attrExp: Record<Attr, number>;
-  /** 收藏：id -> 状态 */
-  owned: Record<string, OwnedGame>;
-  /** 某宝库存：id -> 剩余 */
+  /** 收藏：id -> 收藏级进度 */
+  collections: Record<string, CollectionEntry>;
+  /** 全部实体（含上架中的） */
+  copies: Copy[];
+  /** 下一个实体 uid（自增） */
+  nextUid: number;
+  /** 某宝剩余库存：id -> 剩余可购次数 */
   taobaoStock: Record<string, number>;
-  xianyu: XianyuItem[];
-  /** 下次某鱼自动到货时间戳 */
+  /** 某鱼在售货源 */
+  xianyuBuys: MarketItem[];
+  /** 某鱼出售上架 */
+  listings: Listing[];
+  /** 出售槽位数（1~5，可花钱扩充） */
+  sellSlots: number;
+  /** 市场每次刷新商品数（3~7，可花钱扩充） */
+  marketSlots: number;
+  /** 下次某鱼自动到货/成交判定时间戳 */
   xyNext: number;
-  /** 某赏 SSR 保底进度 */
+  /** 某赏常驻池 SSR 保底进度 */
   pity: number;
+  /** 某赏轮换池 SSR 保底进度（独立） */
+  pityRot: number;
+  /** 轮换赏池主题属性；null = 尚未开池 */
+  rotTheme: Attr | null;
+  /** 下次轮换时间戳 */
+  rotNext: number;
   /** 当前职业 id */
   job: string | null;
+  /** 当前工作周期已推进的秒数（换工作清零） */
+  jobProgress: number;
   /** 是否已完成开局三选一 */
   started: boolean;
   /** 离线收益待领取 */
@@ -58,16 +95,37 @@ export function defaultState(): GameState {
     money: 200,
     sleeves: 100,
     tickets: 0,
+    hiTickets: 0,
     attrExp: Object.fromEntries(ATTRS.map(a => [a, 0])) as Record<Attr, number>,
-    owned: {},
+    collections: {},
+    copies: [],
+    nextUid: 1,
     taobaoStock: {},
-    xianyu: [],
+    xianyuBuys: [],
+    listings: [],
+    sellSlots: 1,
+    marketSlots: 3,
     xyNext: 0,
     pity: 0,
+    pityRot: 0,
+    rotTheme: null,
+    rotNext: 0,
     job: null,
+    jobProgress: 0,
     started: false,
     offlineBank: { t: 0, money: 0, log: [] },
     lastSeen: Date.now(),
     stats: { plays: 0, pulls: 0 },
   };
+}
+
+/** 查找实体 */
+export function copyByUid(state: GameState, uid: number): Copy | undefined {
+  return state.copies.find(c => c.uid === uid);
+}
+
+/** 某收藏当前可用实体（未上架的） */
+export function copiesOf(state: GameState, gameId: string): Copy[] {
+  const listed = new Set(state.listings.map(l => l.copyUid));
+  return state.copies.filter(c => c.gameId === gameId && !listed.has(c.uid));
 }

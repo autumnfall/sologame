@@ -44,17 +44,19 @@ export interface Game {
   affix?: Affix;
 }
 
-/** 职业条目 */
+/** 职业条目（周期制：每 cycleSec 秒自动结算一次 cyclePay，与游玩并行） */
 export interface Job {
   id: string;
   name: string;
   /** 属性门槛：属性等级（罗马数字级别） */
   req: Partial<Record<import('./constants').Attr, number>>;
-  /** 是否自动产生秒收入 */
+  /** 是否自动产生周期收入（试玩员为手动：游玩结算给钱） */
   auto: boolean;
-  /** 基础收入（元/秒） */
-  rate: number;
-  /** 收入波动（主播带货） */
+  /** 工作周期（秒）；0 = 无周期（试玩员） */
+  cycleSec: number;
+  /** 每周期酬劳（元）；volatile 职业在结算时按沉浸下限~1.5 波动 */
+  cyclePay: number;
+  /** 酬劳波动（主播带货：结算时掷 ±） */
   volatile?: boolean;
   desc: string;
 }

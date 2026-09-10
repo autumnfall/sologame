@@ -5,9 +5,9 @@ import { gameById } from '../data/games';
 import type { AffixType } from '../data/types';
 import type { GameState } from '../state';
 
-/** 已收藏的桌游种数（count > 0，含隐藏款） */
+/** 已收藏的桌游种数（firstOpened，含隐藏款；实体卖光后收藏进度仍保留） */
 export function kindCount(state: GameState): number {
-  return Object.values(state.owned).filter(o => o.count > 0).length;
+  return Object.values(state.collections).filter(c => c.firstOpened).length;
 }
 
 /**
@@ -19,10 +19,10 @@ export function globalBonus(state: GameState): number {
   return raw <= GLOBAL_SOFTCAP ? raw : GLOBAL_SOFTCAP + (raw - GLOBAL_SOFTCAP) * 0.1;
 }
 
-/** 是否拥有指定类型的隐藏款词条 */
+/** 是否拥有指定类型的隐藏款词条（词条随收藏永久生效，与实体去留无关） */
 export function hasAffix(state: GameState, type: AffixType): boolean {
-  return Object.keys(state.owned).some(
-    id => state.owned[id].count > 0 && gameById(id).affix?.type === type,
+  return Object.keys(state.collections).some(
+    id => state.collections[id].firstOpened && gameById(id).affix?.type === type,
   );
 }
 
@@ -31,9 +31,9 @@ export function computeSetBonus(): number {
   return 1;
 }
 
-/** 某稀有度常规款中已收藏的款数 */
+/** 某稀有度常规款中已开箱的款数 */
 export function tierOwned(state: GameState, rarity: Rarity): number {
-  return gamesByRarity(rarity).filter(g => (state.owned[g.id]?.count ?? 0) > 0).length;
+  return gamesByRarity(rarity).filter(g => state.collections[g.id]?.firstOpened === true).length;
 }
 
 /** 该稀有度是否已解锁某宝购买（集齐上一级全部常规款；隐藏款不计入） */
@@ -46,9 +46,9 @@ export function tierUnlocked(state: GameState, rarity: Rarity): boolean {
 
 /** 是否已精通（不再出现在某鱼货源中） */
 export function isMastered(state: GameState, id: string): boolean {
-  const o = state.owned[id];
-  if (!o) return false;
-  return o.prof >= MASTERY[gameById(id).rarity];
+  const c = state.collections[id];
+  if (!c) return false;
+  return c.prof >= MASTERY[gameById(id).rarity];
 }
 
 /** 当前某宝货架应展示的稀有度：已解锁的最高级 */

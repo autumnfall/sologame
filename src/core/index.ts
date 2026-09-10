@@ -4,6 +4,7 @@ export * from './data/constants';
 export * from './data/games';
 export * from './data/jobs';
 export * from './data/prices';
+export * from './data/balance';
 export * from './state';
 export * from './mechanics/attrs';
 export * from './mechanics/collection';

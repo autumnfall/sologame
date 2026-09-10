@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SAVE_VERSION, defaultState, load, memoryStorage, save,
+  DURABILITY, SAVE_VERSION, defaultState, load, memoryStorage, save,
 } from '../src/core';
 
 function stateWithLastSeen(t: number) {
@@ -15,8 +15,18 @@ describe('存档系统', () => {
     const s = stateWithLastSeen(1234567890);
     s.money = 1234.5;
     s.started = true;
-    s.job = 'clerk';
-    s.owned['guoyuan'] = { count: 1, prof: 7, fatigue: 3, sleeved: true, stored: false, rulesRead: true };
+    s.job = 'teacher';
+    s.jobProgress = 42;
+    s.collections['guoyuan'] = { firstOpened: true, prof: 7, fatigue: 3, rulesRead: true };
+    s.copies.push({ uid: 1, gameId: 'guoyuan', durability: 6, sleeved: true, stored: false });
+    s.nextUid = 2;
+    s.listings.push({ copyUid: 1, price: 50 });
+    s.xianyuBuys.push({ gameId: 'mori', price: 200, durability: 30, sleeved: false, stored: true });
+    s.sellSlots = 2;
+    s.marketSlots = 4;
+    s.hiTickets = 3;
+    s.rotTheme = '演算';
+    s.pityRot = 7;
     s.attrExp['谋略'] = 42;
     s.stats.plays = 9;
     save(s, storage);
@@ -45,7 +55,7 @@ describe('存档系统', () => {
     expect(load(storage)).toBeNull();
   });
 
-  it('原型 v3 存档 → 迁移到当前版本：剥掉死字段 attrs、补默认字段、归一化 owned 条目', () => {
+  it('原型 v3 存档 → 迁移到最新版：owned→collections+满耐久实体，xianyu→xianyuBuys，剥掉 attrs', () => {
     const v3 = {
       saveVersion: 3,
       money: 500, sleeves: 80, tickets: 2,
@@ -54,7 +64,7 @@ describe('存档系统', () => {
         guoyuan: { count: 1, prof: 3, fatigue: 1 }, // 缺布尔字段（模拟旧存档）
       },
       taobaoStock: { guoyuan: 0 },
-      xianyu: [], pity: 5, job: 'calc', started: true,
+      xianyu: [{ id: 'mori', price: 260 }], pity: 5, job: 'calc', started: true,
       offlineBank: { t: 60000, money: 120 },
       lastSeen: 1111111111, stats: { plays: 3, pulls: 1 },
       // 无 xyNext（原型旧存档兜底场景）
@@ -67,19 +77,75 @@ describe('存档系统', () => {
     expect(s!.money).toBe(500);
     expect('attrs' in s!).toBe(false);
     expect(s!.xyNext).toBe(0); // 默认填充
-    expect(s!.owned['guoyuan']).toEqual({
-      count: 1, prof: 3, fatigue: 1, sleeved: false, stored: false, rulesRead: false,
-    });
+    // owned → collections + copies
+    expect(s!.collections['guoyuan']).toEqual({ firstOpened: true, prof: 3, fatigue: 1, rulesRead: false });
+    expect(s!.copies).toEqual([
+      { uid: 1, gameId: 'guoyuan', durability: DURABILITY.N, sleeved: false, stored: false },
+    ]);
+    expect(s!.nextUid).toBe(2);
+    // 旧 xianyu → 在售实体（满耐久）
+    expect(s!.xianyuBuys).toEqual([
+      { gameId: 'mori', price: 260, durability: DURABILITY.R, sleeved: false, stored: false },
+    ]);
+    // 旧库存 0 → 售罄保留；新字段默认
+    expect(s!.taobaoStock['guoyuan']).toBe(0);
+    expect(s!.sellSlots).toBe(1);
+    expect(s!.marketSlots).toBe(3);
+    expect(s!.hiTickets).toBe(0);
+    expect(s!.listings).toEqual([]);
     // attrExp 补齐全部六维
     expect(Object.keys(s!.attrExp)).toHaveLength(6);
     expect(s!.attrExp['谋略']).toBe(10);
   });
 
-  it('脏数据兜底：负数 count / 非法 owned 条目 / 缺 stats', () => {
+  it('v4 存档多副本/牌套收纳迁移：count 个满耐久实体，牌套收纳挂第一个', () => {
+    const v4 = {
+      saveVersion: 4,
+      money: 100, sleeves: 50, tickets: 0,
+      attrExp: {},
+      owned: {
+        guoyuan: { count: 2, prof: 9, fatigue: 2, sleeved: true, stored: false, rulesRead: true },
+      },
+      taobaoStock: {}, xianyu: [], pity: 0, job: null, started: true,
+      offlineBank: { t: 0, money: 0, log: [] },
+      lastSeen: 2222222222, stats: { plays: 9, pulls: 0 },
+    };
+    const storage = memoryStorage();
+    storage.setItem('bgcollector_save', JSON.stringify(v4));
+    const s = load(storage);
+    expect(s).not.toBeNull();
+    expect(s!.collections['guoyuan']).toEqual({ firstOpened: true, prof: 9, fatigue: 2, rulesRead: true });
+    expect(s!.copies).toHaveLength(2);
+    expect(s!.copies[0].sleeved).toBe(true);
+    expect(s!.copies[1].sleeved).toBe(false);
+    expect(s!.copies.every(c => c.durability === DURABILITY.N)).toBe(true);
+    expect(s!.nextUid).toBe(3);
+  });
+
+  it('v5 → v6（职业周期制）：旧职业 id 映射（clerk→teacher / editor→writer / designer→consultant），jobProgress 清零', () => {
+    for (const [old, mapped] of [['clerk', 'teacher'], ['editor', 'writer'], ['designer', 'consultant'], ['calc', 'calc']] as const) {
+      const v5 = {
+        saveVersion: 5,
+        money: 100, job: old, jobProgress: 77, rate: 1.0,
+        collections: {}, copies: [], xianyuBuys: [], listings: [],
+        offlineBank: { t: 0, money: 0, log: [] }, lastSeen: 1, stats: { plays: 0, pulls: 0 },
+      };
+      const storage = memoryStorage();
+      storage.setItem('bgcollector_save', JSON.stringify(v5));
+      const s = load(storage);
+      expect(s).not.toBeNull();
+      expect(s!.job).toBe(mapped);
+      expect(s!.jobProgress).toBe(0);
+      expect('rate' in s!).toBe(false); // 旧 rate 字段已剥掉
+    }
+  });
+
+  it('脏数据兜底：负值归零 / 非法实体条目 / 缺 stats', () => {
     const dirty = {
       saveVersion: SAVE_VERSION,
-      money: 'abc', sleeves: -5,
-      owned: { guoyuan: { count: -2, prof: 'x' }, bad: 'not-object', ghost: null },
+      money: 'abc', sleeves: -5, sellSlots: 99, marketSlots: 0,
+      copies: [{ uid: 'x', gameId: 'guoyuan', durability: -3 }, { bad: true }, null],
+      collections: { guoyuan: { firstOpened: 1, prof: 'y' }, bad: 'nope' },
       stats: null, offlineBank: undefined,
     };
     const storage = memoryStorage();
@@ -88,8 +154,12 @@ describe('存档系统', () => {
     expect(s).not.toBeNull();
     expect(s!.money).toBe(200); // 非法值回退默认
     expect(s!.sleeves).toBe(0); // 负值归零
-    expect(s!.owned['guoyuan'].count).toBe(0);
-    expect(s!.owned['bad']).toBeUndefined();
+    expect(s!.sellSlots).toBe(5); // 越界收敛
+    expect(s!.marketSlots).toBe(3);
+    expect(s!.copies).toHaveLength(1);
+    expect(s!.copies[0].durability).toBe(0); // 负值耐久归零（视为磨光）
+    expect(s!.collections['guoyuan'].firstOpened).toBe(false); // 非 true 即 false
+    expect(s!.collections['bad']).toBeUndefined();
     expect(s!.stats).toEqual({ plays: 0, pulls: 0 });
   });
 });

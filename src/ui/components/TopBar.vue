@@ -24,6 +24,7 @@ function chipTitle(a: (typeof ATTRS)[number]): string {
       <span>💰 <span class="res">{{ fmt(store.s.money) }}</span> 元</span>
       <span>🎴 牌套 <b>{{ store.s.sleeves }}</b> 张</span>
       <span>🎫 抽赏券 <b>{{ store.s.tickets }}</b></span>
+      <span v-if="store.s.hiTickets > 0">🎟️ 高级券 <b>{{ store.s.hiTickets }}</b></span>
       <span class="attrs">
         <span v-for="a in ATTRS" :key="a" class="attr-chip" :title="chipTitle(a)">
           {{ ATTR_ICON[a] }}{{ a }} <b>{{ ROMAN[attrProgress(store.s, a).lv] }}</b>

@@ -1,0 +1,109 @@
+import type { Rarity } from './types';
+
+// ================= 平衡调参区 =================
+// 所有新玩法的可调数值集中于此，调平衡只改这里（★ 均为占位初值）。
+
+/** 满耐久（≈可玩次数），按稀有度 */
+export const DURABILITY: Record<Rarity, number> = { N: 10, R: 20, SR: 40, SSR: 80 };
+
+/** 收纳为一次性整理：做收纳时按稀有度一次性扣除的耐久 */
+export const STORE_WEAR_ONCE: Record<Rarity, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
+
+/** 收纳完成后，该实体每次游玩的耐久磨损倍率（减缓 25%） */
+export const STORE_WEAR_MULT = 0.75;
+
+/** 耐久为 0 时整体收益（经验+收入）倍率 */
+export const WORN_PENALTY = 0.5;
+
+/** 某宝每款可购次数（售完不补） */
+export const TAOBAO_STOCK: Record<Rarity, number> = { N: 4, R: 3, SR: 2, SSR: 1 };
+
+/**
+ * 某赏奖池（常驻/轮换统一）：累加判定，顺序即优先级。
+ * 牌套 4/10/20 包 = 46/15/5%；桌游 N/R/SR/SSR = 20/10/3/1%。
+ */
+export const GACHA_TABLE: readonly (
+  | { kind: 'sleeves'; packs: number; p: number }
+  | { kind: 'game'; rarity: Rarity; p: number }
+)[] = [
+  { kind: 'sleeves', packs: 4, p: 0.46 },
+  { kind: 'sleeves', packs: 10, p: 0.15 },
+  { kind: 'sleeves', packs: 20, p: 0.05 },
+  { kind: 'game', rarity: 'N', p: 0.20 },
+  { kind: 'game', rarity: 'R', p: 0.10 },
+  { kind: 'game', rarity: 'SR', p: 0.03 },
+  { kind: 'game', rarity: 'SSR', p: 0.01 },
+];
+
+/** 保底触发时 SR/SSR 的比例（与基础 3:1 一致） */
+export const GACHA_PITY_SSR_SHARE = 0.25;
+
+/** 轮换赏池：周期与单抽价（金钱，与常驻同价） */
+export const ROTATION_MS = 10 * 60 * 1000;
+export const ROTATION_PRICE = 100; // = GACHA_PRICE，这里独立常量避免循环依赖
+
+/** 兑换：1 普通券 + 50 牌套 = 1 高级券 */
+export const HI_TICKET_SLEEVES = 50;
+
+/** 某鱼成交手续费（运筹每级 -0.3%，10 级全免） */
+export const SELL_FEE = 0.05;
+
+/** 离线收益折算比例（离线只按 50% 计入 bank，上限 1 小时不变） */
+export const OFFLINE_RATE = 0.5;
+
+/** 出售槽位扩充价格：扩到 2/3/4/5 个（初始 1 个，上限 5） */
+export const SELL_SLOT_COSTS: readonly number[] = [500, 1500, 4000, 10000];
+
+/** 市场刷新商品数扩充价格：扩到 4/5/6/7 件（初始 3 件，上限 7） */
+export const MARKET_SLOT_COSTS: readonly number[] = [200, 600, 1500, 3500];
+
+export const SELL_SLOTS_MAX = 5;
+export const MARKET_SLOTS_MAX = 7;
+
+/** 市场上架定价范围（相对实体总价值） */
+export const SELL_PRICE_MIN = 0.5;
+export const SELL_PRICE_MAX = 2.0;
+
+// ---------- 成色与价值 ----------
+
+/** 成色比 0~1（0 = 5成新，1 = 全新） */
+export function durabilityRatio(durability: number, rarity: Rarity): number {
+  return Math.max(0, Math.min(1, durability / DURABILITY[rarity]));
+}
+
+/** 成色文案：满耐久「全新」，否则 N 成新（0 耐久 = 5成新） */
+export function conditionText(durability: number, rarity: Rarity): string {
+  const r = durabilityRatio(durability, rarity);
+  return r >= 1 ? '全新' : `${Math.floor(5 + 5 * r)}成新`;
+}
+
+/** 单次游玩耐久磨损：基础 1，收纳 ×0.75（一次性扣耐久后生效），牌套 ×0.5 */
+export function playWear(stored: boolean, sleeved: boolean): number {
+  return (stored ? STORE_WEAR_MULT : 1) * (sleeved ? 0.5 : 1);
+}
+
+/**
+ * 实体总价值（某鱼买卖的定价基础）：
+ * 基础 = 市场价 × (0.5 + 0.5×成色比)；收纳 +20% 市场价；牌套每 50 张 10 元（不足向上取整）。
+ */
+export function copyValue(
+  marketPrice: number,
+  cards: number | null,
+  durability: number,
+  rarity: Rarity,
+  sleeved: boolean,
+  stored: boolean,
+): number {
+  const base = marketPrice * (0.5 + 0.5 * durabilityRatio(durability, rarity));
+  const extras = (stored ? marketPrice * 0.2 : 0) + (sleeved && cards ? Math.ceil(cards / 50) * 10 : 0);
+  return Math.round(base + extras);
+}
+
+/**
+ * 某鱼出售成交概率：clamp01((1.5 − 定价倍率) × (0.5 + 0.5×成色比))。
+ * 全新 ×50% 定价 = 1.0 必卖；0 耐久 ×200% 定价 = 0 必不卖。
+ */
+export function sellChance(priceMult: number, durability: number, rarity: Rarity): number {
+  const p = (1.5 - priceMult) * (0.5 + 0.5 * durabilityRatio(durability, rarity));
+  return Math.max(0, Math.min(1, p));
+}

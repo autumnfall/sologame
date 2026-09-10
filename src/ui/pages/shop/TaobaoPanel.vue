@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { currentTier, gamesByRarity, nextTier, taobaoBase, tierOwned } from '../../../core';
+import { TAOBAO_STOCK, currentTier, gameById, gamesByRarity, nextTier, taobaoBase, tierOwned } from '../../../core';
 import { useGameStore } from '../../stores/game';
 import GameCard from '../../components/GameCard.vue';
 
@@ -13,8 +13,14 @@ const ownedN = computed(() => tierOwned(store.s, cur.value));
 const done = computed(() => ownedN.value >= total.value);
 const nextTierKey = computed(() => nextTier(cur.value));
 
+function stockLeft(id: string): number {
+  return store.s.taobaoStock[id] ?? TAOBAO_STOCK[gameById(id).rarity];
+}
+
 const headerText = computed(() => {
-  const parts = [`收集进度 ${ownedN.value}/${total.value} · 每款限购 1 件`];
+  const parts = [
+    `收集进度 ${ownedN.value}/${total.value} · 每款限量 ${TAOBAO_STOCK[cur.value]} 件，售完不补（可重复购买同款）`,
+  ];
   if (done.value && nextTierKey.value) parts.push(` · 🎉 已集齐，即将解锁 ${nextTierKey.value} 级`);
   else if (nextTierKey.value) parts.push(` · 集齐后解锁 ${nextTierKey.value} 级`);
   else parts.push(' · 已是最高级别');
@@ -30,10 +36,10 @@ const headerText = computed(() => {
     </div>
     <GameCard v-for="g in gamesByRarity(cur)" :key="g.id" :game="g">
       <div class="tagline">{{ g.tags.join(' · ') }} · {{ g.playTime }}分钟</div>
+      <div class="tagline mut">库存 {{ stockLeft(g.id) }}/{{ TAOBAO_STOCK[g.rarity] }}</div>
       <template #actions>
-        <div v-if="store.s.owned[g.id] && store.s.owned[g.id].count > 0" class="mut" style="margin-top:6px">✓ 已收藏</div>
         <div
-          v-else-if="(store.s.taobaoStock[g.id] || 0) > 0"
+          v-if="stockLeft(g.id) > 0"
           style="margin-top:6px;display:flex;justify-content:space-between;align-items:center"
         >
           <span class="price">¥{{ taobaoBase(g) }}</span>

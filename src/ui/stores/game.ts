@@ -8,27 +8,37 @@ import {
   buyTaobao,
   buyXianyu,
   claimOffline,
+  conditionText,
+  copyByUid,
+  copiesOf,
   defaultState,
+  exchangeHiTickets,
+  expandMarketSlots,
+  expandSellSlots,
   fmt,
   gameById,
   gachaDraw,
   goldZoneWidth,
   initTaobaoStock,
+  listCopy,
   load,
   jobById,
   pickStarter as corePickStarter,
   playDuration,
   quitJob,
   refreshXianyu,
+  rotatingThemeText,
   ruleDuration,
   save,
   settleRound,
   setupDuration,
   takeJob,
+  tickRotation,
   tickSecond,
   tickXianyu,
+  unlistCopy,
 } from '../../core';
-import type { Attr, GameState, Rarity } from '../../core';
+import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 
 export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'guide';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
@@ -65,6 +75,8 @@ export interface TimingState {
 
 export interface PlaySession {
   gameId: string;
+  /** 本局使用的实体 uid（多实体游戏由选择器决定；换游戏时自动挑一个可用实体） */
+  copyUid: number | null;
   nextId: string | null;
   stopAfter: boolean;
   round: number;
@@ -81,7 +93,8 @@ export interface LogLine {
 }
 
 export interface GachaEntry {
-  rar: Rarity;
+  /** 牌套结果用 '🎴' 占位（RAR_COLOR 无此键则不着色） */
+  rar: Rarity | '🎴';
   dup: boolean;
   name: string;
   text: string;
@@ -93,6 +106,11 @@ let toastTimer: number | undefined;
 /** 光标往返位置公式：elapsed%2<1 时 (elapsed%1)*100，否则 (1-elapsed%1)*100 */
 function cursorPos(el: number): number {
   return el % 2 < 1 ? (el % 1) * 100 : (1 - (el % 1)) * 100;
+}
+
+/** 耐久可能带 .5（牌套磨损减半），展示时去掉多余的 .0 */
+function durText(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 export const useGameStore = defineStore('game', {
@@ -111,6 +129,10 @@ export const useGameStore = defineStore('game', {
     nowMs: Date.now(),
     lastTick: 0,
     secAcc: 0,
+    /** 多实体游戏开玩前的实体选择（gameId；null = 未在选择中） */
+    pendingCopyPick: null as string | null,
+    /** 收藏架「某鱼上架」跳转时预选的要上架实体 uid */
+    sellPickUid: null as number | null,
   }),
   getters: {
     /** 离线收益已累积分钟数（展示用） */
@@ -120,6 +142,11 @@ export const useGameStore = defineStore('game', {
     /** 某鱼到货倒计时 mm:ss */
     xyCd(state): string {
       const r = Math.max(0, state.s.xyNext - state.nowMs);
+      return `${Math.floor(r / 60000)}:${String(Math.floor(r / 1000) % 60).padStart(2, '0')}`;
+    },
+    /** 轮换赏池换主题倒计时 mm:ss */
+    rotCd(state): string {
+      const r = Math.max(0, state.s.rotNext - state.nowMs);
       return `${Math.floor(r / 60000)}:${String(Math.floor(r / 1000) % 60).padStart(2, '0')}`;
     },
   },
@@ -141,13 +168,14 @@ export const useGameStore = defineStore('game', {
     boot() {
       this.s = load() ?? defaultState();
       initTaobaoStock(this.s);
+      tickRotation(this.s); // 补开轮换赏池（老存档 rotNext=0）
       if (!this.s.started) {
         refreshXianyu(this.s, false);
         save(this.s);
         this.showStarter = true;
       } else {
         if (!this.s.xyNext) this.s.xyNext = Date.now() + XY_REFRESH_MS;
-        if (!this.s.xianyu.length) refreshXianyu(this.s, false);
+        if (!this.s.xianyuBuys.length) refreshXianyu(this.s, false);
         const away = Date.now() - this.s.lastSeen;
         if (away > 60000) accumulateOffline(this.s, away);
         if (away > 60000 && this.s.offlineBank.money > 0) {
@@ -172,12 +200,17 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    /** 每秒一次：工作结算 + 某鱼自动到货 */
+    /** 每秒一次：工作周期推进 + 某鱼自动到货/成交 + 某赏轮换池计时 */
     tickOnce() {
       const r = tickSecond(this.s);
+      if (r.payout) this.toast(`💼 工作周期结算 +¥${fmt(r.payAmount)}`);
       if (r.ticketDrop) this.toast('🎫 工作中捡到一张某赏抽赏券！');
       if (r.streamEvent) this.toast('📺 直播事件：' + r.streamEvent);
-      if (tickXianyu(this.s)) this.toast('🔄 某鱼自动到货一批新货源');
+      const xy = tickXianyu(this.s);
+      if (xy.refreshed) this.toast('🔄 某鱼自动到货一批新货源');
+      for (const sold of xy.sold) this.toast(`《${sold.name}》已售出，到账 ¥${sold.gain}`);
+      const rot = tickRotation(this.s);
+      if (rot.changed && rot.theme) this.toast(`轮换赏池更新：${rotatingThemeText(rot.theme)}`);
     },
 
     logPlay(text: string, cls = '') {
@@ -187,11 +220,42 @@ export const useGameStore = defineStore('game', {
 
     // ---------- 游玩会话 ----------
 
-    startPlay(id: string) {
+    /**
+     * 开玩入口：单实体直接开局；多实体先弹实体选择器
+     *（pendingCopyPick 由页面弹选择器，选定后走 pickCopy → startPlay）
+     */
+    requestPlay(id: string) {
+      if (this.session) return;
+      const avail = copiesOf(this.s, id);
+      if (!avail.length) {
+        this.toast('没有可游玩的实体（可能已全部上架某鱼）');
+        return;
+      }
+      if (avail.length > 1) {
+        this.pendingCopyPick = id;
+        return;
+      }
+      this.startPlay(id, avail[0].uid);
+    },
+
+    /** 实体选择器选定（页面调用） */
+    pickCopy(uid: number) {
+      const id = this.pendingCopyPick;
+      if (!id) return;
+      this.pendingCopyPick = null;
+      this.startPlay(id, uid);
+    },
+
+    cancelCopyPick() {
+      this.pendingCopyPick = null;
+    },
+
+    startPlay(id: string, copyUid: number) {
       if (this.session) return;
       this.playLog = [];
       this.session = {
         gameId: id,
+        copyUid,
         nextId: null,
         stopAfter: false,
         round: 0,
@@ -213,13 +277,18 @@ export const useGameStore = defineStore('game', {
         clearTimeout(ps.restartTimer);
         ps.restartTimer = null;
       }
+      // 换游戏（下轮换它）时自动挑一个可用实体；本局实体全程固定
+      if (ps.copyUid == null || copyByUid(this.s, ps.copyUid)?.gameId !== id) {
+        ps.copyUid = copiesOf(this.s, id)[0]?.uid ?? null;
+      }
+      const copy = ps.copyUid != null ? copyByUid(this.s, ps.copyUid) : undefined;
       ps.gameId = id;
       ps.nextId = null;
       ps.round++;
       ps.phases = [
         { key: 'rules', name: '读规则', total: ruleDuration(this.s, g), done: false, hit: null, t: 0, pct: 0, timingStarted: false },
-        { key: 'setup', name: 'Setup', total: setupDuration(this.s, g), done: false, hit: null, t: 0, pct: 0, timingStarted: false },
-        { key: 'play', name: '游玩', total: playDuration(this.s, g), done: false, hit: null, t: 0, pct: 0, timingStarted: false },
+        { key: 'setup', name: 'Setup', total: setupDuration(this.s, g, copy), done: false, hit: null, t: 0, pct: 0, timingStarted: false },
+        { key: 'play', name: '游玩', total: playDuration(this.s, g, copy), done: false, hit: null, t: 0, pct: 0, timingStarted: false },
         { key: 'settle', name: '结算', total: 4, done: false, hit: null, t: 0, pct: 0, timingStarted: false },
       ];
       ps.idx = 0;
@@ -297,8 +366,21 @@ export const useGameStore = defineStore('game', {
       if (!ps || ps.settled) return;
       ps.settled = true;
       ps.timing = null;
-      const res = settleRound(this.s, ps.gameId, ps.round);
+      if (ps.copyUid == null) {
+        this.toast('没有可游玩的实体了');
+        this.clearSession();
+        return;
+      }
       const g = gameById(ps.gameId);
+      let res;
+      try {
+        res = settleRound(this.s, ps.gameId, ps.copyUid, ps.round);
+      } catch (e) {
+        // 实体在中途被上架某鱼等：本局作废
+        this.toast(e instanceof Error ? e.message : '结算失败');
+        this.clearSession();
+        return;
+      }
       const gainStr = Object.entries(res.gains)
         .map(([a, v]) => `${ATTR_ICON[a as Attr]}${a}+${(v ?? 0).toFixed(1)}`)
         .join('　');
@@ -306,6 +388,17 @@ export const useGameStore = defineStore('game', {
         `✅ 第 ${res.round} 局结算：${gainStr}，收入 ¥${res.pay}${res.ticketDrop ? '，掉落🎫×1！' : ''}`,
         'good',
       );
+      // 实体磨损：结算后追加耐久变化
+      const before = res.durability + res.wear;
+      if (res.worn) {
+        this.logPlay(`🧰 实体已磨光（耐久 0），本局收益减半`, 'bad');
+      } else {
+        const copy = copyByUid(this.s, ps.copyUid);
+        this.logPlay(
+          `🧰 耐久 ${durText(before)}→${durText(res.durability)}${copy?.sleeved ? '（牌套减半磨损）' : ''}${copy?.stored ? '（收纳减缓磨损）' : ''}`,
+          'mut',
+        );
+      }
       if (res.tired) this.logPlay(`《${g.name}》有点玩腻了（疲劳 ${res.fatigue}），换一盒收益更高。`, 'bad');
       this.saveGame();
       if (ps.stopAfter) {
@@ -373,12 +466,22 @@ export const useGameStore = defineStore('game', {
     },
 
     buyXy(index: number) {
+      const it = this.s.xianyuBuys[index];
       const r = buyXianyu(this.s, index);
       if (r.ok && r.gameId) {
         const g = gameById(r.gameId);
-        const bonus = r.acquire?.first ? `开箱奖励：全属性经验 +${Math.round(r.acquire.bonusExp)}` : '';
-        this.toast(`淘到《${g.name}》！${bonus}`);
+        if (it?.blind) {
+          // 一口价开盒：揭示真实成色/牌套/收纳
+          const cond = conditionText(it.durability, g.rarity);
+          const extras = `${it.sleeved ? '·已套牌套' : ''}${it.stored ? '·已收纳' : ''}`;
+          this.toast(`一口价《${g.name}》开盒：${cond}${extras}！`);
+        } else {
+          const cond = it ? conditionText(it.durability, g.rarity) : '';
+          this.toast(`淘到《${g.name}》${cond ? `（${cond}）` : ''}！`);
+        }
         this.saveGame();
+      } else if (r.reason) {
+        this.toast(r.reason);
       }
     },
 
@@ -387,36 +490,61 @@ export const useGameStore = defineStore('game', {
       if (!r.ok && r.reason) this.toast(r.reason);
     },
 
-    pullGacha(useTicket: boolean) {
-      const r = gachaDraw(this.s, useTicket);
+    // ---------- 某赏 ----------
+
+    pullGacha(pool: GachaPool, pay: GachaPay) {
+      const r = gachaDraw(this.s, pool, pay);
       if ('error' in r) {
         this.toast(r.error);
         return;
       }
-      const g = gameById(r.gameId);
-      if (r.duplicate) {
+      const poolTag = r.pool === 'rot' ? '（轮换池）' : '';
+      if (r.kind === 'sleeves') {
         this.gachaLog.unshift({
-          rar: r.rarity,
-          dup: true,
-          name: g.name,
-          text: `→ 转化 牌套 ×${r.sleevePacks} 包（${r.sleeveSheets} 张）+ 熟练度 +${r.profGain}`,
-          cls: r.rarity === 'N' ? '' : 'hit',
+          rar: '🎴',
+          dup: false,
+          name: `${r.packs} 包牌套`,
+          text: `+${r.sleeves} 张牌套${poolTag}`,
+          cls: '',
         });
       } else {
-        const bonus = r.acquire.first ? `开箱奖励：全属性经验 +${Math.round(r.acquire.bonusExp)}` : '';
-        this.gachaLog.unshift({
-          rar: r.rarity,
-          dup: false,
-          name: g.name,
-          text: `！${bonus}`,
-          cls: r.rarity !== 'N' ? 'hit' : '',
-        });
+        const g = gameById(r.gameId);
+        if (r.duplicate) {
+          this.gachaLog.unshift({
+            rar: r.rarity,
+            dup: true,
+            name: g.name,
+            text: `直接获得新实体${poolTag}（收藏级进度保留，可挂某鱼出售）`,
+            cls: r.rarity === 'N' ? '' : 'hit',
+          });
+        } else {
+          const bonus = r.acquire.first ? `开箱奖励：全属性经验 +${Math.round(r.acquire.bonusExp)}` : '';
+          this.gachaLog.unshift({
+            rar: r.rarity,
+            dup: false,
+            name: g.name,
+            text: `新收藏！${bonus}${poolTag}`,
+            cls: r.rarity !== 'N' ? 'hit' : '',
+          });
+        }
       }
       this.saveGame();
     },
 
-    sleeve(id: string) {
-      const r = applySleeve(this.s, id);
+    exchangeHi(n: number) {
+      const r = exchangeHiTickets(this.s, n);
+      if (r.ok) {
+        this.toast(`兑换成功：高级券 +${n}`);
+        this.saveGame();
+      } else {
+        this.toast(r.reason ?? '兑换失败');
+      }
+    },
+
+    // ---------- 实体：牌套 / 收纳 / 某鱼出售 ----------
+
+    sleeve(uid: number) {
+      const r = applySleeve(this.s, uid);
       if (r.ok) {
         this.toast(r.message);
         this.saveGame();
@@ -425,13 +553,50 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    storage(id: string) {
-      const r = applyStorage(this.s, id);
+    storage(uid: number) {
+      const r = applyStorage(this.s, uid);
       if (r.ok) {
         this.toast(r.message);
         this.saveGame();
       }
     },
+
+    /** 某鱼上架实体（priceMult 0.5~2.0） */
+    listForSale(uid: number, priceMult: number) {
+      const r = listCopy(this.s, uid, priceMult);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) {
+        this.sellPickUid = null;
+        this.saveGame();
+      }
+    },
+
+    unlistForSale(uid: number) {
+      const r = unlistCopy(this.s, uid);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    expandSell() {
+      const r = expandSellSlots(this.s);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    expandMarket() {
+      const r = expandMarketSlots(this.s);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 收藏架「某鱼上架」入口：预选实体并跳到某鱼出售区 */
+    gotoSell(uid: number) {
+      this.sellPickUid = uid;
+      this.tab = 'shop';
+      this.shopTab = 'xianyu';
+    },
+
+    // ---------- 工作 ----------
 
     doTakeJob(id: string) {
       takeJob(this.s, id);

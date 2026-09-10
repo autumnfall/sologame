@@ -6,7 +6,7 @@ import { useGameStore } from '../stores/game';
 const props = defineProps<{ game: Game }>();
 const store = useGameStore();
 
-const owned = computed(() => store.s.owned[props.game.id]);
+const owned = computed(() => store.s.collections[props.game.id]);
 const tired = computed(() => !!owned.value && owned.value.fatigue >= 7);
 
 // 封面渐变底色（对应原型 coverStyle）
