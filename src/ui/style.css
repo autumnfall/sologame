@@ -1,0 +1,81 @@
+/* ============ 基础 ============ */
+:root{
+  --bg:#16130f; --panel:#221d16; --panel2:#2b241b; --line:#3d3428;
+  --txt:#e8dfc9; --dim:#9a8f76; --gold:#e8b64c; --green:#7fb069; --red:#d1605e;
+  --N:#8a8578; --R:#5b8dd9; --SR:#a06ee8; --SSR:#e8a13c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:6px;padding:6px 12px;font-size:13px;transition:all .15s}
+button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--gold);border-color:var(--gold);color:#241c0c;font-weight:700}
+button.primary:hover:not(:disabled){color:#241c0c;filter:brightness(1.1)}
+button.danger:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+h2{font-size:16px;margin-bottom:10px;color:var(--gold)}
+h3{font-size:14px;margin-bottom:8px}
+small{color:var(--dim)}
+/* ============ 状态栏+标签页（整体吸顶固定） ============ */
+#topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
+#statusbar{background:linear-gradient(180deg,#2b241b,#221d16);border-bottom:2px solid var(--line);padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:13px}
+#statusbar .res{font-weight:700;color:var(--gold)}
+#statusbar .attrs{display:flex;gap:10px;flex-wrap:wrap}
+.attr-chip{background:#191510;border:1px solid var(--line);border-radius:12px;padding:2px 9px;font-size:12px;cursor:default}
+.attr-chip b{color:#7fb8e0}
+.attr-chip .prog{color:var(--dim);font-size:11px}
+#statusbar .gbonus{color:var(--green);font-weight:700}
+/* ============ 标签页 ============ */
+#tabs{display:flex;gap:4px;padding:10px 14px 0;background:var(--panel);border-bottom:1px solid var(--line)}
+#tabs button{border-radius:8px 8px 0 0;border-bottom:none;padding:9px 22px;font-size:14px}
+#tabs button.active{background:var(--bg);color:var(--gold);border-color:var(--gold);font-weight:700}
+#content{padding:16px;max-width:1200px;margin:0 auto}
+.tabpage{display:none}.tabpage.active{display:block}
+/* ============ 卡牌/封面 ============ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative}
+.card .cover{height:96px;display:flex;align-items:center;justify-content:center;font-size:38px;position:relative}
+.card .cover .cname{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:12px;font-weight:700;text-shadow:0 1px 4px #000;padding:0 4px}
+.card .body{padding:8px 10px;font-size:12px;line-height:1.7}
+.card .rarity{position:absolute;top:5px;left:6px;font-size:11px;font-weight:800;z-index:2;text-shadow:0 1px 3px #000}
+.card .fatigue-badge{position:absolute;top:5px;right:6px;background:#000a;color:#bbb;font-size:11px;padding:1px 7px;border-radius:8px;z-index:2;border:1px solid #666}
+.card.tired .cover{filter:grayscale(.95) brightness(.7)}
+.card .bar{height:5px;background:#111;border-radius:3px;overflow:hidden;margin-top:3px}
+.card .bar>i{display:block;height:100%;background:var(--green)}
+.rar-N{--rc:var(--N)}.rar-R{--rc:var(--R)}.rar-SR{--rc:var(--SR)}.rar-SSR{--rc:var(--SSR)}
+.card{border-top:3px solid var(--rc)}
+.tagline{color:var(--dim);font-size:11px}
+/* ============ 弹窗 ============ */
+#modal-mask{position:fixed;inset:0;background:#000c;z-index:100;display:flex;align-items:center;justify-content:center}
+#modal{background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:22px;max-width:560px;width:92%;max-height:86vh;overflow-y:auto;box-shadow:0 8px 40px #000}
+/* ============ 游玩流程 ============ */
+#play-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px}
+.phase-row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.phase-row .plabel{width:80px;font-size:13px;color:var(--dim)}
+.pbar{flex:1;height:22px;background:#14100c;border:1px solid var(--line);border-radius:6px;position:relative;overflow:hidden}
+.pbar .fill{height:100%;width:0;background:linear-gradient(90deg,#6b5a2e,var(--gold));transition:width .1s linear}
+.pbar .gzone{position:absolute;top:0;bottom:0;background:#ffd75e88;border-left:2px solid #ffd75e;border-right:2px solid #ffd75e;display:none}
+.pbar .cursor{position:absolute;top:-2px;bottom:-2px;width:4px;background:#fff;display:none;box-shadow:0 0 6px #fff}
+.pbar.active .gzone,.pbar.active .cursor{display:block}
+.pbar.done .fill{width:100%!important;background:var(--green)}
+.presult{width:56px;font-size:12px;text-align:right}
+.logbox{background:#12100c;border:1px solid var(--line);border-radius:8px;padding:10px;height:150px;overflow-y:auto;font-size:12px;line-height:1.8;color:#c9bfa4}
+.logbox .hit{color:var(--gold)}.logbox .good{color:var(--green)}.logbox .bad{color:var(--red)}
+/* ============ 工作 ============ */
+.job{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.job.locked{opacity:.55}
+.job .jname{font-weight:700;font-size:15px}
+.job.current{border-color:var(--gold);box-shadow:0 0 12px #e8b64c33}
+/* ============ 商店 ============ */
+.subtabs{display:flex;gap:6px;margin-bottom:14px}
+.subtabs button.active{border-color:var(--gold);color:var(--gold);font-weight:700}
+.shop-item{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--rc);border-radius:10px;padding:12px;position:relative}
+.shop-item .sname{font-weight:700}
+.price{color:var(--gold);font-weight:700;font-size:15px}
+.oop-tag{background:linear-gradient(90deg,#7a2ea0,#b04ce8);color:#fff;font-size:11px;padding:1px 8px;border-radius:8px;display:inline-block}
+.gacha-banner{background:linear-gradient(135deg,#3a2c14,#241d12);border:1px solid var(--gold);border-radius:10px;padding:18px;text-align:center;margin-bottom:14px}
+/* 浮动提示 */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2b241b;border:1px solid var(--gold);color:var(--txt);padding:10px 20px;border-radius:8px;z-index:200;box-shadow:0 4px 20px #000}
+.mut{color:var(--dim)} .ok{color:var(--green)} .warn{color:#e8a13c} .bad2{color:var(--red)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
