@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { ATTR_EFFECT, ATTR_ICON, ATTRS, JOBS, ROMAN } from '../../core';
 import type { Attr } from '../../core';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
 
 const MECH: Record<Attr, string> = {
   谋略: '策略 / 长线规划',
@@ -15,6 +19,16 @@ function jobReq(req: Partial<Record<Attr, number>>): string {
   const entries = Object.entries(req);
   if (!entries.length) return '无门槛';
   return entries.map(([a, lv]) => `${ATTR_ICON[a as Attr]}${a} ${ROMAN[lv as number]}`).join(' + ');
+}
+
+// ---------- 存档管理 ----------
+const importInput = ref<HTMLInputElement | null>(null);
+
+function onImportPicked(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) store.importSaveFile(file);
+  input.value = ''; // 允许重复选同一文件
 }
 </script>
 
@@ -65,6 +79,24 @@ function jobReq(req: Partial<Record<Attr, number>>): string {
         </tr>
       </table>
       <p class="mut" style="margin-top:4px">工作是<b>周期制</b>：进度条满一个周期自动发一次酬劳，与玩桌游并行；换工作会放弃当前周期进度。离线收益按整周期累积、50% 折算，上限 1 小时。打工与游玩均有概率掉落某赏抽赏券（洞察越高掉率越高）。主播带货每周期结算时掷 ±50% 波动，沉浸可提高下限。</p>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <h3 style="margin:0 0 6px">💾 存档管理</h3>
+      <div class="mut" style="margin-bottom:8px">存档自动保存在浏览器本地（localStorage）。可导出 JSON 备份、导入旧存档（自动迁移到当前版本），或清空重开。</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button @click="store.exportSave()">📤 导出存档</button>
+        <label style="display:inline-flex;align-items:center;gap:6px">
+          <input
+            ref="importInput"
+            type="file"
+            accept=".json,application/json"
+            style="display:none"
+            @change="onImportPicked"
+          />
+          <button @click="(importInput as HTMLInputElement)?.click()">📥 导入存档</button>
+        </label>
+        <button class="danger" @click="store.resetGame()">🗑️ 重新开始</button>
+      </div>
     </div>
   </div>
 </template>

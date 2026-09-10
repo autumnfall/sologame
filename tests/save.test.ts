@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DURABILITY, SAVE_VERSION, defaultState, load, memoryStorage, save,
+  DURABILITY, SAVE_VERSION, defaultState, load, memoryStorage, parseSave, save, serialize, wipeSave,
 } from '../src/core';
 
 function stateWithLastSeen(t: number) {
@@ -31,6 +31,40 @@ describe('存档系统', () => {
     s.stats.plays = 9;
     save(s, storage);
     expect(load(storage)).toEqual(s);
+  });
+
+  it('导出 → 导入：parseSave 往返一致；旧版导出文件自动迁移', () => {
+    const s = stateWithLastSeen(1234567890);
+    s.money = 777;
+    s.started = true;
+    s.collections['guoyuan'] = { firstOpened: true, prof: 3, fatigue: 1, rulesRead: true };
+    const json = serialize(s);
+    const imported = parseSave(json);
+    expect(imported).not.toBeNull();
+    expect(imported!.money).toBe(777);
+    expect(imported!.collections['guoyuan'].prof).toBe(3);
+    // 旧版（v5）导出串也能导入并迁移
+    const v5 = JSON.parse(json) as Record<string, unknown>;
+    v5.saveVersion = 5;
+    v5.job = 'clerk';
+    const migrated = parseSave(JSON.stringify(v5));
+    expect(migrated).not.toBeNull();
+    expect(migrated!.saveVersion).toBe(SAVE_VERSION);
+    expect(migrated!.job).toBe('teacher');
+  });
+
+  it('导入：损坏 JSON / 非对象 / 版本过高 → null', () => {
+    expect(parseSave('{not json')).toBeNull();
+    expect(parseSave('[1,2,3]')).toBeNull();
+    expect(parseSave(JSON.stringify({ saveVersion: SAVE_VERSION + 1, money: 1 }))).toBeNull();
+  });
+
+  it('wipeSave 清档后 load 返回 null', () => {
+    const storage = memoryStorage();
+    save(stateWithLastSeen(1), storage);
+    expect(load(storage)).not.toBeNull();
+    wipeSave(storage);
+    expect(load(storage)).toBeNull();
   });
 
   it('无存档 / 损坏 JSON / 非对象 → null', () => {

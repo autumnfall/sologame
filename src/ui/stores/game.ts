@@ -23,6 +23,7 @@ import {
   listCopy,
   load,
   jobById,
+  parseSave,
   pickStarter as corePickStarter,
   playDuration,
   quitJob,
@@ -30,6 +31,7 @@ import {
   rotatingThemeText,
   ruleDuration,
   save,
+  serialize,
   settleRound,
   setupDuration,
   takeJob,
@@ -37,6 +39,7 @@ import {
   tickSecond,
   tickXianyu,
   unlistCopy,
+  wipeSave,
 } from '../../core';
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 
@@ -613,6 +616,41 @@ export const useGameStore = defineStore('game', {
       const amount = claimOffline(this.s);
       this.toast(`领取离线收益 ¥${fmt(amount)}`);
       this.saveGame();
+    },
+
+    // ---------- 存档管理：导出 / 导入 / 重新开始 ----------
+
+    /** 导出存档为 JSON 文件下载 */
+    exportSave() {
+      this.saveGame();
+      const blob = new Blob([serialize(this.s)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `桌游收藏家存档-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toast('存档已导出');
+    },
+
+    /** 导入存档文件：校验并迁移后写入本地，刷新页面生效 */
+    async importSaveFile(file: File) {
+      const text = await file.text();
+      const s = parseSave(text);
+      if (!s) {
+        this.toast('存档文件无效或版本高于当前游戏');
+        return;
+      }
+      save(s);
+      window.location.reload();
+    },
+
+    /** 清空存档重新开始（二次确认） */
+    resetGame() {
+      if (!window.confirm('确定要清空当前存档、从头开始吗？此操作不可恢复！')) return;
+      if (!window.confirm('再确认一次：所有收藏、实体、金钱、属性进度都将被删除。')) return;
+      wipeSave();
+      window.location.reload();
     },
   },
 });

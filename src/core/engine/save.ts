@@ -9,6 +9,7 @@ import type { Attr } from '../data/constants';
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 export function memoryStorage(): StorageLike {
@@ -16,6 +17,7 @@ export function memoryStorage(): StorageLike {
   return {
     getItem: k => m.get(k) ?? null,
     setItem: (k, v) => void m.set(k, v),
+    removeItem: k => void m.delete(k),
   };
 }
 
@@ -122,15 +124,13 @@ function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * 读取并迁移存档；返回 null 表示无存档或已损坏（调用方应新开一局）。
- * 版本高于当前版本（来自更新版本的客户端）同样返回 null。
+ * 从 JSON 文本导入存档（导出文件/粘贴串）：
+ * 解析 → 版本检查 → 迁移链 → 归一化。损坏或版本过高返回 null。
  */
-export function load(storage: StorageLike = defaultStorage()): GameState | null {
-  const raw = storage.getItem(SAVE_KEY);
-  if (!raw) return null;
+export function parseSave(json: string): GameState | null {
   let data: Record<string, unknown>;
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(json);
     if (!isRecord(parsed)) return null;
     data = parsed;
   } catch {
@@ -148,6 +148,16 @@ export function load(storage: StorageLike = defaultStorage()): GameState | null 
     version++;
   }
   return normalize(data);
+}
+
+/**
+ * 读取并迁移存档；返回 null 表示无存档或已损坏（调用方应新开一局）。
+ * 版本高于当前版本（来自更新版本的客户端）同样返回 null。
+ */
+export function load(storage: StorageLike = defaultStorage()): GameState | null {
+  const raw = storage.getItem(SAVE_KEY);
+  if (!raw) return null;
+  return parseSave(raw);
 }
 
 /** 以默认存档为底，把存档数据归一化：补新字段、剔脏字段、填充条目缺省值 */
@@ -251,5 +261,14 @@ export function save(state: GameState, storage: StorageLike = defaultStorage()):
     storage.setItem(SAVE_KEY, serialize(state));
   } catch {
     // 存储满/隐私模式等：静默失败，不阻塞游戏
+  }
+}
+
+/** 清档重开（重新开始） */
+export function wipeSave(storage: StorageLike = defaultStorage()): void {
+  try {
+    storage.removeItem(SAVE_KEY);
+  } catch {
+    // 同上：静默失败
   }
 }
