@@ -179,11 +179,19 @@ describe('某鱼：购买与出售', () => {
     expect(s2.copies).toHaveLength(1);
   });
 
-  it('tickXianyu：到点才刷新；上架判定与刷新共用计时器', () => {
+  it('tickXianyu：到点才刷新；成交判定与刷新共用计时器（未到点不掷骰）', () => {
     const s = defaultState();
     refreshXianyu(s, false, lcg(5), 0);
-    expect(tickXianyu(s, lcg(5), s.xyNext - 1).refreshed).toBe(false);
-    expect(tickXianyu(s, lcg(5), s.xyNext).refreshed).toBe(true);
+    // 必卖上架（全新×50%），但未到 5 分钟到点
+    const c = own(s, 'guoyuan');
+    expect(listCopy(s, c.uid, 0.5).ok).toBe(true);
+    expect(tickXianyu(s, () => 0, s.xyNext - 1).sold).toHaveLength(0); // rng 恒 0 也不成交
+    expect(s.listings).toHaveLength(1);
+    // 到点后同一秒 tick 立即判定成交
+    const r = tickXianyu(s, () => 0.3, s.xyNext);
+    expect(r.refreshed).toBe(true);
+    expect(r.sold).toHaveLength(1);
+    expect(s.listings).toHaveLength(0);
   });
 
   it('已精通桌游不再刷出', () => {

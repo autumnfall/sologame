@@ -110,7 +110,8 @@ export interface XianyuTickResult {
 
 /**
  * 某鱼 5 分钟计时：到点自动刷新货源，并对每件上架商品按
- * 「定价倍率 × 成色」做成交判定；卖出收取 5% 手续费。
+ * 「定价倍率 × 成色」做成交判定（判定同样只在 5 分钟到点时进行一次，
+ * 期间每秒的 tick 不会重复掷骰）；卖出收取 5% 手续费。
  */
 export function tickXianyu(
   state: GameState,
@@ -118,10 +119,9 @@ export function tickXianyu(
   now: number = Date.now(),
 ): XianyuTickResult {
   const result: XianyuTickResult = { refreshed: false, sold: [] };
-  if (state.xyNext && now >= state.xyNext) {
-    const r = refreshXianyu(state, false, rng, now);
-    result.refreshed = r.ok;
-  }
+  if (!state.xyNext || now < state.xyNext) return result;
+  const r = refreshXianyu(state, false, rng, now);
+  result.refreshed = r.ok;
   for (let i = state.listings.length - 1; i >= 0; i--) {
     const l = state.listings[i];
     const copy = copyByUid(state, l.copyUid);
