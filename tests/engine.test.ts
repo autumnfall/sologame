@@ -409,6 +409,46 @@ describe('tick 与离线（工作周期制）', () => {
     accumulateOffline(s2, 10 * 60 * 1000, lcg(3));
     expect(s2.offlineBank.playRounds).toBe(0);
   });
+
+  it('离线自动更换（玩腻了换）：疲劳≥7 的收藏被跳过，全疲劳时退回贪心', () => {
+    // boendi baseExp 28 但疲劳 8（玩腻了）；guoyuan baseExp 12 无疲劳
+    const s = defaultState();
+    own(s, 'boendi', { fatigue: 8 });
+    own(s, 'guoyuan');
+    s.settings.autoSwitch = 'fatigue';
+    accumulateOffline(s, 10 * 60 * 1000, lcg(3));
+    expect(s.offlineBank.playRounds).toBeGreaterThan(0);
+    // guoyuan 一直玩到自己也腻了（疲劳≥7）才退回贪心换 boendi
+    expect(s.offlineBank.games.map(g => g.gameId)).toEqual(['guoyuan', 'boendi']);
+    expect(s.collections['guoyuan'].fatigue).toBeGreaterThanOrEqual(7);
+    // 全部候选都玩腻了 → 退回按收益贪心（其他收藏每局 -1 疲劳，会交替出现）
+    const s2 = defaultState();
+    own(s2, 'boendi', { fatigue: 8 });
+    own(s2, 'guoyuan', { fatigue: 8 });
+    s2.settings.autoSwitch = 'fatigue';
+    accumulateOffline(s2, 10 * 60 * 1000, lcg(3));
+    expect(s2.offlineBank.playRounds).toBeGreaterThan(0);
+  });
+
+  it('离线自动更换（精通后换）：已精通收藏被跳过', () => {
+    // boendi 熟练 25（N 需求 20，已精通）；guoyuan 熟练 0
+    const s = defaultState();
+    own(s, 'boendi', { prof: 25 });
+    own(s, 'guoyuan');
+    s.settings.autoSwitch = 'mastery';
+    accumulateOffline(s, 10 * 60 * 1000, lcg(3));
+    expect(s.offlineBank.playRounds).toBeGreaterThan(0);
+    // guoyuan 一直玩到精通（熟练≥20）才换 boendi
+    expect(s.offlineBank.games.map(g => g.gameId)).toEqual(['guoyuan', 'boendi']);
+    expect(s.collections['guoyuan'].prof).toBeGreaterThanOrEqual(20);
+    // 全部精通 → 仍可游玩（退回贪心）
+    const s2 = defaultState();
+    own(s2, 'boendi', { prof: 25 });
+    own(s2, 'guoyuan', { prof: 25 });
+    s2.settings.autoSwitch = 'mastery';
+    accumulateOffline(s2, 10 * 60 * 1000, lcg(3));
+    expect(s2.offlineBank.playRounds).toBeGreaterThan(0);
+  });
 });
 
 describe('游玩结算（含磨损与 0 耐久惩罚）', () => {

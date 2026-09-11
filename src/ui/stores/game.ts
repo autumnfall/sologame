@@ -11,6 +11,7 @@ import {
   checkAchievements,
   autoSwitchTarget,
   isFeatureUnlocked,
+  isMastered,
   sleeveAll,
   listWornCopies,
   conditionText,
@@ -438,7 +439,11 @@ export const useGameStore = defineStore('game', {
       // 自动连刷：1.2 秒后开始下一局（可被「下轮换它」切换；成就解锁后可按疲劳/精通自动换）
       let nextId = ps.nextId || ps.gameId;
       const mode = this.s.settings.autoSwitch;
-      if (!ps.nextId && (mode === 'fatigue' || mode === 'mastery')) {
+      // 只有当前游戏达成条件（玩腻了 / 已精通）才自动更换，否则继续玩当前游戏
+      const shouldAuto =
+        !ps.nextId &&
+        ((mode === 'fatigue' && res.tired) || (mode === 'mastery' && isMastered(this.s, ps.gameId)));
+      if (shouldAuto) {
         const t = autoSwitchTarget(this.s, mode, ps.gameId);
         if (t) {
           nextId = t;

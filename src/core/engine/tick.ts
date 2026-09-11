@@ -6,7 +6,7 @@ import { gameById } from '../data/games';
 import type { GameState } from '../state';
 import { copyByUid } from '../state';
 import { attrShares } from '../mechanics/attrs';
-import { globalBonus, hasAffix } from '../mechanics/collection';
+import { globalBonus, hasAffix, isMastered } from '../mechanics/collection';
 import { currentJob, expMult, fatigueIncMult, incomeMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
 import { fatigueMod, playDuration, ruleDuration, setupDuration } from '../mechanics/play';
 import { perkLv } from '../mechanics/prestige';
@@ -50,7 +50,8 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
  * 离线累积（收益直接入账，统计写入 offlineBank 供总结弹窗展示）：
  * ① 工作：按完成的整周期入账（期望酬劳 × 离线折算），不足一周期的余量转回 jobProgress；
  * ② 游玩：离线期间自动连刷——每轮挑「基础经验 × 疲劳修正」最高的可玩实体结算一局
- * （真实消耗回合时长，无时机条加成），金钱/经验/熟练度/疲劳/磨损全部照常结算。
+ * （真实消耗回合时长，无时机条加成）；开启自动更换时优先挑未疲劳/未精通的实体。
+ * 金钱/经验/熟练度/疲劳/磨损全部照常结算。
  * 总上限 1 小时、bank 满则不再累积。
  */
 export function accumulateOffline(
@@ -78,17 +79,28 @@ export function accumulateOffline(
   // ② 自动游玩
   let secs = addT / 1000;
   let guard = 0; // 防御上限：单轮最短约 10s，1 小时最多 ~360 局
+  const mode = state.settings.autoSwitch;
   while (secs > 0 && guard < 500) {
     const listed = new Set(state.listings.map(l => l.copyUid));
-    let best: { gameId: string; uid: number; score: number } | null = null;
+    const cands: { gameId: string; uid: number; score: number }[] = [];
     for (const c of state.copies) {
       if (listed.has(c.uid)) continue;
       const col = state.collections[c.gameId];
       if (!col?.firstOpened) continue;
       const score = gameById(c.gameId).baseExp * fatigueMod(state, gameById(c.gameId));
-      if (!best || score > best.score) best = { gameId: c.gameId, uid: c.uid, score };
+      cands.push({ gameId: c.gameId, uid: c.uid, score });
     }
-    if (!best) break;
+    if (!cands.length) break;
+    // 自动更换设置：优先挑未疲劳（<7）/未精通的实体；无候选则退回全部
+    const fresh =
+      mode === 'fatigue'
+        ? cands.filter(x => (state.collections[x.gameId]?.fatigue ?? 99) < 7)
+        : mode === 'mastery'
+          ? cands.filter(x => !isMastered(state, x.gameId))
+          : cands;
+    const pool = fresh.length ? fresh : cands;
+    let best = pool[0];
+    for (const x of pool) if (x.score > best.score) best = x;
     const g = gameById(best.gameId);
     const copy = copyByUid(state, best.uid)!;
     const roundSec =
