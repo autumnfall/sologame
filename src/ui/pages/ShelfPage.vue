@@ -10,6 +10,7 @@ import {
   gameById,
   globalBonus,
   isFeatureUnlocked,
+  isMastered,
   kindCount,
   masteryText,
   storageCost,
@@ -28,7 +29,9 @@ const ownedIds = computed(() =>
   Object.keys(store.s.collections).filter(
     id =>
       store.s.collections[id].firstOpened &&
-      (!store.shelfFilter || gameById(id).attrs.includes(store.shelfFilter)),
+      (!store.shelfFilter || gameById(id).attrs.includes(store.shelfFilter)) &&
+      (!store.shelfTiredOnly || store.s.collections[id].fatigue >= 7) &&
+      (!store.shelfUnmasteredOnly || !isMastered(store.s, id)),
   ),
 );
 
@@ -59,7 +62,11 @@ function copies(id: string) {
 <template>
   <div>
     <h2>收藏架 <small>{{ shelfCount }}</small></h2>
-    <FilterBar v-model="store.shelfFilter" />
+    <FilterBar
+      v-model="store.shelfFilter"
+      v-model:tired-only="store.shelfTiredOnly"
+      v-model:unmastered-only="store.shelfUnmasteredOnly"
+    />
     <div v-if="sleeveAllUnlocked" style="margin:0 0 10px">
       <button :disabled="!sleeveAllable" @click="store.sleeveAllCopies()">🎴 一键套牌套（逐盒扣牌套）</button>
     </div>

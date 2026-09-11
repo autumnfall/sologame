@@ -136,6 +136,10 @@ export const useGameStore = defineStore('game', {
     shopTab: 'taobao' as ShopTabKey,
     playFilter: null as Attr | null,
     shelfFilter: null as Attr | null,
+    playTiredOnly: false,
+    playUnmasteredOnly: false,
+    shelfTiredOnly: false,
+    shelfUnmasteredOnly: false,
     session: null as PlaySession | null,
     playLog: [] as LogLine[],
     gachaLog: [] as GachaEntry[],
@@ -306,9 +310,10 @@ export const useGameStore = defineStore('game', {
         clearTimeout(ps.restartTimer);
         ps.restartTimer = null;
       }
-      // 换游戏（下轮换它）时自动挑一个可用实体；本局实体全程固定
+      // 换游戏（下轮换它）时自动挑耐久最高的可用实体；本局实体全程固定
       if (ps.copyUid == null || copyByUid(this.s, ps.copyUid)?.gameId !== id) {
-        ps.copyUid = copiesOf(this.s, id)[0]?.uid ?? null;
+        const avail = copiesOf(this.s, id);
+        ps.copyUid = avail.reduce((a, b) => (b.durability > a.durability ? b : a), avail[0])?.uid ?? null;
       }
       const copy = ps.copyUid != null ? copyByUid(this.s, ps.copyUid) : undefined;
       ps.gameId = id;

@@ -55,7 +55,27 @@ function circled(i: number): string {
 function copyLabel(c: Copy): string {
   const g = gameById(c.gameId);
   const idx = store.s.copies.filter(x => x.gameId === c.gameId).findIndex(x => x.uid === c.uid);
-  return `《${g.name}》实体${circled(idx)} · ${conditionText(c.durability, g.rarity)}`;
+  return `实体${circled(idx)} · ${conditionText(c.durability, g.rarity)} · 耐久 ${durText(c.durability)}`;
+}
+
+/** 出售候选：按游戏分组（组名排序），组内低耐久在前，磨光件标 🔧 */
+const sellGroups = computed(() => {
+  const map = new Map<string, Copy[]>();
+  for (const c of sellable.value) {
+    const arr = map.get(c.gameId) ?? [];
+    arr.push(c);
+    map.set(c.gameId, arr);
+  }
+  return [...map.entries()]
+    .map(([gameId, copies]) => ({
+      gameId,
+      copies: [...copies].sort((a, b) => a.durability - b.durability),
+    }))
+    .sort((a, b) => gameById(a.gameId).name.localeCompare(gameById(b.gameId).name, 'zh'));
+});
+
+function durText(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function listedPrice(c: Copy, mult: number): number {
@@ -146,9 +166,13 @@ const listingRows = computed(() =>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <label>
           选择实体：
-          <select v-model.number="sellUid" style="margin-left:4px;max-width:260px">
+          <select v-model.number="sellUid" style="margin-left:4px;max-width:280px">
             <option :value="null" disabled>— 选择要上架的实体 —</option>
-            <option v-for="c in sellable" :key="c.uid" :value="c.uid">{{ copyLabel(c) }}</option>
+            <optgroup v-for="grp in sellGroups" :key="grp.gameId" :label="`《${gameById(grp.gameId).name}》`">
+              <option v-for="c in grp.copies" :key="c.uid" :value="c.uid">
+                {{ (c.durability <= 0 ? '🔧 ' : '') + copyLabel(c) }}
+              </option>
+            </optgroup>
           </select>
         </label>
         <label>

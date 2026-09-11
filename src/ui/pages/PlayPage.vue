@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { DURABILITY, conditionText, copiesOf, copyByUid, gainText, gameById, isFeatureUnlocked, masteryText } from '../../core';
+import { DURABILITY, conditionText, copiesOf, copyByUid, gainText, gameById, isFeatureUnlocked, isMastered, masteryText } from '../../core';
 import { useGameStore } from '../stores/game';
 import FilterBar from '../components/FilterBar.vue';
 import GameCard from '../components/GameCard.vue';
@@ -13,7 +13,9 @@ const ownedIds = computed(() =>
     id =>
       store.s.collections[id].firstOpened &&
       copiesOf(store.s, id).length > 0 &&
-      (!store.playFilter || gameById(id).attrs.includes(store.playFilter)),
+      (!store.playFilter || gameById(id).attrs.includes(store.playFilter)) &&
+      (!store.playTiredOnly || store.s.collections[id].fatigue >= 7) &&
+      (!store.playUnmasteredOnly || !isMastered(store.s, id)),
   ),
 );
 
@@ -113,7 +115,11 @@ watch(
     </div>
 
     <h2>选择一款桌游开玩</h2>
-    <FilterBar v-model="store.playFilter" />
+    <FilterBar
+      v-model="store.playFilter"
+      v-model:tired-only="store.playTiredOnly"
+      v-model:unmastered-only="store.playUnmasteredOnly"
+    />
     <div v-if="fatigueUnlocked || masteryUnlocked" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <small class="mut">连刷自动更换（互斥）：</small>
       <button
@@ -134,7 +140,7 @@ watch(
     </div>
 
     <div v-if="!ownedIds.length" class="mut">
-      {{ store.playFilter ? '该属性下没有可玩的桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}
+      {{ store.playFilter || store.playTiredOnly || store.playUnmasteredOnly ? '没有符合筛选的可玩桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}
     </div>
     <div v-else class="grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
