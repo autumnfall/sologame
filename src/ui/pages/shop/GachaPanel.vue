@@ -5,6 +5,7 @@ import {
   GACHA_PRICE,
   HI_TICKET_SLEEVES,
   ROTATION_PRICE,
+  isFeatureUnlocked,
   rotatingPool,
   rotatingThemeText,
 } from '../../../core';
@@ -27,6 +28,8 @@ const maxExchange = computed(() =>
 );
 const exN = ref(1);
 const exValid = computed(() => Number.isInteger(exN.value) && exN.value >= 1 && exN.value <= maxExchange.value);
+
+const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
 </script>
 
 <template>
@@ -41,11 +44,15 @@ const exValid = computed(() => Number.isInteger(exN.value) && exN.value >= 1 && 
       <div style="font-size:18px;font-weight:800;color:var(--gold)">🎁 某赏 · 常驻一番抽</div>
       <div class="mut" style="margin:6px 0">牌套 30%（4包）/ 15%（10包）/ 5%（20包）· 桌游 N30 / R15 / SR4 / SSR1 · 50 抽保底 SR 及以上</div>
       <div>SR+ 保底进度：<b class="warn">{{ store.s.pity }} / {{ GACHA_PITY }}</b></div>
-      <div style="margin-top:10px;display:flex;gap:10px;justify-content:center">
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="primary" @click="store.pullGacha('perm', 'money')">单抽（¥{{ GACHA_PRICE }}）</button>
         <button class="primary" :disabled="store.s.tickets < 1" @click="store.pullGacha('perm', 'ticket')">
           用抽赏券 ×1 抽（🎫{{ store.s.tickets }}）
         </button>
+        <template v-if="tenUnlocked">
+          <button :disabled="store.s.money < GACHA_PRICE * 10" @click="store.pullGachaTen('perm', 'money')">十连（¥{{ GACHA_PRICE * 10 }}）</button>
+          <button :disabled="store.s.tickets < 10" @click="store.pullGachaTen('perm', 'ticket')">十连（🎫10）</button>
+        </template>
       </div>
       <small>不受某宝级别解锁限制。桌游结果均为全新实体，重复款直接获得新实体（收藏级进度保留，可挂某鱼出售）；抽出 SR/SSR 时保底进度归零。</small>
     </div>
@@ -61,7 +68,7 @@ const exValid = computed(() => Number.isInteger(exN.value) && exN.value >= 1 && 
       <div v-if="store.s.rotTheme" class="mut" style="margin-top:8px;line-height:2">
         池内桌游：{{ rotatingPool(store.s.rotTheme).map(g => `${g.icon}${g.name}`).join('　') }}
       </div>
-      <div style="margin-top:10px;display:flex;gap:10px;justify-content:center">
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button
           class="primary"
           :disabled="!store.s.rotTheme"
@@ -76,6 +83,10 @@ const exValid = computed(() => Number.isInteger(exN.value) && exN.value >= 1 && 
         >
           用高级券 ×1 抽（🎟️{{ store.s.hiTickets }}）
         </button>
+        <template v-if="tenUnlocked && store.s.rotTheme">
+          <button :disabled="store.s.money < ROTATION_PRICE * 10" @click="store.pullGachaTen('rot', 'money')">十连（¥{{ ROTATION_PRICE * 10 }}）</button>
+          <button :disabled="store.s.hiTickets < 10" @click="store.pullGachaTen('rot', 'hiTicket')">十连（🎟️10）</button>
+        </template>
       </div>
       <small>轮换池每 10 分钟换一个主题属性，仅能用金钱或高级券抽取；重复同样直接获得新实体。</small>
     </div>

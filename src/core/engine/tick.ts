@@ -37,6 +37,7 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
   state.jobProgress -= j.cycleSec;
   const pay = jobCyclePay(state, j, rng);
   state.money += pay;
+  state.stats.workCycles++;
   result.payout = 1;
   result.payAmount = pay;
   if (j.volatile && rng() < 0.3) {
@@ -72,6 +73,7 @@ export function accumulateOffline(
     state.money += pay;
     state.offlineBank.workMoney += pay;
     state.offlineBank.workCycles += cycles;
+    state.stats.workCycles += cycles;
   }
   // ② 自动游玩
   let secs = addT / 1000;

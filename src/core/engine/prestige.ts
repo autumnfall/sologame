@@ -23,10 +23,14 @@ export function doPrestige(state: GameState): PrestigeResult {
   const gain = insightGain(state);
   const { insight, perks, runs } = state.prestige;
   const stats = state.stats;
+  const achievements = state.achievements;
+  const settings = state.settings;
   const fresh = defaultState();
   Object.assign(state, fresh, {
     prestige: { insight: insight + gain, perks: { ...perks }, runs: runs + 1, lastGain: gain },
     stats,
+    achievements,
+    settings,
     lastSeen: Date.now(),
   });
   // 天赋的开局加成
@@ -53,5 +57,6 @@ export function respecPerks(state: GameState): { ok: boolean; reason?: string } 
   if (!Object.keys(state.prestige.perks).length) return { ok: false, reason: '尚未投资天赋' };
   state.prestige.insight += insightSpent(state);
   state.prestige.perks = {};
+  state.stats.respecCount++;
   return { ok: true };
 }

@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import {
+  ACHIEVEMENTS,
+  FEATURE_UNLOCKS,
   PERKS,
   PERK_BRANCH_NAME,
+  achievedCount,
   canPrestige,
   insightGain,
   insightSpent,
+  isFeatureUnlocked,
   masteredCount,
   perkCost,
   perkLevel,
@@ -35,6 +39,14 @@ function cost(id: string): number {
   const def = PERKS.find(p => p.id === id)!;
   return perkCost(def, lv(id));
 }
+
+// ---------- 成就 ----------
+const achCount = computed(() => achievedCount(store.s));
+const achList = computed(() => {
+  const done = new Set(store.s.achievements);
+  return [...ACHIEVEMENTS].sort((a, b) => Number(done.has(b.id)) - Number(done.has(a.id)));
+});
+const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.need) ?? null);
 </script>
 
 <template>
@@ -69,6 +81,37 @@ function cost(id: string): number {
       </div>
       <div class="mut" style="margin-top:6px;font-size:12px">
         退坑会重置本周目的收藏、实体、金钱、属性、职业与槽位；阅历、天赋和生涯统计永久保留。天赋按三条线取舍投资，可随时洗点重分。
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <h3 style="margin:0 0 8px">🏆 成就 <small class="mut">{{ achCount }}/{{ ACHIEVEMENTS.length }} · 全局经验 +{{ achCount }}%（无上限）</small></h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <span
+          v-for="f in FEATURE_UNLOCKS"
+          :key="f.key"
+          class="mut"
+          style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 8px"
+          :style="isFeatureUnlocked(store.s, f.key) ? { borderColor: 'var(--green)', color: 'var(--green)' } : {}"
+          :title="f.desc"
+        >
+          {{ isFeatureUnlocked(store.s, f.key) ? '✓' : `${achCount}/${f.need}` }} {{ f.name }}
+        </span>
+      </div>
+      <div v-if="nextUnlock" class="mut" style="font-size:12px;margin-bottom:8px">
+        再达成 {{ nextUnlock.need - achCount }} 个成就解锁「{{ nextUnlock.name }}」：{{ nextUnlock.desc }}
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+        <div
+          v-for="a in achList"
+          :key="a.id"
+          class="panel"
+          style="padding:8px;margin:0"
+          :style="store.s.achievements.includes(a.id) ? { borderColor: 'var(--gold)' } : { opacity: 0.55 }"
+        >
+          <b style="font-size:12px">{{ store.s.achievements.includes(a.id) ? '🏆 ' : '🔒 ' }}{{ a.name }}</b>
+          <div class="tagline">{{ a.desc }}</div>
+        </div>
       </div>
     </div>
 

@@ -144,6 +144,11 @@ export function tickXianyu(
         state.money += gain;
         state.copies = state.copies.filter(c => c.uid !== l.copyUid);
         state.listings.splice(i, 1);
+        state.stats.soldCount++;
+        if (l.price >= value * 2) state.stats.highPriceSold++; // 200% 定价成交
+        // 唯一副本卖光 → 打回头客标记
+        const col = state.collections[g.id];
+        if (col && !state.copies.some(c => c.gameId === g.id)) col.resold = true;
         result.sold.push({ gameId: g.id, name: g.name, price: l.price, gain });
       }
     }
@@ -168,5 +173,8 @@ export function buyXianyu(
   r.copy.sleeved = it.sleeved;
   r.copy.stored = it.stored;
   if (wasOpened) r.first = false; // 防万一：已开箱过的收藏不重复给奖励
+  // 捡漏判定：不高于总价值 90%
+  if (it.price <= marketItemValue(it) * 0.9) state.stats.bargainBuys++;
+  state.stats.xyBought++;
   return { ok: true, gameId: it.gameId, blind: it.blind === true };
 }

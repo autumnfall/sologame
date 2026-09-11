@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { DURABILITY, conditionText, copiesOf, copyByUid, gainText, gameById, masteryText } from '../../core';
+import { DURABILITY, conditionText, copiesOf, copyByUid, gainText, gameById, isFeatureUnlocked, masteryText } from '../../core';
 import { useGameStore } from '../stores/game';
 import FilterBar from '../components/FilterBar.vue';
 import GameCard from '../components/GameCard.vue';
@@ -34,6 +34,11 @@ function durText(n: number): string {
 }
 
 const pendingCopies = computed(() => (store.pendingCopyPick ? copiesOf(store.s, store.pendingCopyPick) : []));
+
+/** 自动更换开关（成就里程碑解锁，两档互斥） */
+const fatigueUnlocked = computed(() => isFeatureUnlocked(store.s, 'autoFatigue'));
+const masteryUnlocked = computed(() => isFeatureUnlocked(store.s, 'autoMastery'));
+const autoMode = computed(() => store.s.settings.autoSwitch);
 
 const panelTitle = computed(() => {
   const s = ps.value;
@@ -109,6 +114,24 @@ watch(
 
     <h2>选择一款桌游开玩</h2>
     <FilterBar v-model="store.playFilter" />
+    <div v-if="fatigueUnlocked || masteryUnlocked" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <small class="mut">连刷自动更换（互斥）：</small>
+      <button
+        v-if="fatigueUnlocked"
+        :class="{ primary: autoMode === 'fatigue' }"
+        @click="store.toggleAutoSwitch('fatigue')"
+      >
+        {{ autoMode === 'fatigue' ? '✓ ' : '' }}玩腻了换
+      </button>
+      <button
+        v-if="masteryUnlocked"
+        :class="{ primary: autoMode === 'mastery' }"
+        @click="store.toggleAutoSwitch('mastery')"
+      >
+        {{ autoMode === 'mastery' ? '✓ ' : '' }}精通后换
+      </button>
+      <small v-if="autoMode !== 'off'" class="mut">已开启；再点一次关闭</small>
+    </div>
 
     <div v-if="!ownedIds.length" class="mut">
       {{ store.playFilter ? '该属性下没有可玩的桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}

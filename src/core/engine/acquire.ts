@@ -29,6 +29,11 @@ export function acquireGame(state: GameState, id: string): AcquireResult {
     c = { firstOpened: true, prof: 0, fatigue: 0, rulesRead: false };
     state.collections[id] = c;
   } else {
+    // 回头客：唯一副本卖光过（resold 标记）后重新入手
+    if (c.resold === true) {
+      state.stats.comeback = true;
+      c.resold = false;
+    }
     c.firstOpened = true;
   }
   const copy: Copy = {

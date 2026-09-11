@@ -8,9 +8,10 @@ import type { Rarity } from './types';
  * v5 = 收藏/实体分离（owned→collections+copies、某鱼市场、某宝多次购买、某赏轮换池）；
  * v6 = 职业改周期制（rate→cycleSec/cyclePay、jobProgress；旧 clerk/editor/designer 映射新职业）；
  * v7 = 转生系统（新增 prestige：阅历/天赋/周目数）；
- * v8 = 某鱼挂售独立 30s 成交判定（新增 xySellNext）；移除手动职业 tryout；离线总结弹窗（offlineBank 结构变更）。
+ * v8 = 某鱼挂售独立 30s 成交判定（新增 xySellNext）；移除手动职业 tryout；离线总结弹窗（offlineBank 结构变更）；
+ * v9 = 成就系统（achievements/settings）+ stats 事件计数器 + 收藏 resold 标记。
  */
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */

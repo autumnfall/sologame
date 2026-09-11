@@ -67,6 +67,17 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
       offlineBank: { t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] },
     };
   },
+  // v8 → v9（成就系统）：新增 achievements/settings；stats 补事件计数器
+  8: raw => ({
+    ...raw,
+    achievements: [],
+    settings: { autoSwitch: 'off' },
+    stats: {
+      ...(isRecord(raw.stats) ? raw.stats : {}),
+      workCycles: 0, soldCount: 0, tbBought: 0, xyBought: 0,
+      pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
+    },
+  }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -190,6 +201,7 @@ function normalize(data: Record<string, unknown>): GameState {
       prof: num(v.prof, 0),
       fatigue: num(v.fatigue, 0),
       rulesRead: v.rulesRead === true,
+      ...(v.resold === true ? { resold: true } : {}),
     };
   }
   const copies: Copy[] = [];
@@ -285,6 +297,23 @@ function normalize(data: Record<string, unknown>): GameState {
     stats: {
       plays: num(stats.plays, 0),
       pulls: num(stats.pulls, 0),
+      workCycles: Math.floor(num(stats.workCycles, 0)),
+      soldCount: Math.floor(num(stats.soldCount, 0)),
+      tbBought: Math.floor(num(stats.tbBought, 0)),
+      xyBought: Math.floor(num(stats.xyBought, 0)),
+      pityHits: Math.floor(num(stats.pityHits, 0)),
+      highPriceSold: Math.floor(num(stats.highPriceSold, 0)),
+      bargainBuys: Math.floor(num(stats.bargainBuys, 0)),
+      comeback: stats.comeback === true,
+      respecCount: Math.floor(num(stats.respecCount, 0)),
+    },
+    achievements: Array.isArray(data.achievements)
+      ? data.achievements.filter((id): id is string => typeof id === 'string')
+      : [],
+    settings: {
+      autoSwitch: (isRecord(data.settings) && data.settings.autoSwitch === 'fatigue') || (isRecord(data.settings) && data.settings.autoSwitch === 'mastery')
+        ? data.settings.autoSwitch
+        : 'off',
     },
   };
 }

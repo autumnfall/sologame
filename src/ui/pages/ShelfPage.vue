@@ -9,6 +9,7 @@ import {
   gainText,
   gameById,
   globalBonus,
+  isFeatureUnlocked,
   kindCount,
   masteryText,
   storageCost,
@@ -31,6 +32,16 @@ const ownedIds = computed(() =>
   ),
 );
 
+/** 一键套牌套（成就 15 个解锁）：有可套实体时可用 */
+const sleeveAllUnlocked = computed(() => isFeatureUnlocked(store.s, 'sleeveAll'));
+const sleeveAllable = computed(() =>
+  store.s.copies.some(c => {
+    if (c.sleeved || store.s.listings.some(l => l.copyUid === c.uid)) return false;
+    const cards = gameById(c.gameId).cards;
+    return !!cards && cards > 0;
+  }),
+);
+
 /** 实体序号：①②③…（超过 10 用 (11) 兜底） */
 function circled(i: number): string {
   return i < 10 ? String.fromCharCode(0x2460 + i) : `(${i + 1})`;
@@ -49,6 +60,9 @@ function copies(id: string) {
   <div>
     <h2>收藏架 <small>{{ shelfCount }}</small></h2>
     <FilterBar v-model="store.shelfFilter" />
+    <div v-if="sleeveAllUnlocked" style="margin:0 0 10px">
+      <button :disabled="!sleeveAllable" @click="store.sleeveAllCopies()">🎴 一键套牌套（逐盒扣牌套）</button>
+    </div>
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
     <div v-else class="grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">

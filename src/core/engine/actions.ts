@@ -56,6 +56,7 @@ export function buyTaobao(state: GameState, id: string): ActionResult {
   if (!tierUnlocked(state, g.rarity)) return fail('该级别尚未解锁');
   state.money -= price;
   state.taobaoStock[id] = left - 1;
+  state.stats.tbBought++;
   const r = acquireGame(state, id);
   let message = `购入全新《${g.name}》！${firstBonusText(r)}`;
   const next = nextTier(g.rarity);
@@ -96,6 +97,36 @@ export function applyStorage(state: GameState, uid: number): ActionResult {
   const once = STORE_WEAR_ONCE[g.rarity];
   copy.durability = Math.max(0, copy.durability - once);
   return ok(`《${g.name}》收纳完成，Setup ×0.5、磨损 ×0.75（整理一次性 -${once} 耐久）`);
+}
+
+/** 一键套牌套：给所有未套且牌足够的实体套牌套（成就里程碑解锁） */
+export function sleeveAll(state: GameState): { count: number; used: number } {
+  let count = 0;
+  let used = 0;
+  for (const c of state.copies) {
+    if (c.sleeved) continue;
+    const g = gameById(c.gameId);
+    if (!g.cards || g.cards <= 0) continue;
+    if (state.listings.some(l => l.copyUid === c.uid)) continue;
+    if (state.sleeves < g.cards) continue; // 剩余不够的跳过
+    state.sleeves -= g.cards;
+    used += g.cards;
+    c.sleeved = true;
+    count++;
+  }
+  return { count, used };
+}
+
+/** 一键上架磨光件：所有耐久 0 的未上架实体按行情价（100%）上架，占满槽位为止 */
+export function listWornCopies(state: GameState): { count: number } {
+  let count = 0;
+  for (const c of state.copies) {
+    if (c.durability > 0) continue;
+    if (state.listings.length >= state.sellSlots) break;
+    if (state.listings.some(l => l.copyUid === c.uid)) continue;
+    if (listCopy(state, c.uid, 1.0).ok) count++;
+  }
+  return { count };
 }
 
 /** 上岗/辞职：换工作会放弃当前周期进度 */

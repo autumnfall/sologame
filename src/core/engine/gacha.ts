@@ -85,7 +85,9 @@ export function gachaDraw(
   // —— 判定与保底（欧非守恒天赋可缩短保底） ——
   const pityKey = pool === 'perm' ? 'pity' : 'pityRot';
   const pityNeed = Math.max(10, GACHA_PITY - 5 * perkLv(state, 'pityCut'));
-  const roll = rollGachaOutcome(rng, state[pityKey] >= pityNeed - 1);
+  const forcePity = state[pityKey] >= pityNeed - 1;
+  if (forcePity) state.stats.pityHits++;
+  const roll = rollGachaOutcome(rng, forcePity);
   const hitSRplus = roll.kind === 'game' && (roll.rarity === 'SR' || roll.rarity === 'SSR');
   state[pityKey] = hitSRplus ? 0 : state[pityKey] + 1;
   // —— 发放 ——

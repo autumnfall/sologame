@@ -12,6 +12,7 @@ import {
   copyValue,
   gameById,
   gainText,
+  isFeatureUnlocked,
   marketItemValue,
   sellChance,
 } from '../../../core';
@@ -72,6 +73,12 @@ const sellCost = computed(() =>
 );
 const marketCost = computed(() =>
   store.s.marketSlots >= MARKET_SLOTS_MAX ? null : MARKET_SLOT_COSTS[store.s.marketSlots - 3],
+);
+
+/** 一键上架磨光件（成就 20 个解锁） */
+const listWornUnlocked = computed(() => isFeatureUnlocked(store.s, 'listWorn'));
+const wornCount = computed(() =>
+  store.s.copies.filter(c => c.durability <= 0 && !store.s.listings.some(l => l.copyUid === c.uid)).length,
 );
 
 /** 在售列表展示行（游戏名/成色、定价、预计成交率） */
@@ -165,6 +172,14 @@ const listingRows = computed(() =>
           @click="store.listForSale(sellCopy!.uid, priceMult)"
         >
           上架
+        </button>
+        <button
+          v-if="listWornUnlocked"
+          :disabled="wornCount === 0 || store.s.listings.length >= store.s.sellSlots"
+          :title="`按行情价 100% 上架所有磨光实体（当前 ${wornCount} 件）`"
+          @click="store.listWorn()"
+        >
+          📦 一键上架磨光件（{{ wornCount }}）
         </button>
       </div>
       <div v-if="listingRows.length" style="display:flex;flex-direction:column;gap:6px">

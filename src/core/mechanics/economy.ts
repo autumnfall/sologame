@@ -6,6 +6,7 @@ import type { Game, Job } from '../data/types';
 import type { GameState } from '../state';
 import { attrLevel } from './attrs';
 import { computeSetBonus, globalBonus, hasAffix } from './collection';
+import { achievementExpMult } from './achievements';
 import { perkLv } from './prestige';
 
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
@@ -13,11 +14,11 @@ import { perkLv } from './prestige';
 // 应变：疲劳增长 -4%/级（下限 ×0.60）  运筹：某鱼砍价 -2%/级（下限 ×0.80）、手续费 -0.5%/级（10 级全免）
 // 洞察：掉券率 +10%/级、时机条金区 +2%/级宽（上限 40%）  沉浸：游玩收入 +4%/级、主播下限上移
 
-/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 × 触类旁通 */
+/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 × 触类旁通 × 成就 */
 export function expMult(state: GameState): number {
   return (1 + globalBonus(state)) * (1 + 0.025 * attrLevel(state, '谋略'))
     * (hasAffix(state, 'expAll') ? 1.05 : 1) * computeSetBonus()
-    * Math.pow(1.1, perkLv(state, 'expAll'));
+    * Math.pow(1.1, perkLv(state, 'expAll')) * achievementExpMult(state);
 }
 
 /** 疲劳增长倍率（应变 × 科学作息，下限 ×0.60） */

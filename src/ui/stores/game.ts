@@ -8,6 +8,11 @@ import {
   buyTaobao,
   buyXianyu,
   buyPerk,
+  checkAchievements,
+  autoSwitchTarget,
+  isFeatureUnlocked,
+  sleeveAll,
+  listWornCopies,
   conditionText,
   copyByUid,
   copiesOf,
@@ -20,6 +25,7 @@ import {
   fmt,
   gameById,
   gachaDraw,
+  GACHA_PRICE,
   goldZoneWidth,
   initTaobaoStock,
   listCopy,
@@ -30,6 +36,7 @@ import {
   playDuration,
   quitJob,
   refreshXianyu,
+  ROTATION_PRICE,
   respecPerks,
   rotatingThemeText,
   ruleDuration,
@@ -216,7 +223,7 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    /** 每秒一次：工作周期推进 + 某鱼自动到货/成交 + 某赏轮换池计时 */
+    /** 每秒一次：工作周期推进 + 某鱼自动到货/成交 + 某赏轮换池计时 + 成就扫描 */
     tickOnce() {
       const r = tickSecond(this.s);
       if (r.payout) this.toast(`💼 工作周期结算 +¥${fmt(r.payAmount)}`);
@@ -227,6 +234,11 @@ export const useGameStore = defineStore('game', {
       for (const sold of xy.sold) this.toast(`《${sold.name}》已售出，到账 ¥${sold.gain}`);
       const rot = tickRotation(this.s);
       if (rot.changed && rot.theme) this.toast(`轮换赏池更新：${rotatingThemeText(rot.theme)}`);
+      const fresh = checkAchievements(this.s);
+      if (fresh.length) {
+        const names = fresh.map(a => `「${a.name}」`).join('');
+        this.toast(`🏆 达成成就 ${names} 等 ${fresh.length} 项，全局经验 +${fresh.length}%`);
+      }
     },
 
     logPlay(text: string, cls = '') {
@@ -423,8 +435,16 @@ export const useGameStore = defineStore('game', {
         this.toast(`连刷结束，共完成 ${rounds} 局。`);
         return;
       }
-      // 自动连刷：1.2 秒后开始下一局（可被「下轮换它」切换）
-      const nextId = ps.nextId || ps.gameId;
+      // 自动连刷：1.2 秒后开始下一局（可被「下轮换它」切换；成就解锁后可按疲劳/精通自动换）
+      let nextId = ps.nextId || ps.gameId;
+      const mode = this.s.settings.autoSwitch;
+      if (!ps.nextId && (mode === 'fatigue' || mode === 'mastery')) {
+        const t = autoSwitchTarget(this.s, mode, ps.gameId);
+        if (t) {
+          nextId = t;
+          this.logPlay(`🔀 自动更换为《${gameById(t).name}》（${mode === 'fatigue' ? '疲劳' : '精通'}自动更换）`, 'mut');
+        }
+      }
       this.logPlay(nextId !== ps.gameId ? `下一局换《${gameById(nextId).name}》……` : '下一局即将开始……', 'mut');
       ps.restartTimer = window.setTimeout(() => {
         if (this.session === ps) this.beginRound(nextId);
@@ -508,12 +528,7 @@ export const useGameStore = defineStore('game', {
 
     // ---------- 某赏 ----------
 
-    pullGacha(pool: GachaPool, pay: GachaPay) {
-      const r = gachaDraw(this.s, pool, pay);
-      if ('error' in r) {
-        this.toast(r.error);
-        return;
-      }
+    logGachaOutcome(r: Exclude<ReturnType<typeof gachaDraw>, { error: string }>) {
       const poolTag = r.pool === 'rot' ? '（轮换池）' : '';
       if (r.kind === 'sleeves') {
         this.gachaLog.unshift({
@@ -544,6 +559,34 @@ export const useGameStore = defineStore('game', {
           });
         }
       }
+    },
+
+    pullGacha(pool: GachaPool, pay: GachaPay) {
+      const r = gachaDraw(this.s, pool, pay);
+      if ('error' in r) {
+        this.toast(r.error);
+        return;
+      }
+      this.logGachaOutcome(r);
+      this.saveGame();
+    },
+
+    /** 十连抽（成就里程碑解锁）：10 倍价格/券，保底逐抽正常累积 */
+    pullGachaTen(pool: GachaPool, pay: GachaPay) {
+      if (!isFeatureUnlocked(this.s, 'tenPull')) {
+        this.toast('十连抽尚未解锁（达成 10 个成就）');
+        return;
+      }
+      const price = pool === 'perm' ? GACHA_PRICE : ROTATION_PRICE;
+      if (pay === 'money' && this.s.money < price * 10) return this.toast('钱不够十连');
+      if (pay === 'ticket' && this.s.tickets < 10) return this.toast('普通券不够 10 张');
+      if (pay === 'hiTicket' && this.s.hiTickets < 10) return this.toast('高级券不够 10 张');
+      for (let i = 0; i < 10; i++) {
+        const r = gachaDraw(this.s, pool, pay);
+        if ('error' in r) break;
+        this.logGachaOutcome(r);
+      }
+      this.toast('🎰 十连抽完成！');
       this.saveGame();
     },
 
@@ -666,6 +709,34 @@ export const useGameStore = defineStore('game', {
       const r = respecPerks(this.s);
       this.toast(r.ok ? `已洗点，阅历全额退还（现有 ${this.s.prestige.insight}）` : (r.reason ?? '洗点失败'));
       if (r.ok) this.saveGame();
+    },
+
+    // ---------- 成就功能解锁 ----------
+
+    /** 疲劳/精通自动更换开关（两档互斥；需对应里程碑解锁） */
+    toggleAutoSwitch(mode: 'fatigue' | 'mastery') {
+      const key = mode === 'fatigue' ? 'autoFatigue' : 'autoMastery';
+      if (!isFeatureUnlocked(this.s, key)) {
+        const need = mode === 'fatigue' ? 5 : 25;
+        this.toast(`该功能尚未解锁（达成 ${need} 个成就）`);
+        return;
+      }
+      this.s.settings.autoSwitch = this.s.settings.autoSwitch === mode ? 'off' : mode;
+      const label = mode === 'fatigue' ? '疲劳自动更换' : '精通自动更换';
+      this.toast(this.s.settings.autoSwitch === mode ? `已开启${label}` : `已关闭${label}`);
+      this.saveGame();
+    },
+
+    sleeveAllCopies() {
+      const r = sleeveAll(this.s);
+      this.toast(r.count > 0 ? `一键套牌套完成：${r.count} 盒实体（消耗 ${r.used} 张）` : '没有可套的实体（牌套可能不够）');
+      if (r.count > 0) this.saveGame();
+    },
+
+    listWorn() {
+      const r = listWornCopies(this.s);
+      this.toast(r.count > 0 ? `已上架 ${r.count} 件磨光实体（行情价 100%）` : '没有可上架的磨光实体（或槽位已满）');
+      if (r.count > 0) this.saveGame();
     },
 
     // ---------- 存档管理：导出 / 导入 / 重新开始 ----------

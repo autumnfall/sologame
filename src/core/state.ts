@@ -11,6 +11,8 @@ export interface CollectionEntry {
   fatigue: number;
   /** 规则已读（跳过读规则阶段） */
   rulesRead: boolean;
+  /** 唯一副本卖光过（回头客成就用：再次 acquire 时触发） */
+  resold?: boolean;
 }
 
 /** 桌游实体：每个副本有自己的成色/牌套/收纳 */
@@ -126,7 +128,32 @@ export interface GameState {
   /** 离线总结（收益已自动入账；>1 分钟离线回来时弹窗展示，关闭后清空） */
   offlineBank: OfflineBank;
   lastSeen: number;
-  stats: { plays: number; pulls: number };
+  /** 生涯统计（含成就用事件计数器） */
+  stats: {
+    plays: number;
+    pulls: number;
+    /** 完成的工作周期数（在线 + 离线） */
+    workCycles: number;
+    /** 某鱼挂售成交次数 */
+    soldCount: number;
+    /** 某宝 / 某鱼购买次数 */
+    tbBought: number;
+    xyBought: number;
+    /** 触发保底次数 / 200% 定价成交次数 / 捡漏次数 */
+    pityHits: number;
+    highPriceSold: number;
+    bargainBuys: number;
+    /** 回头客：唯一副本卖光后重新入手 */
+    comeback: boolean;
+    respecCount: number;
+  };
+  /** 已达成成就 id 列表（每个 +1% 全局经验） */
+  achievements: string[];
+  /** 功能性设置 */
+  settings: {
+    /** 连刷自动更换：关 / 疲劳后换 / 精通后换（两档互斥） */
+    autoSwitch: 'off' | 'fatigue' | 'mastery';
+  };
 }
 
 export function emptyOfflineBank(): OfflineBank {
@@ -165,7 +192,12 @@ export function defaultState(): GameState {
     started: false,
     offlineBank: emptyOfflineBank(),
     lastSeen: Date.now(),
-    stats: { plays: 0, pulls: 0 },
+    stats: {
+      plays: 0, pulls: 0, workCycles: 0, soldCount: 0, tbBought: 0, xyBought: 0,
+      pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
+    },
+    achievements: [],
+    settings: { autoSwitch: 'off' },
   };
 }
 
