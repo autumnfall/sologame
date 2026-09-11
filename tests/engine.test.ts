@@ -3,7 +3,7 @@ import {
   DURABILITY, HI_TICKET_SLEEVES, MARKET_SLOT_COSTS, ROTATION_MS,
   SELL_FEE, SELL_SLOT_COSTS, STORE_WEAR_ONCE, XY_REFRESH_MS, XY_SELL_MS,
   accumulateOffline, applySleeve, applyStorage, buyTaobao, buyXianyu,
-  copyValue, defaultState, exchangeHiTickets, expandMarketSlots, expandSellSlots, gachaDraw,
+  copyValue, defaultState, exchangeHiTickets, expandMarketSlots, expandSellSlots, expMult, gachaDraw,
   gameById, initTaobaoStock, listCopy, pickStarter, quitJob, refreshXianyu, rollGachaOutcome, rotatingPool, settleRound,
   takeJob, tickRotation, tickSecond, tickXianyu, unlistCopy,
 } from '../src/core';
@@ -428,6 +428,20 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     expect(r.wear).toBe(1);
     expect(r.worn).toBe(false);
     expect(s.stats.plays).toBe(1);
+  });
+
+  it('疲劳 float 累计：应变按百分比平滑生效（1 级 → +1.92，不取整）', () => {
+    const s = defaultState();
+    const copy = own(s, 'guoyuan');
+    s.attrExp['应变'] = 60; // 1 级：疲劳增长 ×0.96
+    settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
+    expect(s.collections['guoyuan'].fatigue).toBeCloseTo(1.92, 10);
+    settleRound(s, 'guoyuan', copy.uid, 2, () => 0.99);
+    expect(s.collections['guoyuan'].fatigue).toBeCloseTo(3.84, 10);
+    // 疲劳收益按 float 计算（1/(1+3.84×0.15)），连续生效无档位钝化
+    const expBase = 12 * expMult(s) / (1 + 3.84 * 0.15);
+    const r = settleRound(s, 'guoyuan', copy.uid, 3, () => 0.99);
+    expect(r.gains['演算']).toBeCloseTo(expBase, 6);
   });
 
   it('磨损公式：收纳 ×0.75、牌套 ×0.5（收藏级与实体级分离）', () => {

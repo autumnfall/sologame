@@ -149,7 +149,8 @@ export function settleRound(
   if (!c || !c.firstOpened) throw new Error(`未拥有《${g.name}》`);
   if (!copy || copy.gameId !== gameId) throw new Error('实体不存在');
   if (state.listings.some(l => l.copyUid === copyUid)) throw new Error('上架中的实体不可游玩');
-  const fInc = Math.max(1, Math.round(2 * fatigueIncMult(state) * (hasAffix(state, 'fatHalf') ? 0.5 : 1)));
+  // 疲劳与熟练度：疲劳为 float 累计（页面不显示数值，只看「玩腻了」状态）
+  const fInc = Math.max(0.5, 2 * fatigueIncMult(state) * (hasAffix(state, 'fatHalf') ? 0.5 : 1));
   for (const id of Object.keys(state.collections)) {
     if (id === gameId) state.collections[id].fatigue = Math.min(20, state.collections[id].fatigue + fInc);
     else state.collections[id].fatigue = Math.max(0, state.collections[id].fatigue - 1);

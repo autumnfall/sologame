@@ -52,13 +52,13 @@ function copies(id: string) {
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
     <div v-else class="grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
-        <div>{{ masteryText(store.s, gameById(id)) }} · 疲劳 {{ store.s.collections[id].fatigue }}</div>
+        <div>{{ masteryText(store.s, gameById(id)) }}</div>
         <div class="tagline">每局 {{ gainText(gameById(id)) }}</div>
         <div v-if="gameById(id).affix" class="tagline" style="color:#d9a5f5">✦ {{ gameById(id).affix?.desc }}</div>
-        <div class="bar" title="疲劳">
+        <div class="bar" title="疲劳（变红 = 玩腻了）">
           <i
             :style="{
-              width: Math.min(100, store.s.collections[id].fatigue * 10) + '%',
+              width: Math.min(100, Math.round(store.s.collections[id].fatigue * 10)) + '%',
               background: store.s.collections[id].fatigue >= 7 ? 'var(--red)' : 'var(--green)',
             }"
           ></i>
@@ -98,7 +98,7 @@ function copies(id: string) {
             <div class="bar" title="耐久">
               <i
                 :style="{
-                  width: Math.min(100, (c.durability / DURABILITY[gameById(id).rarity]) * 100) + '%',
+                  width: Math.min(100, Math.round((c.durability / DURABILITY[gameById(id).rarity]) * 1000) / 10) + '%',
                   background: c.durability <= 0 ? 'var(--red)' : 'var(--green)',
                 }"
               ></i>

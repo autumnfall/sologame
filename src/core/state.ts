@@ -7,7 +7,7 @@ export interface CollectionEntry {
   firstOpened: boolean;
   /** 熟练度：已玩局数（仅游玩 +1） */
   prof: number;
-  /** 疲劳：游玩目标 +2 / 其余收藏 -1，收益 = 1/(1+疲劳×0.15)，≥7「玩腻了」 */
+  /** 疲劳：float 累计（页面不显示数值）；游玩目标 +2/其余 -1，收益 = 1/(1+疲劳×0.15)，≥7「玩腻了」 */
   fatigue: number;
   /** 规则已读（跳过读规则阶段） */
   rulesRead: boolean;

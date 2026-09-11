@@ -117,8 +117,7 @@ watch(
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
         <div>复杂度 {{ gameById(id).weight }} · {{ gameById(id).playTime }}分钟 · 每局 {{ gainText(gameById(id)) }}</div>
         <div class="tagline">
-          {{ masteryText(store.s, gameById(id)) }} · 疲劳 {{ store.s.collections[id].fatigue
-          }} · ×{{ copiesOf(store.s, id).length }} 实体
+          {{ masteryText(store.s, gameById(id)) }} · ×{{ copiesOf(store.s, id).length }} 实体
         </div>
         <template #actions>
           <div style="margin-top:6px">
@@ -179,7 +178,7 @@ watch(
             <i
               style="display:block;height:100%"
               :style="{
-                width: Math.min(100, (c.durability / DURABILITY[gameById(c.gameId).rarity]) * 100) + '%',
+                width: Math.min(100, Math.round((c.durability / DURABILITY[gameById(c.gameId).rarity]) * 1000) / 10) + '%',
                 background: c.durability <= 0 ? 'var(--red)' : 'var(--green)',
               }"
             ></i>

@@ -7,8 +7,8 @@ import { useGameStore } from '../stores/game';
 const store = useGameStore();
 const b = computed(() => store.s.offlineBank);
 
-/** 总体进度条：离线时长占上限比例 */
-const totalPct = computed(() => Math.min(100, (b.value.t / OFFLINE_CAP_MS) * 100));
+/** 总体进度条：离线时长占上限比例（展示保留 1 位小数） */
+const totalPct = computed(() => Math.min(100, Math.round((b.value.t / OFFLINE_CAP_MS) * 1000) / 10));
 
 const expLines = computed(() =>
   (Object.entries(b.value.exp) as [Attr, number][])

@@ -351,7 +351,7 @@ export const useGameStore = defineStore('game', {
         }
       }
       p.t += dtMs;
-      p.pct = Math.min(100, (p.t / durMs) * 100);
+      p.pct = Math.min(100, Math.round((p.t / durMs) * 1000) / 10); // 展示保留 1 位小数
       if (p.pct >= 100 && p.hit !== null) {
         p.done = true;
         ps.idx++;
@@ -415,7 +415,7 @@ export const useGameStore = defineStore('game', {
           'mut',
         );
       }
-      if (res.tired) this.logPlay(`《${g.name}》有点玩腻了（疲劳 ${res.fatigue}），换一盒收益更高。`, 'bad');
+      if (res.tired) this.logPlay(`《${g.name}》有点玩腻了，换一盒收益更高。`, 'bad');
       this.saveGame();
       if (ps.stopAfter) {
         const rounds = ps.round;
