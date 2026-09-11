@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   DURABILITY, HI_TICKET_SLEEVES, MARKET_SLOT_COSTS, ROTATION_MS,
-  SELL_FEE, SELL_SLOT_COSTS, STORE_WEAR_ONCE, XY_REFRESH_MS,
-  accumulateOffline, applySleeve, applyStorage, buyTaobao, buyXianyu, claimOffline,
+  SELL_FEE, SELL_SLOT_COSTS, STORE_WEAR_ONCE, XY_REFRESH_MS, XY_SELL_MS,
+  accumulateOffline, applySleeve, applyStorage, buyTaobao, buyXianyu,
   copyValue, defaultState, exchangeHiTickets, expandMarketSlots, expandSellSlots, gachaDraw,
   gameById, initTaobaoStock, listCopy, pickStarter, quitJob, refreshXianyu, rollGachaOutcome, rotatingPool, settleRound,
   takeJob, tickRotation, tickSecond, tickXianyu, unlistCopy,
@@ -161,7 +161,7 @@ describe('某鱼：购买与出售', () => {
     const s = defaultState();
     const c = own(s, 'guoyuan'); // 全新 88 价值
     expect(listCopy(s, c.uid, 0.5).ok).toBe(true); // ¥44
-    s.xyNext = 1; // 立即判定
+    s.xySellNext = 1; // 立即判定
     const r = tickXianyu(s, () => 0.3, 100);
     expect(r.sold).toHaveLength(1);
     expect(r.sold[0].gain).toBe(Math.round(44 * (1 - SELL_FEE))); // 41.8→42
@@ -173,25 +173,31 @@ describe('某鱼：购买与出售', () => {
     const s2 = defaultState();
     const c2 = own(s2, 'guoyuan', { durability: 0 });
     expect(listCopy(s2, c2.uid, 2.0).ok).toBe(true);
-    s2.xyNext = 1;
+    s2.xySellNext = 1;
     const r2 = tickXianyu(s2, () => 0.0, 100); // rng 0 都卖不掉
     expect(r2.sold).toHaveLength(0);
     expect(s2.copies).toHaveLength(1);
   });
 
-  it('tickXianyu：到点才刷新；成交判定与刷新共用计时器（未到点不掷骰）', () => {
+  it('tickXianyu：货源 5 分钟刷新与挂售 30s 判定互相独立', () => {
     const s = defaultState();
     refreshXianyu(s, false, lcg(5), 0);
-    // 必卖上架（全新×50%），但未到 5 分钟到点
+    // 必卖上架（全新×50%）
     const c = own(s, 'guoyuan');
     expect(listCopy(s, c.uid, 0.5).ok).toBe(true);
-    expect(tickXianyu(s, () => 0, s.xyNext - 1).sold).toHaveLength(0); // rng 恒 0 也不成交
+    // 判定时钟未初始化：首个 tick 只武装不判定
+    expect(tickXianyu(s, () => 0, 100).sold).toHaveLength(0);
     expect(s.listings).toHaveLength(1);
-    // 到点后同一秒 tick 立即判定成交
-    const r = tickXianyu(s, () => 0.3, s.xyNext);
-    expect(r.refreshed).toBe(true);
-    expect(r.sold).toHaveLength(1);
-    expect(s.listings).toHaveLength(0);
+    // 30s 到点：判定成交，但货源尚未到 5 分钟不刷新
+    const mid = s.xySellNext!;
+    const r1 = tickXianyu(s, () => 0.3, mid);
+    expect(r1.sold).toHaveLength(1);
+    expect(r1.refreshed).toBe(false);
+    expect(s.xySellNext).toBe(mid + XY_SELL_MS);
+    // 5 分钟到点：只刷新货源
+    const r2 = tickXianyu(s, lcg(5), s.xyNext);
+    expect(r2.refreshed).toBe(true);
+    expect(r2.sold).toHaveLength(0);
   });
 
   it('已精通桌游不再刷出', () => {
@@ -362,22 +368,46 @@ describe('tick 与离线（工作周期制）', () => {
     expect(s.money).toBe(200 + 100 + 150);
   });
 
-  it('离线累积：按整周期 ×50% 折算入账，余量转回进度；上限 1 小时', () => {
+  it('离线累积：工作按整周期折算直接入账；上限 1 小时', () => {
     const s = defaultState();
     takeJob(s, 'teacher'); // 160s/¥50
     accumulateOffline(s, 30 * 60 * 1000); // 1800 秒 → 11 周期 + 余 40 秒
     expect(s.offlineBank.t).toBe(1800 * 1000);
-    expect(s.offlineBank.money).toBeCloseTo(11 * 50 * 0.5, 6); // ¥275
+    expect(s.offlineBank.workMoney).toBeCloseTo(11 * 50 * 0.5, 6); // ¥275
+    expect(s.offlineBank.workCycles).toBe(11);
+    expect(s.money).toBe(200 + 275); // 直接入账，无需领取
     expect(s.jobProgress).toBe(40);
     accumulateOffline(s, 2 * 3600 * 1000); // 再来 2 小时，封顶（再计 1800 秒 → 11 周期余 80）
     expect(s.offlineBank.t).toBe(3600 * 1000);
-    expect(s.offlineBank.money).toBeCloseTo(22 * 50 * 0.5, 6); // ¥550
+    expect(s.offlineBank.workMoney).toBeCloseTo(22 * 50 * 0.5, 6); // ¥550
     expect(s.jobProgress).toBe(80);
     accumulateOffline(s, 60000); // 已满，不再累积
     expect(s.offlineBank.t).toBe(3600 * 1000);
-    const got = claimOffline(s);
-    expect(got).toBeCloseTo(550, 6);
-    expect(s.offlineBank.money).toBe(0);
+  });
+
+  it('离线自动游玩：真实扣疲劳/耐久，战报记录局数/收入/经验', () => {
+    const s = defaultState();
+    const c = own(s, 'guoyuan'); // 单实体，单回合 ≈ 42.6s
+    const moneyBefore = s.money;
+    accumulateOffline(s, 10 * 60 * 1000, lcg(3)); // 600 秒
+    const b = s.offlineBank;
+    expect(b.playRounds).toBeGreaterThan(5);
+    expect(b.playMoney).toBeGreaterThan(0);
+    expect(s.money).toBe(moneyBefore + b.playMoney); // 游玩收入也已入账
+    expect(s.collections['guoyuan'].prof).toBe(b.playRounds);
+    expect(c.durability).toBeLessThan(DURABILITY.N);
+    const row = b.games.find(g => g.gameId === 'guoyuan')!;
+    expect(row.rounds).toBe(b.playRounds);
+    expect(row.wear).toBeCloseTo(DURABILITY.N - c.durability, 6);
+    expect(b.exp['演算']).toBeGreaterThan(0);
+    // 疲劳真实增长（目标收藏每局 +2，封顶 20）
+    expect(s.collections['guoyuan'].fatigue).toBe(Math.min(20, 2 * b.playRounds));
+    // 上架中的实体不参与离线游玩
+    const s2 = defaultState();
+    own(s2, 'guoyuan');
+    listCopy(s2, s2.copies[0].uid, 0.5);
+    accumulateOffline(s2, 10 * 60 * 1000, lcg(3));
+    expect(s2.offlineBank.playRounds).toBe(0);
   });
 });
 

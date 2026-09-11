@@ -4,6 +4,7 @@ import { useGameStore } from './stores/game';
 import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
 import StarterModal from './components/StarterModal.vue';
+import OfflineModal from './components/OfflineModal.vue';
 import PlayPage from './pages/PlayPage.vue';
 import WorkPage from './pages/WorkPage.vue';
 import ShopPage from './pages/ShopPage.vue';
@@ -60,5 +61,6 @@ onUnmounted(() => {
     <GuidePage v-else />
   </div>
   <StarterModal />
+  <OfflineModal />
   <Toast />
 </template>

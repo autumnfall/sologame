@@ -1,4 +1,4 @@
-import { XY_REFRESH_MS } from '../data/constants';
+import { XY_REFRESH_MS, XY_SELL_MS } from '../data/constants';
 import { DURABILITY, copyValue, sellChance } from '../data/balance';
 import { XY_REFRESH_COST } from '../data/prices';
 import { GAMES, REGULAR_GAMES, gameById } from '../data/games';
@@ -110,9 +110,10 @@ export interface XianyuTickResult {
 }
 
 /**
- * 某鱼 5 分钟计时：到点自动刷新货源，并对每件上架商品按
- * 「定价倍率 × 成色」做成交判定（判定同样只在 5 分钟到点时进行一次，
- * 期间每秒的 tick 不会重复掷骰）；卖出收取 5% 手续费。
+ * 某鱼计时（两个独立时钟）：
+ * 1) 货源刷新：xyNext 到点自动刷新（5 分钟）；
+ * 2) 成交判定：xySellNext 每 30 秒对每件上架商品按「定价倍率 × 成色」掷一次骰
+ *    （好口碑天赋提升成交率）；卖出收取手续费。
  */
 export function tickXianyu(
   state: GameState,
@@ -120,25 +121,31 @@ export function tickXianyu(
   now: number = Date.now(),
 ): XianyuTickResult {
   const result: XianyuTickResult = { refreshed: false, sold: [] };
-  if (!state.xyNext || now < state.xyNext) return result;
-  const r = refreshXianyu(state, false, rng, now);
-  result.refreshed = r.ok;
-  for (let i = state.listings.length - 1; i >= 0; i--) {
-    const l = state.listings[i];
-    const copy = copyByUid(state, l.copyUid);
-    if (!copy) {
-      state.listings.splice(i, 1); // 实体丢失（不应发生），清理
-      continue;
-    }
-    const g = gameById(copy.gameId);
-    const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
-    const chance = Math.min(1, sellChance(l.price / value, copy.durability, g.rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
-    if (rng() < chance) {
-      const gain = Math.round(l.price * (1 - sellFeeRate(state)));
-      state.money += gain;
-      state.copies = state.copies.filter(c => c.uid !== l.copyUid);
-      state.listings.splice(i, 1);
-      result.sold.push({ gameId: g.id, name: g.name, price: l.price, gain });
+  if (state.xyNext && now >= state.xyNext) {
+    const r = refreshXianyu(state, false, rng, now);
+    result.refreshed = r.ok;
+  }
+  if (!state.xySellNext) {
+    state.xySellNext = now + XY_SELL_MS; // 判定时钟未初始化：本 tick 只武装不判定
+  } else if (now >= state.xySellNext) {
+    state.xySellNext = now + XY_SELL_MS;
+    for (let i = state.listings.length - 1; i >= 0; i--) {
+      const l = state.listings[i];
+      const copy = copyByUid(state, l.copyUid);
+      if (!copy) {
+        state.listings.splice(i, 1); // 实体丢失（不应发生），清理
+        continue;
+      }
+      const g = gameById(copy.gameId);
+      const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
+      const chance = Math.min(1, sellChance(l.price / value, copy.durability, g.rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
+      if (rng() < chance) {
+        const gain = Math.round(l.price * (1 - sellFeeRate(state)));
+        state.money += gain;
+        state.copies = state.copies.filter(c => c.uid !== l.copyUid);
+        state.listings.splice(i, 1);
+        result.sold.push({ gameId: g.id, name: g.name, price: l.price, gain });
+      }
     }
   }
   return result;

@@ -8,7 +8,7 @@ import { copyByUid } from '../state';
 import { attrShares } from '../mechanics/attrs';
 import { globalBonus, hasAffix } from '../mechanics/collection';
 import { currentJob, expMult, fatigueIncMult, incomeMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
-import { fatigueMod } from '../mechanics/play';
+import { fatigueMod, playDuration, ruleDuration, setupDuration } from '../mechanics/play';
 import { perkLv } from '../mechanics/prestige';
 
 export interface TickResult {
@@ -46,28 +46,69 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
 }
 
 /**
- * 离线收益累积：按完成的整周期数入账（期望酬劳 × 离线折算 50%），
- * 不足一周期的余量转回 jobProgress；总上限 1 小时、bank 满则不再累积。
+ * 离线累积（收益直接入账，统计写入 offlineBank 供总结弹窗展示）：
+ * ① 工作：按完成的整周期入账（期望酬劳 × 离线折算），不足一周期的余量转回 jobProgress；
+ * ② 游玩：离线期间自动连刷——每轮挑「基础经验 × 疲劳修正」最高的可玩实体结算一局
+ * （真实消耗回合时长，无时机条加成），金钱/经验/熟练度/疲劳/磨损全部照常结算。
+ * 总上限 1 小时、bank 满则不再累积。
  */
-export function accumulateOffline(state: GameState, elapsedMs: number): void {
+export function accumulateOffline(
+  state: GameState,
+  elapsedMs: number,
+  rng: () => number = Math.random,
+): void {
   const j = currentJob(state);
-  if (!j || !j.auto) return;
   const t = Math.min(elapsedMs, OFFLINE_CAP_MS);
   if (state.offlineBank.t >= OFFLINE_CAP_MS) return;
   const addT = Math.min(t, OFFLINE_CAP_MS - state.offlineBank.t);
   state.offlineBank.t += addT;
-  const total = state.jobProgress + addT / 1000;
-  const cycles = Math.floor(total / j.cycleSec);
-  state.jobProgress = total - cycles * j.cycleSec;
   const rate = OFFLINE_RATE + 0.15 * perkLv(state, 'offlineUp'); // 挂机心得：离线折算提升
-  state.offlineBank.money += cycles * jobCyclePayExpected(state, j) * rate;
-}
-
-export function claimOffline(state: GameState): number {
-  const amount = state.offlineBank.money;
-  state.money += amount;
-  state.offlineBank = { t: 0, money: 0, log: [] };
-  return amount;
+  // ① 工作整周期
+  if (j?.auto) {
+    const total = state.jobProgress + addT / 1000;
+    const cycles = Math.floor(total / j.cycleSec);
+    state.jobProgress = total - cycles * j.cycleSec;
+    const pay = Math.round(cycles * jobCyclePayExpected(state, j) * rate);
+    state.money += pay;
+    state.offlineBank.workMoney += pay;
+    state.offlineBank.workCycles += cycles;
+  }
+  // ② 自动游玩
+  let secs = addT / 1000;
+  let guard = 0; // 防御上限：单轮最短约 10s，1 小时最多 ~360 局
+  while (secs > 0 && guard < 500) {
+    const listed = new Set(state.listings.map(l => l.copyUid));
+    let best: { gameId: string; uid: number; score: number } | null = null;
+    for (const c of state.copies) {
+      if (listed.has(c.uid)) continue;
+      const col = state.collections[c.gameId];
+      if (!col?.firstOpened) continue;
+      const score = gameById(c.gameId).baseExp * fatigueMod(state, gameById(c.gameId));
+      if (!best || score > best.score) best = { gameId: c.gameId, uid: c.uid, score };
+    }
+    if (!best) break;
+    const g = gameById(best.gameId);
+    const copy = copyByUid(state, best.uid)!;
+    const roundSec =
+      ruleDuration(state, g) + setupDuration(state, g, copy) + playDuration(state, g, copy) + 4;
+    if (secs < roundSec) break;
+    const wearBefore = copy.durability;
+    const res = settleRound(state, g.id, copy.uid, state.offlineBank.playRounds + 1, rng);
+    secs -= roundSec;
+    guard++;
+    state.offlineBank.playMoney += res.pay;
+    state.offlineBank.playRounds++;
+    for (const [a, v] of Object.entries(res.gains)) {
+      state.offlineBank.exp[a as Attr] = (state.offlineBank.exp[a as Attr] ?? 0) + (v ?? 0);
+    }
+    const st = state.offlineBank.games.find(x => x.gameId === g.id);
+    if (st) {
+      st.rounds++;
+      st.wear += wearBefore - copy.durability;
+    } else {
+      state.offlineBank.games.push({ gameId: g.id, rounds: 1, wear: wearBefore - copy.durability });
+    }
+  }
 }
 
 export interface SettleResult {

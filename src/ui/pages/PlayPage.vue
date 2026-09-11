@@ -65,6 +65,48 @@ watch(
 
 <template>
   <div>
+    <!-- 游玩中：进度面板固定在页面顶部，选游戏列表在下方 -->
+    <div v-if="ps" id="play-panel">
+      <h3 style="margin-top:0">{{ panelTitle }}</h3>
+      <div>
+        <div v-for="(p, i) in ps.phases" :key="p.key" class="phase-row">
+          <span class="plabel">{{ p.name }}</span>
+          <div
+            class="pbar"
+            :class="{ active: isTimingActive(i), done: p.done || p.total <= 0 }"
+            @click="store.judgeTiming()"
+          >
+            <div class="fill" :style="{ width: p.pct + '%' }"></div>
+            <div
+              v-if="isTimingActive(i) && ps.timing"
+              class="gzone"
+              :style="{ left: ps.timing.zl + '%', width: ps.timing.zw + '%' }"
+            ></div>
+            <div
+              v-if="isTimingActive(i) && ps.timing"
+              class="cursor"
+              :style="{ left: ps.timing.pos + '%' }"
+            ></div>
+          </div>
+          <span class="presult">
+            <span v-if="p.total <= 0" class="mut">跳过</span>
+            <template v-else-if="p.done || p.hit !== null">
+              <span v-if="p.hit" class="ok">命中+50%</span>
+              <span v-else class="mut">普通</span>
+            </template>
+          </span>
+        </div>
+      </div>
+      <div ref="logEl" class="logbox">
+        <div v-for="(line, i) in store.playLog" :key="i" :class="line.cls">{{ line.text }}</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <button :disabled="ps.stopAfter" @click="store.stopAfterRound()">⏹ 本轮结算后停止</button>
+        <button class="danger" @click="store.cancelPlay()">立即放弃本轮（无收益）</button>
+        <small class="mut">连刷中：在下方列表点「下轮换它」即可在本轮结束后换游戏</small>
+      </div>
+    </div>
+
     <h2>选择一款桌游开玩</h2>
     <FilterBar v-model="store.playFilter" />
 
@@ -106,47 +148,6 @@ watch(
           </div>
         </template>
       </GameCard>
-    </div>
-
-    <div v-if="ps" id="play-panel">
-      <h3>{{ panelTitle }}</h3>
-      <div>
-        <div v-for="(p, i) in ps.phases" :key="p.key" class="phase-row">
-          <span class="plabel">{{ p.name }}</span>
-          <div
-            class="pbar"
-            :class="{ active: isTimingActive(i), done: p.done || p.total <= 0 }"
-            @click="store.judgeTiming()"
-          >
-            <div class="fill" :style="{ width: p.pct + '%' }"></div>
-            <div
-              v-if="isTimingActive(i) && ps.timing"
-              class="gzone"
-              :style="{ left: ps.timing.zl + '%', width: ps.timing.zw + '%' }"
-            ></div>
-            <div
-              v-if="isTimingActive(i) && ps.timing"
-              class="cursor"
-              :style="{ left: ps.timing.pos + '%' }"
-            ></div>
-          </div>
-          <span class="presult">
-            <span v-if="p.total <= 0" class="mut">跳过</span>
-            <template v-else-if="p.done || p.hit !== null">
-              <span v-if="p.hit" class="ok">命中+50%</span>
-              <span v-else class="mut">普通</span>
-            </template>
-          </span>
-        </div>
-      </div>
-      <div ref="logEl" class="logbox">
-        <div v-for="(line, i) in store.playLog" :key="i" :class="line.cls">{{ line.text }}</div>
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-        <button :disabled="ps.stopAfter" @click="store.stopAfterRound()">⏹ 本轮结算后停止</button>
-        <button class="danger" @click="store.cancelPlay()">立即放弃本轮（无收益）</button>
-        <small class="mut">连刷中：在下方列表点「下轮换它」即可在本轮结束后换游戏</small>
-      </div>
     </div>
 
     <!-- 多实体选择器 -->

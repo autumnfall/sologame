@@ -2,8 +2,8 @@ import type { Job } from './types';
 
 // ---------- 职业阶梯（周期制；六维均衡，每属性一条线，终点全属性 Ⅳ） ----------
 // 周期最长 5 分钟（300s）；酬劳按周期时长等比设定，等效速率 0.15/s → 1.67/s。
+// 游玩本身产出入门收入，职业从第一个自动岗起步。
 export const JOBS: readonly Job[] = [
-  { id: 'tryout', name: '桌游试玩员', req: {}, auto: false, cycleSec: 0, cyclePay: 0, desc: '手动玩桌游本身产出微薄收入（每次游玩结算给钱）' },
   { id: 'calc', name: '计分陪练', req: { 演算: 1 }, auto: true, cycleSec: 100, cyclePay: 15, desc: '入门岗 · 每 100 秒 ¥15' },
   { id: 'dicehost', name: '骰子活动主持', req: { 应变: 1 }, auto: true, cycleSec: 100, cyclePay: 15, desc: '入门岗 · 每 100 秒 ¥15' },
   { id: 'stockboy', name: '库房理货员', req: { 运筹: 1 }, auto: true, cycleSec: 100, cyclePay: 15, desc: '入门岗 · 每 100 秒 ¥15' },

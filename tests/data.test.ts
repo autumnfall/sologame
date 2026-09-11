@@ -49,8 +49,8 @@ describe('数据集完整性', () => {
     expect(gameById('kafei').cards).toBeNull();
   });
 
-  it('职业阶梯：12 个职业、六维均衡各属性有岗、终点全属性 Ⅳ、id 唯一', () => {
-    expect(JOBS).toHaveLength(12);
+  it('职业阶梯：11 个职业（游玩本身产出入门收入）、六维均衡各属性有岗、终点全属性 Ⅳ、id 唯一', () => {
+    expect(JOBS).toHaveLength(11);
     const master = jobById('master');
     expect(master?.req).toEqual({ 谋略: 4, 演算: 4, 应变: 4, 运筹: 4, 洞察: 4, 沉浸: 4 });
     // 周期制：自动职业都有正周期与酬劳，最长 5 分钟
@@ -91,8 +91,8 @@ describe('价格派生', () => {
     expect(GACHA_PITY).toBe(50);
     expect(TAOBAO_STOCK).toEqual({ N: 4, R: 3, SR: 2, SSR: 1 });
     expect(XY_REFRESH_COST).toBe(20);
-    expect(SELL_SLOT_COSTS).toEqual([500, 1500, 4000, 10000]);
-    expect(MARKET_SLOT_COSTS).toEqual([200, 600, 1500, 3500]);
+    expect(SELL_SLOT_COSTS).toEqual([60, 60, 60, 60]);
+    expect(MARKET_SLOT_COSTS).toEqual([50, 50, 50, 50]);
   });
 
   it('开箱奖励与精通门槛表与原型一致', () => {

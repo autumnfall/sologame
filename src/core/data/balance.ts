@@ -52,10 +52,10 @@ export const SELL_FEE = 0.05;
 export const OFFLINE_RATE = 0.5;
 
 /** 出售槽位扩充价格：扩到 2/3/4/5 个（初始 1 个，上限 5） */
-export const SELL_SLOT_COSTS: readonly number[] = [500, 1500, 4000, 10000];
+export const SELL_SLOT_COSTS: readonly number[] = [60, 60, 60, 60];
 
 /** 市场刷新商品数扩充价格：扩到 4/5/6/7 件（初始 3 件，上限 7） */
-export const MARKET_SLOT_COSTS: readonly number[] = [200, 600, 1500, 3500];
+export const MARKET_SLOT_COSTS: readonly number[] = [50, 50, 50, 50];
 
 export const SELL_SLOTS_MAX = 5;
 export const MARKET_SLOTS_MAX = 7;

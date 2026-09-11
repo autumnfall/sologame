@@ -23,6 +23,31 @@ export interface Copy {
   stored: boolean;
 }
 
+/** 离线期间单款桌游的自动游玩统计 */
+export interface OfflinePlayStat {
+  gameId: string;
+  /** 游玩局数（= 熟练度增量） */
+  rounds: number;
+  /** 耐久磨损合计 */
+  wear: number;
+}
+
+/**
+ * 离线总结（收益已自动入账，这里只存展示数据）：
+ * 超过 1 分钟的离线会在回来时弹出总结弹窗，随后清空。
+ */
+export interface OfflineBank {
+  /** 累计离线毫秒 */
+  t: number;
+  workMoney: number;
+  workCycles: number;
+  playMoney: number;
+  playRounds: number;
+  /** 六维经验增量 */
+  exp: Partial<Record<Attr, number>>;
+  games: OfflinePlayStat[];
+}
+
 /** 某鱼在售货源（一件 = 一个实体）；blind = 一口价盲买：UI 只显示名称，隐藏成色/牌套/收纳 */
 export interface MarketItem {
   gameId: string;
@@ -80,8 +105,10 @@ export interface GameState {
   sellSlots: number;
   /** 市场每次刷新商品数（3~7，可花钱扩充） */
   marketSlots: number;
-  /** 下次某鱼自动到货/成交判定时间戳 */
+  /** 下次某鱼自动到货时间戳 */
   xyNext: number;
+  /** 下次挂售成交判定时间戳（每 30s，与到货刷新独立） */
+  xySellNext: number;
   /** 某赏常驻池 SSR 保底进度 */
   pity: number;
   /** 某赏轮换池 SSR 保底进度（独立） */
@@ -96,10 +123,14 @@ export interface GameState {
   jobProgress: number;
   /** 是否已完成开局三选一 */
   started: boolean;
-  /** 离线收益待领取 */
-  offlineBank: { t: number; money: number; log: string[] };
+  /** 离线总结（收益已自动入账；>1 分钟离线回来时弹窗展示，关闭后清空） */
+  offlineBank: OfflineBank;
   lastSeen: number;
   stats: { plays: number; pulls: number };
+}
+
+export function emptyOfflineBank(): OfflineBank {
+  return { t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] };
 }
 
 export function defaultPrestige(): PrestigeState {
@@ -124,6 +155,7 @@ export function defaultState(): GameState {
     sellSlots: 1,
     marketSlots: 3,
     xyNext: 0,
+    xySellNext: 0,
     pity: 0,
     pityRot: 0,
     rotTheme: null,
@@ -131,7 +163,7 @@ export function defaultState(): GameState {
     job: null,
     jobProgress: 0,
     started: false,
-    offlineBank: { t: 0, money: 0, log: [] },
+    offlineBank: emptyOfflineBank(),
     lastSeen: Date.now(),
     stats: { plays: 0, pulls: 0 },
   };

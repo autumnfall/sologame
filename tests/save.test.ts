@@ -108,7 +108,9 @@ describe('存档系统', () => {
     const s = load(storage);
     expect(s).not.toBeNull();
     expect(s!.saveVersion).toBe(SAVE_VERSION);
-    expect(s!.money).toBe(500);
+    expect(s!.money).toBe(620); // 500 + 旧未领取离线收益 120 由 v8 迁移直接入账
+    expect(s!.offlineBank).toEqual({ t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] });
+    expect(s!.xySellNext).toBe(0);
     expect('attrs' in s!).toBe(false);
     expect(s!.xyNext).toBe(0); // 默认填充
     // owned → collections + copies
@@ -172,6 +174,24 @@ describe('存档系统', () => {
       expect(s!.jobProgress).toBe(0);
       expect('rate' in s!).toBe(false); // 旧 rate 字段已剥掉
     }
+  });
+
+  it('v7 → v8：挂售独立计时；手动职业 tryout 清空；旧离线收益入账', () => {
+    const v7 = {
+      saveVersion: 7,
+      money: 100, job: 'tryout',
+      collections: {}, copies: [], xianyuBuys: [], listings: [],
+      offlineBank: { t: 0, money: 80, log: [] }, lastSeen: 1, stats: { plays: 0, pulls: 0 },
+    };
+    const storage = memoryStorage();
+    storage.setItem('bgcollector_save', JSON.stringify(v7));
+    const s = load(storage);
+    expect(s).not.toBeNull();
+    expect(s!.saveVersion).toBe(SAVE_VERSION);
+    expect(s!.money).toBe(180); // 旧未领取的 80 直接入账
+    expect(s!.job).toBeNull();
+    expect(s!.xySellNext).toBe(0);
+    expect(s!.offlineBank.workMoney).toBe(0);
   });
 
   it('脏数据兜底：负值归零 / 非法实体条目 / 缺 stats', () => {

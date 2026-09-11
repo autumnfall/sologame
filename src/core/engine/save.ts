@@ -3,7 +3,7 @@ import { DURABILITY } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { gameById } from '../data/games';
 import { defaultState } from '../state';
-import type { CollectionEntry, Copy, GameState, Listing, MarketItem } from '../state';
+import type { CollectionEntry, Copy, GameState, Listing, MarketItem, OfflineBank } from '../state';
 import type { Attr } from '../data/constants';
 
 /** 存储适配器：默认 localStorage，测试中可注入内存实现 */
@@ -52,6 +52,21 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   },
   // v6 → v7（转生系统）：新增 prestige 元进度（阅历/天赋/周目数）
   6: raw => ({ ...raw, prestige: { insight: 0, perks: {}, runs: 0, lastGain: 0 } }),
+  // v7 → v8（挂售独立 30s 判定 / 移除手动职业 tryout / 离线总结弹窗）：
+  // 旧未领取离线收益直接入账；offlineBank 换新结构；旧职业 tryout 清空
+  7: raw => {
+    const old = isRecord(raw.offlineBank) ? raw.offlineBank : {};
+    const keep = typeof old.money === 'number' && Number.isFinite(old.money) ? old.money : 0;
+    const { offlineBank: _drop, job: oldJob, ...rest } = raw;
+    void _drop;
+    return {
+      ...rest,
+      money: (typeof raw.money === 'number' ? raw.money : 0) + keep,
+      job: oldJob === 'tryout' ? null : oldJob,
+      xySellNext: 0,
+      offlineBank: { t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] },
+    };
+  },
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -206,6 +221,14 @@ function normalize(data: Record<string, unknown>): GameState {
   const attrExp = { ...s.attrExp, ...(isRecord(data.attrExp) ? data.attrExp : {}) };
   const stats = isRecord(data.stats) ? data.stats : {};
   const bank = isRecord(data.offlineBank) ? data.offlineBank : {};
+  const bankExp = isRecord(bank.exp) ? bank.exp : {};
+  const games = Array.isArray(bank.games)
+    ? bank.games.filter(isRecord).map(g => ({
+        gameId: String(g.gameId ?? ''),
+        rounds: Math.floor(num(g.rounds, 0)),
+        wear: num(g.wear, 0),
+      })).filter(g => g.gameId && g.rounds > 0)
+    : [];
   const presRaw = isRecord(data.prestige) ? data.prestige : {};
   const perksRaw = isRecord(presRaw.perks) ? presRaw.perks : {};
   const perks: Record<string, number> = {};
@@ -239,6 +262,7 @@ function normalize(data: Record<string, unknown>): GameState {
     sellSlots: clampInt(data.sellSlots, 1, 5, 1),
     marketSlots: clampInt(data.marketSlots, 3, 7, 3),
     xyNext: num(data.xyNext, 0),
+    xySellNext: num(data.xySellNext, 0),
     pity: num(data.pity, 0),
     pityRot: num(data.pityRot, 0),
     rotTheme: typeof data.rotTheme === 'string' ? data.rotTheme as Attr : null,
@@ -248,8 +272,14 @@ function normalize(data: Record<string, unknown>): GameState {
     started: data.started === true,
     offlineBank: {
       t: num(bank.t, 0),
-      money: num(bank.money, 0),
-      log: Array.isArray(bank.log) ? (bank.log as string[]) : [],
+      workMoney: num(bank.workMoney, 0),
+      workCycles: Math.floor(num(bank.workCycles, 0)),
+      playMoney: num(bank.playMoney, 0),
+      playRounds: Math.floor(num(bank.playRounds, 0)),
+      exp: Object.fromEntries(
+        Object.entries(bankExp).filter(([, v]) => typeof v === 'number' && Number.isFinite(v)),
+      ) as OfflineBank['exp'],
+      games,
     },
     lastSeen: num(data.lastSeen, Date.now()),
     stats: {

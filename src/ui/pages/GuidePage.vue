@@ -53,7 +53,7 @@ function onImportPicked(e: Event) {
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>⏱️ 时间模型</h3>
-      <p class="mut">游戏内时间随现实流逝：放着不动，工作与离线收益也会自动累积（有上限），回来领取即可。</p>
+      <p class="mut">游戏内时间随现实流逝：放着不动，工作会自动累积酬劳、手头有桌游还会自动连刷（都有上限）；回来时自动结算并弹出离线总结，无需手动领取。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🧭 六维属性</h3>
@@ -93,7 +93,7 @@ function onImportPicked(e: Event) {
           <td class="mut">{{ j.volatile ? '收入大起大落' : j.auto ? '稳定自动收入' : '手动游玩的本职' }}</td>
         </tr>
       </table>
-      <p class="mut" style="margin-top:4px">工作是<b>周期制</b>：进度条走满一个周期就自动发一次酬劳，和玩桌游互不耽误；职业越高级，周期越长、单次酬劳越丰厚（具体数值见工作页）。换工作会放弃当前周期进度；离线时也会按整周期累积收益，回来领取即可。打工与游玩都有概率掉落某赏抽赏券。</p>
+      <p class="mut" style="margin-top:4px">工作是<b>周期制</b>：进度条走满一个周期就自动发一次酬劳，和玩桌游互不耽误；职业越高级，周期越长、单次酬劳越丰厚（具体数值见工作页）。换工作会放弃当前周期进度；离线时也会按整周期累积收益，回来连同自动游玩的战报一起结算。打工与游玩都有概率掉落某赏抽赏券。</p>
     </div>
     <div class="panel" style="margin-top:12px">
       <h3 style="margin:0 0 6px">💾 存档管理</h3>

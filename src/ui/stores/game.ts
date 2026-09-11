@@ -8,12 +8,12 @@ import {
   buyTaobao,
   buyXianyu,
   buyPerk,
-  claimOffline,
   conditionText,
   copyByUid,
   copiesOf,
   defaultState,
   doPrestige,
+  emptyOfflineBank,
   exchangeHiTickets,
   expandMarketSlots,
   expandSellSlots,
@@ -132,6 +132,7 @@ export const useGameStore = defineStore('game', {
     playLog: [] as LogLine[],
     gachaLog: [] as GachaEntry[],
     showStarter: false,
+    showOffline: false,
     toastMsg: '',
     toastOn: false,
     nowMs: Date.now(),
@@ -143,9 +144,15 @@ export const useGameStore = defineStore('game', {
     sellPickUid: null as number | null,
   }),
   getters: {
-    /** 离线收益已累积分钟数（展示用） */
-    bankMinutes(state): string {
-      return (state.s.offlineBank.t / 60000).toFixed(0);
+    /** 离线时长文本（总结弹窗用） */
+    offlineTime(state): string {
+      const m = Math.floor(state.s.offlineBank.t / 60000);
+      if (m >= 60) return `${Math.floor(m / 60)} 小时 ${m % 60} 分钟`;
+      return `${m} 分钟`;
+    },
+    /** 离线总收益（工作 + 游玩） */
+    offlineTotal(state): number {
+      return state.s.offlineBank.workMoney + state.s.offlineBank.playMoney;
     },
     /** 某鱼到货倒计时 mm:ss */
     xyCd(state): string {
@@ -185,9 +192,10 @@ export const useGameStore = defineStore('game', {
         if (!this.s.xyNext) this.s.xyNext = Date.now() + XY_REFRESH_MS;
         if (!this.s.xianyuBuys.length) refreshXianyu(this.s, false);
         const away = Date.now() - this.s.lastSeen;
-        if (away > 60000) accumulateOffline(this.s, away);
-        if (away > 60000 && this.s.offlineBank.money > 0) {
-          this.toast(`欢迎回来！离线收益已累积 ¥${fmt(this.s.offlineBank.money)}`);
+        if (away > 60000) {
+          accumulateOffline(this.s, away);
+          const b = this.s.offlineBank;
+          if (b.workMoney + b.playMoney > 0 || b.playRounds > 0) this.showOffline = true;
         }
       }
       this.lastTick = 0;
@@ -617,9 +625,10 @@ export const useGameStore = defineStore('game', {
       this.saveGame();
     },
 
-    claim() {
-      const amount = claimOffline(this.s);
-      this.toast(`领取离线收益 ¥${fmt(amount)}`);
+    /** 关闭离线总结弹窗（收益早已自动入账） */
+    closeOffline() {
+      this.s.offlineBank = emptyOfflineBank();
+      this.showOffline = false;
       this.saveGame();
     },
 

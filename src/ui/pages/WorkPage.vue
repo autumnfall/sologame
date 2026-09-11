@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ATTR_ICON, JOBS, ROMAN, fmt, jobById, jobUnlocked } from '../../core';
+import { ATTR_ICON, JOBS, ROMAN, jobById, jobUnlocked } from '../../core';
 import { useGameStore } from '../stores/game';
 
 const store = useGameStore();
@@ -20,21 +20,15 @@ function payStr(id: string): string {
   return `每 ${cycle} ¥${j.cyclePay}${j.volatile ? '（±50% 波动）' : ''}`;
 }
 
-/** 当前工作的周期进度 0~1 与倒计时 */
+/** 当前工作的周期进度 0~1（纯进度条展示，不显示具体数字） */
 const curJob = computed(() => (store.s.job ? jobById(store.s.job) : undefined));
 const cyclePct = computed(() =>
   curJob.value?.auto ? Math.min(1, store.s.jobProgress / curJob.value.cycleSec) : 0,
 );
-const cycleLeft = computed(() =>
-  curJob.value?.auto ? Math.max(0, curJob.value.cycleSec - store.s.jobProgress) : 0,
-);
 
 /** 换工作会放弃当前周期进度 */
 function switchJob(id: string) {
-  if (store.s.jobProgress > 0) {
-    const left = curJob.value?.auto ? curJob.value.cycleSec - store.s.jobProgress : 0;
-    if (!window.confirm(`换工作将放弃当前周期已推进的进度（还剩 ${left} 秒结算），确定换岗？`)) return;
-  }
+  if (store.s.jobProgress > 0 && !window.confirm('换工作将放弃当前周期已推进的进度，确定换岗？')) return;
   store.doTakeJob(id);
 }
 </script>
@@ -45,9 +39,9 @@ function switchJob(id: string) {
     <div v-if="curJob?.auto" class="panel" style="margin-bottom:12px;padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <b>▶ {{ curJob.name }}</b>
-        <span class="mut">本周期进度 {{ Math.round(cyclePct * 100) }}% · 还剩 {{ cycleLeft }} 秒结算 ¥{{ curJob.cyclePay }}{{ curJob.volatile ? '±' : '' }}</span>
+        <span class="mut">周期进度（走满自动结算 ¥{{ curJob.cyclePay }}{{ curJob.volatile ? '±' : '' }}）</span>
       </div>
-      <div class="bar" style="margin-top:6px">
+      <div class="bar" style="margin-top:6px;height:12px">
         <i :style="{ width: cyclePct * 100 + '%' }"></i>
       </div>
       <small class="mut">工作自动进行，与玩桌游并行结算；离线也按整周期累积（50% 折算）。</small>
@@ -86,22 +80,11 @@ function switchJob(id: string) {
     </div>
 
     <div class="panel" style="margin-top:14px">
-      <h3>📦 离线收益</h3>
-      <div class="mut">离线收益按已解锁职业的整周期累积、按 50% 折算入账，上限 1 小时。</div>
-      <div class="mut" style="margin-top:6px">
-        <template v-if="store.s.offlineBank.money > 0">
-          已累积 <b class="ok">¥{{ fmt(store.s.offlineBank.money) }}</b>（{{ store.bankMinutes }} 分钟，上限 60 分钟）
-        </template>
-        <template v-else>暂无可领取的离线收益。</template>
+      <h3>🌙 离线收益</h3>
+      <div class="mut">
+        离线超过 1 分钟：工作按整周期折算入账，手头有桌游的话还会自动连刷（按回合真实扣疲劳与耐久）；
+        回来时自动结算并弹出总结，无需手动领取，上限 1 小时。
       </div>
-      <button
-        class="primary"
-        style="margin-top:8px"
-        :disabled="store.s.offlineBank.money <= 0"
-        @click="store.claim()"
-      >
-        领取
-      </button>
     </div>
   </div>
 </template>

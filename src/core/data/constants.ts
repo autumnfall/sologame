@@ -7,9 +7,10 @@ import type { Rarity } from './types';
  * v3 = 原型最终版；v4 = 正式版（去掉死字段 attrs）；
  * v5 = 收藏/实体分离（owned→collections+copies、某鱼市场、某宝多次购买、某赏轮换池）；
  * v6 = 职业改周期制（rate→cycleSec/cyclePay、jobProgress；旧 clerk/editor/designer 映射新职业）；
- * v7 = 转生系统（新增 prestige：阅历/天赋/周目数）。
+ * v7 = 转生系统（新增 prestige：阅历/天赋/周目数）；
+ * v8 = 某鱼挂售独立 30s 成交判定（新增 xySellNext）；移除手动职业 tryout；离线总结弹窗（offlineBank 结构变更）。
  */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */
@@ -29,6 +30,9 @@ export const GACHA_PITY = 50;
 
 /** 某鱼每 5 分钟自动刷新一批货源 */
 export const XY_REFRESH_MS = 5 * 60 * 1000;
+
+/** 某鱼挂售成交判定：每 30 秒一次，与货源刷新互相独立 */
+export const XY_SELL_MS = 30 * 1000;
 
 // ---------- 六维属性 ----------
 
