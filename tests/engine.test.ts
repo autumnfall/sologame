@@ -438,10 +438,11 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(1.92, 10);
     settleRound(s, 'guoyuan', copy.uid, 2, () => 0.99);
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(3.84, 10);
-    // 疲劳收益按 float 计算（1/(1+3.84×0.15)），连续生效无档位钝化
-    const expBase = 12 * expMult(s) / (1 + 3.84 * 0.15);
+    // 疲劳收益按 float 计算：第 3 局先加疲劳（3.84+1.92=5.76）再结算，无档位钝化
+    const expBase = 12 * expMult(s) / (1 + 5.76 * 0.15);
     const r = settleRound(s, 'guoyuan', copy.uid, 3, () => 0.99);
     expect(r.gains['演算']).toBeCloseTo(expBase, 6);
+    expect(s.collections['guoyuan'].fatigue).toBeCloseTo(5.76, 10);
   });
 
   it('磨损公式：收纳 ×0.75、牌套 ×0.5（收藏级与实体级分离）', () => {
