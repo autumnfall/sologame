@@ -400,16 +400,16 @@ describe('tick 与离线（工作周期制）', () => {
   it('tickSecond：周期未满只推进不结算；满周期一次性发酬劳，余量入下周期', () => {
     const s = defaultState();
     expect(tickSecond(s, () => 0.5).payout).toBe(0); // 无职业
-    takeJob(s, 'teacher'); // 160 秒/周期，¥50
+    takeJob(s, 'teacher'); // 160 秒/周期，¥100
     for (let i = 0; i < 159; i++) tickSecond(s, () => 0.5);
     expect(s.money).toBe(200);
     expect(s.jobProgress).toBe(159);
     const r = tickSecond(s, () => 0.5); // 第 160 秒结算
     expect(r.payout).toBe(1);
-    expect(r.payAmount).toBe(50);
+    expect(r.payAmount).toBe(100);
     expect(r.ticketDrop).toBe(false);
     expect(r.streamEvent).toBeNull();
-    expect(s.money).toBe(250);
+    expect(s.money).toBe(300);
     expect(s.jobProgress).toBe(0);
   });
 
@@ -425,47 +425,46 @@ describe('tick 与离线（工作周期制）', () => {
     expect(s.jobProgress).toBe(0);
   });
 
-  it('主播：周期结算时按沉浸下限~1.5 波动', () => {
+  it('主播：周期结算时按应变下限~1.5 波动', () => {
     const s = defaultState();
-    takeJob(s, 'streamer'); // 200 秒/周期，¥100 波动（沉浸 0 级：0.5~1.5）
+    takeJob(s, 'streamer'); // 200 秒/周期，¥200 波动（应变 0 级：0.5~1.5）
     for (let i = 0; i < 199; i++) tickSecond(s, () => 0.5);
-    const r = tickSecond(s, () => 0.5); // 波动 0.5 + 0.5×1.0 = 1.0 → ¥100
+    const r = tickSecond(s, () => 0.5); // 波动 0.5 + 0.5×1.0 = 1.0 → ¥200
     expect(r.payout).toBe(1);
-    expect(r.payAmount).toBe(100);
+    expect(r.payAmount).toBe(200);
     expect(r.streamEvent).toBeNull(); // rng 0.5 ≥ 0.3 不触发
-    // 沉浸 4 级：下限 0.7，rng=1 → ×1.5
-    s.attrExp['沉浸'] = 4 * 300; // 直接塞经验（不必精确到级曲线）
+    // 应变 4 级：收入 ×1.16，下限 0.7，rng=1 → 波动 1.5 → ¥200×1.16×1.5=348
+    s.attrExp['应变'] = 4 * 300; // 直接塞经验（不必精确到级曲线）
     for (let i = 0; i < 200; i++) tickSecond(s, () => 1);
-    // 结算一次即可验证上限：波动 = 0.7 + 1×0.8 = 1.5 → ¥150
-    expect(s.money).toBe(200 + 100 + 150);
+    // 结算一次即可验证上限
+    expect(s.money).toBe(200 + 200 + 348);
   });
 
   it('离线累积：工作按整周期折算直接入账；上限 1 小时', () => {
     const s = defaultState();
-    takeJob(s, 'teacher'); // 160s/¥50
+    takeJob(s, 'teacher'); // 160s/¥100
     accumulateOffline(s, 30 * 60 * 1000); // 1800 秒 → 11 周期 + 余 40 秒
     expect(s.offlineBank.t).toBe(1800 * 1000);
-    expect(s.offlineBank.workMoney).toBeCloseTo(11 * 50 * 0.5, 6); // ¥275
+    expect(s.offlineBank.workMoney).toBeCloseTo(11 * 100 * 0.5, 6); // ¥550
     expect(s.offlineBank.workCycles).toBe(11);
-    expect(s.money).toBe(200 + 275); // 直接入账，无需领取
+    expect(s.money).toBe(200 + 550); // 直接入账，无需领取
     expect(s.jobProgress).toBe(40);
     accumulateOffline(s, 2 * 3600 * 1000); // 再来 2 小时，封顶（再计 1800 秒 → 11 周期余 80）
     expect(s.offlineBank.t).toBe(3600 * 1000);
-    expect(s.offlineBank.workMoney).toBeCloseTo(22 * 50 * 0.5, 6); // ¥550
+    expect(s.offlineBank.workMoney).toBeCloseTo(22 * 100 * 0.5, 6); // ¥1100
     expect(s.jobProgress).toBe(80);
     accumulateOffline(s, 60000); // 已满，不再累积
     expect(s.offlineBank.t).toBe(3600 * 1000);
   });
 
-  it('离线自动游玩：真实扣疲劳/耐久，战报记录局数/收入/经验', () => {
+  it('离线自动游玩：真实扣疲劳/耐久，战报记录局数/经验', () => {
     const s = defaultState();
     const c = own(s, 'guoyuan'); // 单实体，单回合 ≈ 42.6s
     const moneyBefore = s.money;
     accumulateOffline(s, 10 * 60 * 1000, lcg(3)); // 600 秒
     const b = s.offlineBank;
     expect(b.playRounds).toBeGreaterThan(5);
-    expect(b.playMoney).toBeGreaterThan(0);
-    expect(s.money).toBe(moneyBefore + b.playMoney); // 游玩收入也已入账
+    expect(s.money).toBe(moneyBefore); // 游玩不产生金钱
     expect(s.collections['guoyuan'].prof).toBe(b.playRounds);
     expect(c.durability).toBeLessThan(DURABILITY.N);
     const row = b.games.find(g => g.gameId === 'guoyuan')!;
@@ -546,7 +545,6 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     // 原型语义：先加疲劳（0→2）再结算，且吃 2 种图鉴加成 1.03
     const r = settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99); // 不掉券
     expect(r.gains['演算']).toBeCloseTo((13 / 1.3) * 1.03, 10);
-    expect(r.pay).toBe(Math.round((8 + 13 * 0.8) * (1 / 1.3) * 1.03)); // ≈15
     expect(s.collections['guoyuan'].fatigue).toBe(2);
     expect(s.collections['guoyuan'].prof).toBe(1);
     expect(s.collections['guoyuan'].rulesRead).toBe(true);
@@ -557,10 +555,10 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     expect(s.stats.plays).toBe(1);
   });
 
-  it('疲劳 float 累计：应变按百分比平滑生效（1 级 → +1.92，不取整）', () => {
+  it('疲劳 float 累计：沉浸按百分比平滑生效（1 级 → +1.92，不取整）', () => {
     const s = defaultState();
     const copy = own(s, 'guoyuan');
-    s.attrExp['应变'] = 60; // 1 级：疲劳增长 ×0.96
+    s.attrExp['沉浸'] = 60; // 1 级：疲劳增长 ×0.96
     settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(1.92, 10);
     settleRound(s, 'guoyuan', copy.uid, 2, () => 0.99);
@@ -586,7 +584,7 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     expect(sleeved.durability).toBe(DURABILITY.N - 0.5);
   });
 
-  it('0 耐久：可玩但经验与收入 ×0.5；磨损不再扣（已归零）', () => {
+  it('0 耐久：可玩但经验 ×0.5；磨损不再扣（已归零）', () => {
     const s = defaultState();
     const copy = own(s, 'guoyuan', { durability: 0 });
     const r = settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
@@ -594,7 +592,6 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     // 先加疲劳（0→2，÷1.3）× 0耐久惩罚 0.5 × 自身图鉴 1.015
     expect(r.gains['演算']).toBeCloseTo((13 / 1.3) * 0.5 * 1.015, 6);
     expect(copy.durability).toBe(0);
-    expect(r.pay).toBe(Math.round((8 + 13 * 0.8) * (1 / 1.3) * 1.015 * 0.5));
   });
 
   it('20强词条：疲劳增长减半（+2 → +1）', () => {

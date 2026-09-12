@@ -166,10 +166,6 @@ export const useGameStore = defineStore('game', {
       if (m >= 60) return `${Math.floor(m / 60)} 小时 ${m % 60} 分钟`;
       return `${m} 分钟`;
     },
-    /** 离线总收益（工作 + 游玩） */
-    offlineTotal(state): number {
-      return state.s.offlineBank.workMoney + state.s.offlineBank.playMoney;
-    },
     /** 某鱼到货倒计时 mm:ss */
     xyCd(state): string {
       const r = Math.max(0, state.s.xyNext - state.nowMs);
@@ -217,7 +213,7 @@ export const useGameStore = defineStore('game', {
         if (away > 60000) {
           accumulateOffline(this.s, away);
           const b = this.s.offlineBank;
-          if (b.workMoney + b.playMoney > 0 || b.playRounds > 0) this.showOffline = true;
+          if (b.workMoney > 0 || b.playRounds > 0) this.showOffline = true;
         }
       }
       this.lastTick = 0;
@@ -429,7 +425,7 @@ export const useGameStore = defineStore('game', {
         .map(([a, v]) => `${ATTR_ICON[a as Attr]}${a}+${(v ?? 0).toFixed(1)}`)
         .join('　');
       this.logPlay(
-        `✅ 第 ${res.round} 局结算：${gainStr}，收入 ¥${res.pay}${res.ticketDrop ? '，掉落🎫×1！' : ''}`,
+        `✅ 第 ${res.round} 局结算：${gainStr}${res.ticketDrop ? '，掉落🎫×1！' : ''}`,
         'good',
       );
       // 实体磨损：结算后追加耐久变化
@@ -729,12 +725,12 @@ export const useGameStore = defineStore('game', {
         return;
       }
       this.clearSession();
-      // 与 boot 的新开局分支一致：刷首批货源、补开轮换池；先停留转生页投资阅历，手动开新周目
+      // 与 boot 的新开局分支一致：刷首批货源、补开轮换池；强制弹窗先投资阅历再开新周目
       refreshXianyu(this.s, false);
       tickRotation(this.s);
       this.pendingStarter = true;
       this.tab = 'prestige';
-      this.toast(`🌅 第 ${this.s.prestige.runs + 1} 周目待开启！阅历 +${r.gain}，可先投资天赋`);
+      this.toast(`🌅 第 ${this.s.prestige.runs + 1} 周目待开启！阅历 +${r.gain}，先投资天赋再开局`);
       this.saveGame();
     },
 
@@ -746,12 +742,20 @@ export const useGameStore = defineStore('game', {
     },
 
     buyPerk(id: string) {
+      if (!this.pendingStarter) {
+        this.toast('天赋只能在转生后、开启新周目前调整');
+        return;
+      }
       const r = buyPerk(this.s, id);
       this.toast(r.ok ? `已习得天赋（剩余阅历 ${this.s.prestige.insight}）` : (r.reason ?? '购买失败'));
       if (r.ok) this.saveGame();
     },
 
     respec() {
+      if (!this.pendingStarter) {
+        this.toast('洗点只能在转生后、开启新周目前进行');
+        return;
+      }
       if (!window.confirm('洗点将退还全部已投入的阅历（本周目已获得的出售槽位不回收），确定吗？')) return;
       const r = respecPerks(this.s);
       this.toast(r.ok ? `已洗点，阅历全额退还（现有 ${this.s.prestige.insight}）` : (r.reason ?? '洗点失败'));

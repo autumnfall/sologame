@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ATTR_ICON, JOBS, ROMAN, jobById, jobUnlocked } from '../../core';
+import { ATTR_ICON, JOBS, ROMAN, jobById, jobCyclePayExpected, jobUnlocked } from '../../core';
 import { useGameStore } from '../stores/game';
 
 const store = useGameStore();
@@ -11,13 +11,14 @@ function reqStr(req: Partial<Record<string, number>>): string {
   return entries.map(([a, lv]) => `${ATTR_ICON[a as keyof typeof ATTR_ICON]}${a} ${ROMAN[lv as number]}`).join(' + ');
 }
 
+/** 展示用周期酬劳（已含应变收入乘区；主播按期望显示） */
 function payStr(id: string): string {
   const j = jobById(id);
   if (!j) return '';
-  if (!j.auto) return '游玩结算给钱';
+  if (!j.auto) return '手动结算';
   const min = j.cycleSec / 60;
   const cycle = Number.isInteger(min) ? `${min} 分钟` : `${(min).toFixed(1)} 分钟`;
-  return `每 ${cycle} ¥${j.cyclePay}${j.volatile ? '（±50% 波动）' : ''}`;
+  return `每 ${cycle} ¥${Math.round(jobCyclePayExpected(store.s, j))}${j.volatile ? '（±50% 波动）' : ''}`;
 }
 
 /** 当前工作的周期进度 0~1（纯进度条展示，不显示具体数字） */
@@ -39,7 +40,7 @@ function switchJob(id: string) {
     <div v-if="curJob?.auto" class="panel" style="margin-bottom:12px;padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <b>▶ {{ curJob.name }}</b>
-        <span class="mut">周期进度（走满自动结算 ¥{{ curJob.cyclePay }}{{ curJob.volatile ? '±' : '' }}）</span>
+        <span class="mut">周期进度（走满自动结算 ¥{{ curJob ? Math.round(jobCyclePayExpected(store.s, curJob)) : 0 }}{{ curJob?.volatile ? '±' : '' }}）</span>
       </div>
       <div class="bar" style="margin-top:6px;height:12px">
         <i :style="{ width: cyclePct * 100 + '%' }"></i>

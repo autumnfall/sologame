@@ -5,6 +5,7 @@ import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
 import StarterModal from './components/StarterModal.vue';
 import OfflineModal from './components/OfflineModal.vue';
+import PrestigeSetupModal from './components/PrestigeSetupModal.vue';
 import PlayPage from './pages/PlayPage.vue';
 import WorkPage from './pages/WorkPage.vue';
 import ShopPage from './pages/ShopPage.vue';
@@ -72,5 +73,6 @@ onUnmounted(() => {
   </div>
   <StarterModal />
   <OfflineModal />
+  <PrestigeSetupModal />
   <Toast />
 </template>

@@ -2,7 +2,7 @@ import { SELL_SLOTS_MAX } from '../data/balance';
 import { perkDefById } from '../data/prestige';
 import { defaultState } from '../state';
 import type { GameState } from '../state';
-import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, perkLv, prestigeUnlockCount } from '../mechanics/prestige';
+import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, prestigeUnlockCount } from '../mechanics/prestige';
 
 export interface PrestigeResult {
   ok: boolean;
@@ -33,9 +33,8 @@ export function doPrestige(state: GameState): PrestigeResult {
     settings,
     lastSeen: Date.now(),
   });
-  // 天赋的开局加成
-  state.money += 300 * perkLv(state, 'fund');
-  state.sellSlots = Math.min(SELL_SLOTS_MAX, 1 + perkLv(state, 'sellSlot'));
+  // 注：天赋的开局加成（启动资金/老主顾起始槽位）在 pickStarter 选定开局时结算，
+  // 这样转生后、开新周目前购买的天赋同样对本周目生效
   return { ok: true, gain };
 }
 

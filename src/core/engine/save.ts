@@ -289,7 +289,6 @@ function normalize(data: Record<string, unknown>): GameState {
       t: num(bank.t, 0),
       workMoney: num(bank.workMoney, 0),
       workCycles: Math.floor(num(bank.workCycles, 0)),
-      playMoney: num(bank.playMoney, 0),
       playRounds: Math.floor(num(bank.playRounds, 0)),
       exp: Object.fromEntries(
         Object.entries(bankExp).filter(([, v]) => typeof v === 'number' && Number.isFinite(v)),

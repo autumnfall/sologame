@@ -109,7 +109,7 @@ describe('存档系统', () => {
     expect(s).not.toBeNull();
     expect(s!.saveVersion).toBe(SAVE_VERSION);
     expect(s!.money).toBe(620); // 500 + 旧未领取离线收益 120 由 v8 迁移直接入账
-    expect(s!.offlineBank).toEqual({ t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] });
+    expect(s!.offlineBank).toEqual({ t: 0, workMoney: 0, workCycles: 0, playRounds: 0, exp: {}, games: [] });
     expect(s!.xySellNext).toBe(0);
     expect('attrs' in s!).toBe(false);
     expect(s!.xyNext).toBe(0); // 默认填充

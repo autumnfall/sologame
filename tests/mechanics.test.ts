@@ -100,13 +100,13 @@ describe('六维乘区', () => {
     expect(goldZoneWidth(s)).toBe(14);
   });
 
-  it('谋略/沉浸按级线性；运筹与应变有下限', () => {
+  it('谋略/应变按级线性；运筹与沉浸有下限', () => {
     expect(expMult(stateWithAttrs({ 谋略: 2 }))).toBeCloseTo(1.05, 10);
-    expect(incomeMult(stateWithAttrs({ 沉浸: 3 }))).toBeCloseTo(1.12, 10);
+    expect(incomeMult(stateWithAttrs({ 应变: 3 }))).toBeCloseTo(1.12, 10);
     expect(xyPriceMult(stateWithAttrs({ 运筹: 5 }))).toBeCloseTo(0.9, 10);
     expect(xyPriceMult(stateWithAttrs({ 运筹: 15 }))).toBe(0.8); // 下限
-    expect(fatigueIncMult(stateWithAttrs({ 应变: 5 }))).toBeCloseTo(0.8, 10);
-    expect(fatigueIncMult(stateWithAttrs({ 应变: 15 }))).toBe(0.6); // 下限
+    expect(fatigueIncMult(stateWithAttrs({ 沉浸: 5 }))).toBeCloseTo(0.8, 10);
+    expect(fatigueIncMult(stateWithAttrs({ 沉浸: 15 }))).toBe(0.6); // 下限
     expect(goldZoneWidth(stateWithAttrs({ 洞察: 3 }))).toBe(20);
     expect(goldZoneWidth(stateWithAttrs({ 洞察: 20 }))).toBe(40); // 上限
   });
@@ -128,26 +128,26 @@ describe('六维乘区', () => {
 });
 
 describe('职业收入（周期制）', () => {
-  it('未上岗无周期；固定酬劳职业 = cyclePay（不吃收入乘区）', () => {
+  it('未上岗无周期；固定酬劳职业 = cyclePay × 应变收入乘区', () => {
     const s = defaultState();
     expect(currentJob(s)).toBeUndefined();
     const teacher = jobById('teacher')!;
-    expect(jobCyclePay(s, teacher)).toBe(50);
-    s.attrExp['沉浸'] = expToReach(2);
-    expect(incomeMult(s)).toBeCloseTo(1.08, 10); // 沉浸只加游玩收入
-    expect(jobCyclePay(s, teacher)).toBe(50); // 不影响工作酬劳
-    expect(jobCyclePayExpected(s, teacher)).toBe(50);
+    expect(jobCyclePay(s, teacher)).toBe(100);
+    s.attrExp['应变'] = expToReach(2);
+    expect(incomeMult(s)).toBeCloseTo(1.08, 10); // 应变提高工作酬劳
+    expect(jobCyclePay(s, teacher)).toBe(108);
+    expect(jobCyclePayExpected(s, teacher)).toBe(108);
   });
 
-  it('主播带货波动：沉浸决定下限（rng 注入）；期望随沉浸上移', () => {
+  it('主播带货波动：应变决定下限（rng 注入）；期望随应变上移', () => {
     const s = defaultState();
     const streamer = jobById('streamer')!;
-    expect(jobCyclePay(s, streamer, () => 0)).toBe(Math.round(100 * 0.5));
-    expect(jobCyclePay(s, streamer, () => 1)).toBe(Math.round(100 * 1.5));
-    expect(jobCyclePayExpected(s, streamer)).toBeCloseTo(100, 10); // (0.5+1.5)/2
-    s.attrExp['沉浸'] = expToReach(3);
-    expect(jobCyclePay(s, streamer, () => 0)).toBe(Math.round(100 * 0.65));
-    expect(jobCyclePayExpected(s, streamer)).toBeCloseTo(100 * (0.65 + 1.5) / 2, 6);
+    expect(jobCyclePay(s, streamer, () => 0)).toBe(Math.round(200 * 0.5));
+    expect(jobCyclePay(s, streamer, () => 1)).toBe(Math.round(200 * 1.5));
+    expect(jobCyclePayExpected(s, streamer)).toBeCloseTo(200, 10); // (0.5+1.5)/2
+    s.attrExp['应变'] = expToReach(3);
+    expect(jobCyclePay(s, streamer, () => 0)).toBe(Math.round(200 * 0.65 * 1.12));
+    expect(jobCyclePayExpected(s, streamer)).toBeCloseTo(200 * 1.12 * (0.65 + 1.5) / 2, 6);
   });
 
   it('运筹减免成交手续费：每级 -0.5%，10 级全免', () => {

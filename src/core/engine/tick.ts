@@ -6,8 +6,8 @@ import { gameById } from '../data/games';
 import type { GameState } from '../state';
 import { copyByUid } from '../state';
 import { attrShares } from '../mechanics/attrs';
-import { globalBonus, hasAffix, isMastered } from '../mechanics/collection';
-import { currentJob, expMult, fatigueIncMult, incomeMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
+import { hasAffix, isMastered } from '../mechanics/collection';
+import { currentJob, expMult, fatigueIncMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
 import { fatigueMod, playDuration, ruleDuration, setupDuration } from '../mechanics/play';
 import { perkLv } from '../mechanics/prestige';
 
@@ -52,7 +52,7 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
  * ② 游玩：离线期间自动连刷——与在线连刷一致，选定一款桌游后一直玩到它
  * 「玩腻了 / 精通」（取决于自动更换设置）再换下一款；未开启自动更换则全程玩同一款。
  * 每轮在该收藏的可用实体里结算一局（真实消耗回合时长，无时机条加成）；
- * 金钱/经验/熟练度/疲劳/磨损全部照常结算。全部候选都不符合条件时退回贪心挑收益最高的。
+ * 经验/熟练度/疲劳/磨损全部照常结算（游玩不产生金钱）。全部候选都不符合条件时退回贪心挑收益最高的。
  * 总上限 1 小时、bank 满则不再累积。
  */
 export function accumulateOffline(
@@ -134,7 +134,6 @@ export function accumulateOffline(
     const res = settleRound(state, g.id, copy.uid, state.offlineBank.playRounds + 1, rng);
     secs -= roundSec;
     guard++;
-    state.offlineBank.playMoney += res.pay;
     state.offlineBank.playRounds++;
     for (const [a, v] of Object.entries(res.gains)) {
       state.offlineBank.exp[a as Attr] = (state.offlineBank.exp[a as Attr] ?? 0) + (v ?? 0);
@@ -152,8 +151,6 @@ export function accumulateOffline(
 export interface SettleResult {
   /** 各属性本局获得的经验（已含 0 耐久惩罚） */
   gains: Partial<Record<Attr, number>>;
-  /** 本局试玩员收入（元，已含 0 耐久惩罚） */
-  pay: number;
   ticketDrop: boolean;
   /** 结算后收藏疲劳 */
   fatigue: number;
@@ -172,7 +169,8 @@ export interface SettleResult {
  * 一局游玩结算（时机条等交互由 UI 驱动，这里只管数值）：
  * 疲劳/熟练度/读规则记在收藏级（该收藏 +2、其余 -1）；
  * 耐久磨损记在实体上：基础 1，收纳 ×0.75（收纳时一次性扣过耐久），牌套 ×0.5；
- * 耐久归 0 后仍可游玩，但本局起整体收益（经验+收入）×0.5。
+ * 游玩只积累经验，金钱来自工作与桌游买卖。
+ * 耐久归 0 后仍可游玩，但本局起经验 ×0.5。
  */
 export function settleRound(
   state: GameState,
@@ -209,12 +207,10 @@ export function settleRound(
     state.attrExp[a] += v;
     gains[a] = (gains[a] ?? 0) + v;
   });
-  const pay = Math.round((8 + g.baseExp * 0.8) * fatigueMod(state, g) * (1 + globalBonus(state)) * incomeMult(state) * penalty);
-  state.money += pay;
   const ticketDrop = rng() < 0.06 * ticketRateMult(state);
   if (ticketDrop) state.tickets += 1;
   return {
-    gains, pay, ticketDrop,
+    gains, ticketDrop,
     fatigue: c.fatigue, tired: c.fatigue >= 7,
     wear, durability: copy.durability, worn, round,
   };

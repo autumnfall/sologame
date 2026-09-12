@@ -79,7 +79,7 @@ describe('转生：重置保留清单', () => {
     expect(s.prestige.insight).toBe(10);
   });
 
-  it('天赋开局加成：启动资金与老主顾槽位', () => {
+  it('天赋开局加成：启动资金与老主顾槽位（在选定开局时结算）', () => {
     const s = stateWithEightMastered();
     s.prestige.insight = 100;
     expect(buyPerk(s, 'fund').ok).toBe(true); // 2
@@ -87,9 +87,22 @@ describe('转生：重置保留清单', () => {
     expect(buyPerk(s, 'sellslot').ok).toBe(true); // 6，当周目立即 +1
     expect(s.sellSlots).toBe(2);
     expect(doPrestige(s).ok).toBe(true);
-    expect(s.money).toBe(200 + 600);
+    expect(s.money).toBe(200); // 开局加成在 pickStarter 结算，转生瞬间只有默认资金
+    expect(s.sellSlots).toBe(1);
+    pickStarter(s, 'guoyuan');
+    expect(s.money).toBe(200 + 600); // 2 级启动资金
     expect(s.sellSlots).toBe(2); // 1 + 1 级老主顾
     expect(insightSpent(s)).toBe(11);
+  });
+
+  it('转生后购买的开局加成天赋对本周目同样生效', () => {
+    // 模拟新流程：转生到账阅历 → 投资启动资金 → 再开新周目
+    const s = stateWithEightMastered();
+    expect(doPrestige(s).ok).toBe(true);
+    expect(buyPerk(s, 'fund').ok).toBe(true);
+    expect(s.money).toBe(200);
+    pickStarter(s, 'guoyuan');
+    expect(s.money).toBe(500); // 200 + 1 级启动资金
   });
 });
 

@@ -53,18 +53,6 @@ const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.n
   <div>
     <h2>🌅 退坑转生</h2>
 
-    <div v-if="store.pendingStarter" class="panel" style="margin-bottom:12px;border-color:var(--gold)">
-      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <div>
-          <b>🌅 第 {{ store.s.prestige.runs + 1 }} 周目待开启</b>
-          <div class="mut" style="margin-top:4px;font-size:12px">
-            阅历已到账：{{ store.s.prestige.insight }} 点。先投资下方的天赋（如「老友馈赠」需在开局前持有），准备好后点击右侧按钮开始三选一。
-          </div>
-        </div>
-        <button class="primary" style="margin-left:auto" @click="store.startNewRun()">🌅 开启新周目（三选一）</button>
-      </div>
-    </div>
-
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div>
@@ -89,10 +77,9 @@ const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.n
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <span>🌅 桌游阅历：<b class="price" style="font-size:18px">{{ store.s.prestige.insight }}</b></span>
         <span class="mut">已投入 {{ spent }} · 已完成 {{ store.s.prestige.runs }} 周目</span>
-        <button style="margin-left:auto" :disabled="spent === 0" @click="store.respec()">↺ 洗点（全额退还）</button>
       </div>
       <div class="mut" style="margin-top:6px;font-size:12px">
-        退坑会重置本周目的收藏、实体、金钱、属性、职业与槽位；阅历、天赋和生涯统计永久保留。天赋按三条线取舍投资，可随时洗点重分。
+        退坑会重置本周目的收藏、实体、金钱、属性、职业与槽位；阅历、天赋和生涯统计永久保留。天赋按三条线取舍投资，<b>只能在转生后、开启新周目前购买与洗点</b>（弹窗内操作），本周目内锁定。
       </div>
     </div>
 
@@ -142,7 +129,8 @@ const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.n
               <span class="price" style="font-size:13px">🌅 {{ cost(p.id) }}</span>
               <button
                 class="primary"
-                :disabled="store.s.prestige.insight < cost(p.id)"
+                disabled
+                title="仅在转生后、开启新周目前的准备弹窗中可升级"
                 @click="store.buyPerk(p.id)"
               >
                 升级

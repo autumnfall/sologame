@@ -45,7 +45,7 @@ export interface OfflineBank {
   t: number;
   workMoney: number;
   workCycles: number;
-  playMoney: number;
+  /** 离线自动游玩的局数（游玩只积累经验，不产生金钱） */
   playRounds: number;
   /** 六维经验增量 */
   exp: Partial<Record<Attr, number>>;
@@ -161,7 +161,7 @@ export interface GameState {
 }
 
 export function emptyOfflineBank(): OfflineBank {
-  return { t: 0, workMoney: 0, workCycles: 0, playMoney: 0, playRounds: 0, exp: {}, games: [] };
+  return { t: 0, workMoney: 0, workCycles: 0, playRounds: 0, exp: {}, games: [] };
 }
 
 export function defaultPrestige(): PrestigeState {

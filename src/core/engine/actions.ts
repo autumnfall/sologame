@@ -5,7 +5,7 @@ import { copyByUid } from '../state';
 import { tierOwned, tierUnlocked } from '../mechanics/collection';
 import { storageCost, canStore } from '../mechanics/play';
 import { sellFeeRate, taobaoPrice } from '../mechanics/economy';
-import { perkLevel } from '../mechanics/prestige';
+import { perkLevel, perkLv } from '../mechanics/prestige';
 import { acquireGame } from './acquire';
 import { buyXianyu } from './xianyu';
 
@@ -26,6 +26,9 @@ export function pickStarter(state: GameState, id: string, rng: () => number = Ma
   if (state.started) return fail('已完成开局选择');
   const r = acquireGame(state, id);
   state.started = true;
+  // 天赋的开局加成在此结算：转生后、开新周目前购买的天赋同样生效（不会与转生结算重复）
+  state.money += 300 * perkLv(state, 'fund');
+  state.sellSlots = Math.min(SELL_SLOTS_MAX, 1 + perkLv(state, 'sellSlot'));
   const gifts: string[] = [];
   for (let i = 0; i < perkLevel(state, 'gift'); i++) {
     const pool = REGULAR_GAMES.filter(g => !state.collections[g.id]?.firstOpened);

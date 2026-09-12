@@ -51,7 +51,7 @@ const hasPlay = computed(() => b.value.playRounds > 0);
       </div>
 
       <div v-if="hasPlay" class="panel" style="margin-bottom:8px">
-        🎲 游玩：自动连刷 <b>{{ b.playRounds }}</b> 局，收入 <b class="price">¥{{ fmt(b.playMoney) }}</b>
+        🎲 游玩：自动连刷 <b>{{ b.playRounds }}</b> 局（游玩只积累经验，金钱来自工作与桌游买卖）
         <div v-if="expLines.length" style="margin-top:4px">经验：{{ expLines.join('　') }}</div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-top:6px">
           <div v-for="r in gameRows" :key="r.name" style="display:flex;gap:6px;font-size:12px">
