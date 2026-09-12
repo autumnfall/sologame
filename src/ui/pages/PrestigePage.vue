@@ -119,9 +119,9 @@ function boardName(r: RunRecord): string {
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
         <h3 style="margin:0">🥇 排行榜 <small class="mut">周目完成耗时最短的前 10 名</small></h3>
-        <button style="margin-left:auto;padding:3px 10px;font-size:12px" @click="refreshBoard()">🔄 刷新在线榜</button>
+        <button v-if="LEADERBOARD_API" style="margin-left:auto;padding:3px 10px;font-size:12px" @click="refreshBoard()">🔄 刷新在线榜</button>
       </div>
-      <div class="two-col">
+      <div :class="LEADERBOARD_API ? 'two-col' : ''">
         <div>
           <h3 style="margin:0 0 6px;font-size:13px">本存档 <small class="mut">{{ store.s.localBoard.length }}/10</small></h3>
           <table v-if="store.s.localBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
@@ -139,7 +139,7 @@ function boardName(r: RunRecord): string {
           </table>
           <div v-else class="mut" style="font-size:12px">还没有完成的周目。</div>
         </div>
-        <div>
+        <div v-if="LEADERBOARD_API">
           <h3 style="margin:0 0 6px;font-size:13px">在线 <small class="mut">全部玩家</small></h3>
           <table v-if="onlineBoard && onlineBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
             <tr class="mut" style="text-align:left">
