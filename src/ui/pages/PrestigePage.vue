@@ -53,6 +53,18 @@ const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.n
   <div>
     <h2>🌅 退坑转生</h2>
 
+    <div v-if="store.pendingStarter" class="panel" style="margin-bottom:12px;border-color:var(--gold)">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div>
+          <b>🌅 第 {{ store.s.prestige.runs + 1 }} 周目待开启</b>
+          <div class="mut" style="margin-top:4px;font-size:12px">
+            阅历已到账：{{ store.s.prestige.insight }} 点。先投资下方的天赋（如「老友馈赠」需在开局前持有），准备好后点击右侧按钮开始三选一。
+          </div>
+        </div>
+        <button class="primary" style="margin-left:auto" @click="store.startNewRun()">🌅 开启新周目（三选一）</button>
+      </div>
+    </div>
+
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div>

@@ -3,6 +3,15 @@ import type { Rarity } from './types';
 // ================= 平衡调参区 =================
 // 所有新玩法的可调数值集中于此，调平衡只改这里（★ 均为占位初值）。
 
+/**
+ * 桌游基础经验（baseExp）定价公式（games.ts 中各款按此取整填写）：
+ *   baseExp = BASE_EXP_K[稀有度] × 游玩时长(分钟)^0.15 × 市场价格^0.4
+ * 即越稀有 / 游玩时间越长 / 市场价格越高，单局总经验越高。
+ */
+export const BASE_EXP_K: Readonly<Record<Rarity, number>> = { N: 1.5, R: 1.7, SR: 1.9, SSR: 2.0 };
+export const BASE_EXP_TIME_POW = 0.15;
+export const BASE_EXP_PRICE_POW = 0.4;
+
 /** 满耐久（≈可玩次数），按稀有度 */
 export const DURABILITY: Record<Rarity, number> = { N: 10, R: 20, SR: 40, SSR: 80 };
 

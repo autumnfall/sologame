@@ -483,7 +483,7 @@ describe('tick 与离线（工作周期制）', () => {
   });
 
   it('离线自动更换（玩腻了换）：疲劳≥7 的收藏被跳过，全疲劳时退回贪心', () => {
-    // boendi baseExp 28 但疲劳 8（玩腻了）；guoyuan baseExp 12 无疲劳
+    // boendi baseExp 27 但疲劳 8（玩腻了）；guoyuan baseExp 13 无疲劳
     const s = defaultState();
     own(s, 'boendi', { fatigue: 8 });
     own(s, 'guoyuan');
@@ -541,12 +541,12 @@ describe('tick 与离线（工作周期制）', () => {
 describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
   it('基础结算：疲劳 ±（收藏级）、熟练度、磨损 -1（实体级）', () => {
     const s = defaultState();
-    const copy = own(s, 'guoyuan'); // 单属性 演算 12
+    const copy = own(s, 'guoyuan'); // 单属性 演算 13
     own(s, 'boendi', { fatigue: 5 });
     // 原型语义：先加疲劳（0→2）再结算，且吃 2 种图鉴加成 1.03
     const r = settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99); // 不掉券
-    expect(r.gains['演算']).toBeCloseTo((12 / 1.3) * 1.03, 10);
-    expect(r.pay).toBe(Math.round((8 + 12 * 0.8) * (1 / 1.3) * 1.03)); // ≈14
+    expect(r.gains['演算']).toBeCloseTo((13 / 1.3) * 1.03, 10);
+    expect(r.pay).toBe(Math.round((8 + 13 * 0.8) * (1 / 1.3) * 1.03)); // ≈15
     expect(s.collections['guoyuan'].fatigue).toBe(2);
     expect(s.collections['guoyuan'].prof).toBe(1);
     expect(s.collections['guoyuan'].rulesRead).toBe(true);
@@ -566,7 +566,7 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     settleRound(s, 'guoyuan', copy.uid, 2, () => 0.99);
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(3.84, 10);
     // 疲劳收益按 float 计算：第 3 局先加疲劳（3.84+1.92=5.76）再结算，无档位钝化
-    const expBase = 12 * expMult(s) / (1 + 5.76 * 0.15);
+    const expBase = 13 * expMult(s) / (1 + 5.76 * 0.15);
     const r = settleRound(s, 'guoyuan', copy.uid, 3, () => 0.99);
     expect(r.gains['演算']).toBeCloseTo(expBase, 6);
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(5.76, 10);
@@ -592,9 +592,9 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     const r = settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
     expect(r.worn).toBe(true);
     // 先加疲劳（0→2，÷1.3）× 0耐久惩罚 0.5 × 自身图鉴 1.015
-    expect(r.gains['演算']).toBeCloseTo((12 / 1.3) * 0.5 * 1.015, 6);
+    expect(r.gains['演算']).toBeCloseTo((13 / 1.3) * 0.5 * 1.015, 6);
     expect(copy.durability).toBe(0);
-    expect(r.pay).toBe(Math.round((8 + 12 * 0.8) * (1 / 1.3) * 1.015 * 0.5));
+    expect(r.pay).toBe(Math.round((8 + 13 * 0.8) * (1 / 1.3) * 1.015 * 0.5));
   });
 
   it('20强词条：疲劳增长减半（+2 → +1）', () => {
@@ -611,8 +611,8 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     const copy = own(s, 'boendi');
     settleRound(s, 'boendi', copy.uid, 1, () => 0.99);
     // 疲劳 0→2（÷1.3）× 自身图鉴 1.015
-    expect(s.attrExp['谋略']).toBeCloseTo(28 * 0.65 * (1 / 1.3) * 1.015, 6);
-    expect(s.attrExp['应变']).toBeCloseTo(28 * 0.35 * (1 / 1.3) * 1.015, 6);
+    expect(s.attrExp['谋略']).toBeCloseTo(27 * 0.65 * (1 / 1.3) * 1.015, 6);
+    expect(s.attrExp['应变']).toBeCloseTo(27 * 0.35 * (1 / 1.3) * 1.015, 6);
   });
 
   it('上架中的实体不可游玩；未拥有不可结算', () => {

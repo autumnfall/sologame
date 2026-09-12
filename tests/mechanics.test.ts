@@ -37,9 +37,9 @@ describe('属性曲线与经验分摊', () => {
     expect(attrShares(gameById('mofa'))).toEqual([0.2, 0.2, 0.15, 0.15, 0.15, 0.15]);
   });
 
-  it('gainText：双属性 65/35 取整（勃艮第 28 → 18/10）', () => {
-    expect(gainText(gameById('boendi'))).toBe('🧠谋略+18 🎲应变+10');
-    expect(gainText(gameById('guoyuan'))).toBe('📐演算+12');
+  it('gainText：双属性 65/35 取整（勃艮第 27 → 18/9）', () => {
+    expect(gainText(gameById('boendi'))).toBe('🧠谋略+18 🎲应变+9');
+    expect(gainText(gameById('guoyuan'))).toBe('📐演算+13');
   });
 
   it('expToReach 辅助函数与实现曲线吻合', () => {

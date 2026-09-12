@@ -147,6 +147,8 @@ export const useGameStore = defineStore('game', {
     gachaLog: [] as GachaEntry[],
     showStarter: false,
     showOffline: false,
+    /** 转生后待开新周目：先停留在转生页投资阅历，点「开启新周目」才弹三选一 */
+    pendingStarter: false,
     toastMsg: '',
     toastOn: false,
     nowMs: Date.now(),
@@ -201,7 +203,13 @@ export const useGameStore = defineStore('game', {
       if (!this.s.started) {
         refreshXianyu(this.s, false);
         save(this.s);
-        this.showStarter = true;
+        if (this.s.prestige.runs > 0) {
+          // 转生后重进：先停留转生页投资阅历，手动开启新周目（老友馈赠等开局天赋需在三选一前持有）
+          this.pendingStarter = true;
+          this.tab = 'prestige';
+        } else {
+          this.showStarter = true;
+        }
       } else {
         if (!this.s.xyNext) this.s.xyNext = Date.now() + XY_REFRESH_MS;
         if (!this.s.xianyuBuys.length) refreshXianyu(this.s, false);
@@ -721,13 +729,20 @@ export const useGameStore = defineStore('game', {
         return;
       }
       this.clearSession();
-      // 与 boot 的新开局分支一致：刷首批货源、补开轮换池、弹三选一
+      // 与 boot 的新开局分支一致：刷首批货源、补开轮换池；先停留转生页投资阅历，手动开新周目
       refreshXianyu(this.s, false);
       tickRotation(this.s);
-      this.showStarter = true;
-      this.tab = 'play';
-      this.toast(`🌅 第 ${this.s.prestige.runs + 1} 周目开启！阅历 +${r.gain}`);
+      this.pendingStarter = true;
+      this.tab = 'prestige';
+      this.toast(`🌅 第 ${this.s.prestige.runs + 1} 周目待开启！阅历 +${r.gain}，可先投资天赋`);
       this.saveGame();
+    },
+
+    /** 转生页「开启新周目」：弹出三选一（老友馈赠等开局天赋按当前等级结算） */
+    startNewRun() {
+      if (!this.pendingStarter) return;
+      this.pendingStarter = false;
+      this.showStarter = true;
     },
 
     buyPerk(id: string) {
