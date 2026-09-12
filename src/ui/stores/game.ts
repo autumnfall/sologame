@@ -574,7 +574,7 @@ export const useGameStore = defineStore('game', {
             cls: r.rarity === 'N' ? '' : 'hit',
           });
         } else {
-          const bonus = r.acquire.first ? `开箱奖励：全属性经验 +${Math.round(r.acquire.bonusExp)}` : '';
+          const bonus = r.acquire.first ? `开箱奖励：${r.acquire.bonusAttrs.join('、')}经验 +${Math.round(r.acquire.bonusExp)}` : '';
           this.gachaLog.unshift({
             rar: r.rarity,
             dup: false,

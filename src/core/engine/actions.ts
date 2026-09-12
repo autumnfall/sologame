@@ -7,6 +7,7 @@ import { storageCost, canStore } from '../mechanics/play';
 import { sellFeeRate, taobaoPrice } from '../mechanics/economy';
 import { perkLevel, perkLv } from '../mechanics/prestige';
 import { acquireGame } from './acquire';
+import type { AcquireResult } from './acquire';
 import { buyXianyu } from './xianyu';
 
 export type ActionResult =
@@ -45,8 +46,8 @@ export function pickStarter(state: GameState, id: string, rng: () => number = Ma
   return ok(`获得了《${gameById(id).name}》！${firstBonusText(r)}${giftText}`);
 }
 
-function firstBonusText(r: { first: boolean; bonusExp: number }): string {
-  return r.first ? `开箱奖励：全属性经验 +${Math.round(r.bonusExp)}` : '';
+function firstBonusText(r: AcquireResult): string {
+  return r.first ? `开箱奖励：${r.bonusAttrs.join('、')}经验 +${Math.round(r.bonusExp)}` : '';
 }
 
 /** 某宝购买：每款限量 N4/R3/SR2/SSR1 次，售完不补；按稀有度逐级解锁；购入为全新实体（会员折扣天赋生效） */
