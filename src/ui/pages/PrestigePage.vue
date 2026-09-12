@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   ACHIEVEMENTS,
   FEATURE_UNLOCKS,
@@ -7,6 +7,7 @@ import {
   PERK_BRANCH_NAME,
   achievedCount,
   canPrestige,
+  fmtDuration,
   insightGain,
   insightSpent,
   isFeatureUnlocked,
@@ -16,8 +17,9 @@ import {
   prestigeUnlockCount,
   prestigeWeight,
 } from '../../core';
-import type { PerkBranch } from '../../core';
+import type { PerkBranch, RunRecord } from '../../core';
 import { useGameStore } from '../stores/game';
+import { LEADERBOARD_API, fetchBoard } from '../leaderboard';
 
 const store = useGameStore();
 
@@ -47,6 +49,27 @@ const achList = computed(() => {
   return [...ACHIEVEMENTS].sort((a, b) => Number(done.has(b.id)) - Number(done.has(a.id)));
 });
 const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.need) ?? null);
+
+// ---------- 排行榜 ----------
+const onlineBoard = ref<RunRecord[] | null>(null);
+const boardStatus = ref('');
+
+async function refreshBoard() {
+  if (!LEADERBOARD_API) {
+    onlineBoard.value = null;
+    boardStatus.value = '在线排行榜未配置服务器（部署 scripts/leaderboard-server.js 后填入地址即可开启）';
+    return;
+  }
+  boardStatus.value = '加载中…';
+  onlineBoard.value = await fetchBoard();
+  boardStatus.value = onlineBoard.value ? '' : '无法连接排行榜服务器，仅展示本地榜';
+}
+
+onMounted(refreshBoard);
+
+function boardName(r: RunRecord): string {
+  return r.name.trim() || '无名收藏家';
+}
 </script>
 
 <template>
@@ -77,9 +100,62 @@ const nextUnlock = computed(() => FEATURE_UNLOCKS.find(f => achCount.value < f.n
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <span>🌅 桌游阅历：<b class="price" style="font-size:18px">{{ store.s.prestige.insight }}</b></span>
         <span class="mut">已投入 {{ spent }} · 已完成 {{ store.s.prestige.runs }} 周目</span>
+        <label style="margin-left:auto;display:flex;gap:6px;align-items:center;font-size:13px">
+          玩家名称
+          <input
+            v-model="store.s.playerName"
+            maxlength="24"
+            placeholder="排行榜展示用，可留空"
+            style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--txt);padding:5px 10px;font-size:13px;width:200px"
+            @change="store.saveGame()"
+          />
+        </label>
       </div>
       <div class="mut" style="margin-top:6px;font-size:12px">
-        退坑会重置本周目的收藏、实体、金钱、属性、职业与槽位；阅历、天赋和生涯统计永久保留。天赋按三条线取舍投资，<b>只能在转生后、开启新周目前购买与洗点</b>（弹窗内操作），本周目内锁定。
+        退坑会重置本周目的收藏、实体、金钱、属性、职业与槽位；阅历、天赋和生涯统计永久保留。天赋按三条线取舍投资，<b>只能在转生后、开启新周目前购买与洗点</b>（弹窗内操作），本周目内锁定。退坑时会把本周目耗时记入排行榜。
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <h3 style="margin:0">🥇 排行榜 <small class="mut">周目完成耗时最短的前 10 名</small></h3>
+        <button style="margin-left:auto;padding:3px 10px;font-size:12px" @click="refreshBoard()">🔄 刷新在线榜</button>
+      </div>
+      <div class="two-col">
+        <div>
+          <h3 style="margin:0 0 6px;font-size:13px">本存档 <small class="mut">{{ store.s.localBoard.length }}/10</small></h3>
+          <table v-if="store.s.localBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
+            <tr class="mut" style="text-align:left">
+              <th style="padding:3px 4px">#</th><th>名称</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+            </tr>
+            <tr v-for="(r, i) in store.s.localBoard" :key="r.at + '-' + i" style="border-top:1px solid var(--line)">
+              <td style="padding:3px 4px">{{ i + 1 }}</td>
+              <td>{{ boardName(r) }}</td>
+              <td>{{ fmtDuration(r.ms) }}</td>
+              <td>{{ r.runs }}</td>
+              <td>{{ r.insight }}</td>
+              <td>{{ r.achievements }}</td>
+            </tr>
+          </table>
+          <div v-else class="mut" style="font-size:12px">还没有完成的周目。</div>
+        </div>
+        <div>
+          <h3 style="margin:0 0 6px;font-size:13px">在线 <small class="mut">全部玩家</small></h3>
+          <table v-if="onlineBoard && onlineBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
+            <tr class="mut" style="text-align:left">
+              <th style="padding:3px 4px">#</th><th>名称</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+            </tr>
+            <tr v-for="(r, i) in onlineBoard" :key="(r.clientId ?? r.at) + '-' + i" style="border-top:1px solid var(--line)">
+              <td style="padding:3px 4px">{{ i + 1 }}</td>
+              <td>{{ boardName(r) }}</td>
+              <td>{{ fmtDuration(r.ms) }}</td>
+              <td>{{ r.runs }}</td>
+              <td>{{ r.insight }}</td>
+              <td>{{ r.achievements }}</td>
+            </tr>
+          </table>
+          <div v-else class="mut" style="font-size:12px">{{ boardStatus || '加载中…' }}</div>
+        </div>
       </div>
     </div>
 

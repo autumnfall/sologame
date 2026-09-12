@@ -31,6 +31,15 @@ small{color:var(--dim)}
 #tabs button.active{background:var(--bg);color:var(--gold);border-color:var(--gold);font-weight:700}
 #content{padding:16px;max-width:1200px;margin:0 auto}
 .tabpage{display:none}.tabpage.active{display:block}
+/* 移动端：顶部主标签与商店子标签改为横向滑动，避免挤占页面纵向空间 */
+@media(max-width:640px){
+  #tabs{overflow-x:auto;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{white-space:nowrap;flex:0 0 auto;padding:9px 16px}
+  .subtabs{overflow-x:auto;scrollbar-width:none}
+  .subtabs::-webkit-scrollbar{display:none}
+  .subtabs button{white-space:nowrap;flex:0 0 auto}
+}
 /* ============ 卡牌/封面 ============ */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative}

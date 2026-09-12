@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   GACHA_PITY, MASTERY, SAVE_VERSION,
   buyPerk, canPrestige, defaultState, doPrestige, expMult, gachaDraw, gameById,
-  insightGain, insightSpent, masteredCount, parseSave, perkCost, perkDefById,
-  perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, respecPerks, taobaoPrice,
+  insightGain, insightSpent, makeRunRecord, masteredCount, mergeBoard, parseSave, perkCost, perkDefById,
+  perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, recordLocalRun, respecPerks, taobaoPrice,
 } from '../src/core';
 import { lcg, own } from './helpers';
 import type { GameState } from '../src/core';
@@ -190,5 +190,56 @@ describe('转生：存档迁移', () => {
     expect(s!.prestige.perks).toEqual({ fund: 2 });
     expect(s!.prestige.runs).toBe(3);
     expect(s!.prestige.lastGain).toBe(9);
+  });
+});
+
+describe('转生：周目成绩记录（本地/在线排行榜）', () => {
+  it('makeRunRecord：耗时 = 完成 - 开局，数据取转生结算后的周目数/阅历/成就', () => {
+    const s = stateWithEightMastered();
+    s.playerName = '  测试玩家  ';
+    s.achievements = ['a1', 'a2', 'a3'];
+    s.runStartedAt = 1_000_000;
+    expect(doPrestige(s).ok).toBe(true);
+    const rec = makeRunRecord(s, { startedAt: 1_000_000, finishedAt: 4_600_000 });
+    expect(rec.name).toBe('测试玩家');
+    expect(rec.ms).toBe(3_600_000);
+    expect(rec.runs).toBe(1);
+    expect(rec.insight).toBe(10);
+    expect(rec.achievements).toBe(3);
+    expect(rec.clientId).toBe(s.clientId);
+  });
+
+  it('recordLocalRun：按耗时升序，只保留前 10 条', () => {
+    const s = defaultState();
+    const mk = (ms: number) => ({ name: 'n', ms, runs: 1, insight: 1, achievements: 0, at: ms });
+    for (let i = 1; i <= 12; i++) recordLocalRun(s, mk(i * 1000));
+    expect(s.localBoard).toHaveLength(10);
+    expect(s.localBoard[0].ms).toBe(1000);
+    expect(s.localBoard[9].ms).toBe(10000); // 最大的 2 条被裁掉
+    recordLocalRun(s, mk(500)); // 更快的成绩插到榜首
+    expect(s.localBoard[0].ms).toBe(500);
+  });
+
+  it('doPrestige：重置本周目开始时间，保留玩家名/本地榜/clientId', () => {
+    const s = stateWithEightMastered();
+    s.playerName = '老玩家';
+    s.runStartedAt = 1;
+    recordLocalRun(s, { name: '老玩家', ms: 999, runs: 0, insight: 0, achievements: 0, at: 2 });
+    const cid = s.clientId;
+    expect(doPrestige(s).ok).toBe(true);
+    expect(s.playerName).toBe('老玩家');
+    expect(s.localBoard).toHaveLength(1);
+    expect(s.clientId).toBe(cid);
+    expect(s.runStartedAt).toBeGreaterThan(1); // 重置为转生时刻
+  });
+
+  it('mergeBoard：按 clientId 去重取最好成绩，耗时升序截断', () => {
+    const merged = mergeBoard([
+      { name: 'a', ms: 5000, runs: 1, insight: 0, achievements: 0, at: 1, clientId: 'x' },
+      { name: 'a', ms: 3000, runs: 2, insight: 5, achievements: 1, at: 2, clientId: 'x' }, // 同 client 取 3000
+      { name: 'b', ms: 4000, runs: 1, insight: 0, achievements: 0, at: 3, clientId: 'y' },
+      { name: 'c', ms: 1000, runs: 1, insight: 0, achievements: 0, at: 4 },
+    ], 10);
+    expect(merged.map(r => r.ms)).toEqual([1000, 3000, 4000]);
   });
 });

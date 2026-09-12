@@ -80,6 +80,24 @@ export interface PrestigeState {
   lastGain: number;
 }
 
+/** 一个已完成周目的成绩记录（本地榜与在线榜共用结构） */
+export interface RunRecord {
+  /** 玩家填写的名称 */
+  name: string;
+  /** 本周目耗时（真实毫秒，从开局到点转生） */
+  ms: number;
+  /** 完成时的周目数 */
+  runs: number;
+  /** 完成时的总计阅历 */
+  insight: number;
+  /** 完成时的总计成就数 */
+  achievements: number;
+  /** 完成时间戳 */
+  at: number;
+  /** 客户端唯一 id（在线榜按此去重，取最好成绩） */
+  clientId?: string;
+}
+
 /** 游戏存档 */
 export interface GameState {
   saveVersion: number;
@@ -151,6 +169,14 @@ export interface GameState {
   };
   /** 已达成成就 id 列表（每个 +1% 全局经验） */
   achievements: string[];
+  /** 玩家名称（排行榜展示用，可留空） */
+  playerName: string;
+  /** 本周目开始时间戳（转生重置为当前时间） */
+  runStartedAt: number;
+  /** 本地排行榜：耗时最小的 10 个已完成周目 */
+  localBoard: RunRecord[];
+  /** 客户端唯一 id（在线榜去重用，首次生成后永久保留） */
+  clientId: string;
   /** 功能性设置 */
   settings: {
     /** 连刷自动更换：关 / 疲劳后换 / 精通后换（两档互斥） */
@@ -201,8 +227,17 @@ export function defaultState(): GameState {
       pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
     },
     achievements: [],
+    playerName: '',
+    runStartedAt: Date.now(),
+    localBoard: [],
+    clientId: genClientId(),
     settings: { autoSwitch: 'off', quickList: false },
   };
+}
+
+/** 生成客户端唯一 id（在线排行榜按此去重） */
+export function genClientId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** 查找实体 */

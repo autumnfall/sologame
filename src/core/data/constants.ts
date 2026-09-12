@@ -11,8 +11,9 @@ import type { Rarity } from './types';
  * v8 = 某鱼挂售独立 30s 成交判定（新增 xySellNext）；移除手动职业 tryout；离线总结弹窗（offlineBank 结构变更）；
  * v9 = 成就系统（achievements/settings）+ stats 事件计数器 + 收藏 resold 标记。
  * v10 = 实体锁定（copies.locked）+ 某鱼快速上架开关（settings.quickList）；均为新增可选字段，归一化补默认。
+ * v11 = 排行榜（playerName/runStartedAt/localBoard/clientId）；均为新增可选字段，归一化补默认。
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */

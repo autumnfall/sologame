@@ -54,9 +54,12 @@ import {
   unlistCopy,
   canPrestige,
   insightGain,
+  makeRunRecord,
+  recordLocalRun,
   wipeSave,
 } from '../../core';
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
+import { LEADERBOARD_API, submitRun } from '../leaderboard';
 
 export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'prestige' | 'guide';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
@@ -140,8 +143,10 @@ export const useGameStore = defineStore('game', {
     shelfFilter: null as Attr | null,
     playNotTiredOnly: false,
     playUnmasteredOnly: false,
-    shelfNotTiredOnly: false,
-    shelfUnmasteredOnly: false,
+    /** 收藏架筛选：只看已精通 / 稀有度 / 价值排序 */
+    shelfMasteredOnly: false,
+    shelfRarity: null as Rarity | null,
+    shelfSort: 'default' as 'default' | 'valueAsc' | 'valueDesc',
     session: null as PlaySession | null,
     playLog: [] as LogLine[],
     gachaLog: [] as GachaEntry[],
@@ -713,17 +718,25 @@ export const useGameStore = defineStore('game', {
 
     // ---------- 转生 ----------
 
-    /** 退坑转生：确认弹窗后重置本周目，保留阅历/天赋/统计 */
+    /** 退坑转生：确认弹窗后重置本周目，保留阅历/天赋/统计；记录周目成绩进本地/在线排行榜 */
     prestige() {
       const gain = insightGain(this.s);
       if (!canPrestige(this.s)) return;
       if (!window.confirm(`确定退坑出清吗？本周目的收藏、实体、金钱、属性、职业都将重置，获得 ${gain} 点桌游阅历。`)) return;
       if (!window.confirm('再确认一次：阅历和天赋会保留，但本周目的一切进度将消失。')) return;
+      const startedAt = this.s.runStartedAt;
+      const finishedAt = Date.now();
       const r = doPrestige(this.s);
       if (!r.ok) {
         this.toast(r.reason ?? '无法退坑');
         return;
       }
+      // 周目成绩：runs/insight 已含本次转生增量；doPrestige 已重置 runStartedAt，所以上面先快照
+      const rec = makeRunRecord(this.s, { startedAt, finishedAt });
+      recordLocalRun(this.s, rec);
+      void submitRun(rec).then(ok => {
+        if (!ok && LEADERBOARD_API) this.toast('在线排行榜上传失败（服务器不可达），已保留本地记录');
+      });
       this.clearSession();
       // 与 boot 的新开局分支一致：刷首批货源、补开轮换池；强制弹窗先投资阅历再开新周目
       refreshXianyu(this.s, false);

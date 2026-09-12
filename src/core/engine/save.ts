@@ -2,8 +2,8 @@ import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { gameById } from '../data/games';
-import { defaultState } from '../state';
-import type { CollectionEntry, Copy, GameState, Listing, MarketItem, OfflineBank } from '../state';
+import { defaultState, genClientId } from '../state';
+import type { CollectionEntry, Copy, GameState, Listing, MarketItem, OfflineBank, RunRecord } from '../state';
 import type { Attr } from '../data/constants';
 
 /** 存储适配器：默认 localStorage，测试中可注入内存实现 */
@@ -80,6 +80,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   }),
   // v9 → v10（实体锁定 + 快速上架开关）：均为新增可选字段，归一化时补默认值，无需改写数据
   9: raw => ({ ...raw }),
+  // v10 → v11（排行榜：玩家名/本周目开始时间/本地榜/客户端 id）：均为新增可选字段，归一化时补默认值
+  10: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -312,6 +314,10 @@ function normalize(data: Record<string, unknown>): GameState {
     achievements: Array.isArray(data.achievements)
       ? data.achievements.filter((id): id is string => typeof id === 'string')
       : [],
+    playerName: typeof data.playerName === 'string' ? data.playerName.slice(0, 24) : '',
+    runStartedAt: num(data.runStartedAt, Date.now()),
+    localBoard: normalizeBoard(data.localBoard),
+    clientId: typeof data.clientId === 'string' && data.clientId ? data.clientId : genClientId(),
     settings: {
       autoSwitch: (isRecord(data.settings) && data.settings.autoSwitch === 'fatigue') || (isRecord(data.settings) && data.settings.autoSwitch === 'mastery')
         ? data.settings.autoSwitch
@@ -324,6 +330,22 @@ function normalize(data: Record<string, unknown>): GameState {
 function num(v: unknown, fallback: number): number {
   // 非法值回退默认；负值视为脏数据，归零
   return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : fallback;
+}
+
+/** 本地排行榜归一化：只保留结构合法的记录，按耗时升序、截断前 10 */
+function normalizeBoard(raw: unknown): RunRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const list = raw.filter(isRecord).map(r => ({
+    name: typeof r.name === 'string' ? r.name.slice(0, 24) : '',
+    ms: num(r.ms, 0),
+    runs: Math.floor(num(r.runs, 0)),
+    insight: num(r.insight, 0),
+    achievements: Math.floor(num(r.achievements, 0)),
+    at: num(r.at, 0),
+    ...(typeof r.clientId === 'string' && r.clientId ? { clientId: r.clientId } : {}),
+  })).filter(r => r.ms > 0);
+  list.sort((a, b) => a.ms - b.ms);
+  return list.slice(0, 10);
 }
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
