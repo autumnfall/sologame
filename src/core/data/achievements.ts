@@ -74,7 +74,7 @@ export function achievementById(id: string): AchievementDef {
 
 // ---------- 功能解锁（按已达成成就数里程碑） ----------
 
-export type FeatureKey = 'autoFatigue' | 'tenPull' | 'sleeveAll' | 'listWorn' | 'autoMastery';
+export type FeatureKey = 'autoFatigue' | 'tenPull' | 'sleeveAll' | 'listWorn' | 'autoMastery' | 'quickList';
 
 export interface FeatureUnlock {
   key: FeatureKey;
@@ -90,6 +90,7 @@ export const FEATURE_UNLOCKS: readonly FeatureUnlock[] = [
   { key: 'sleeveAll', need: 15, name: '一键套牌套', desc: '收藏架一键给所有未套实体套上牌套' },
   { key: 'listWorn', need: 20, name: '一键上架磨光件', desc: '某鱼一键把所有磨光实体按行情价上架' },
   { key: 'autoMastery', need: 25, name: '精通自动更换', desc: '连刷中当前游戏精通后，自动随机换一款未精通的（可开关）' },
+  { key: 'quickList', need: 30, name: '某鱼快速上架', desc: '收藏架一键开关：开启后点「某鱼上架」直接按行情价 100% 上架，不再跳转某鱼页' },
 ];
 
 /** 全部解锁所需成就数（最后一个里程碑） */

@@ -14,6 +14,7 @@ import {
   isMastered,
   sleeveAll,
   listWornCopies,
+  MASTER_POOL_SLEEVES,
   conditionText,
   copyByUid,
   copiesOf,
@@ -49,6 +50,7 @@ import {
   tickRotation,
   tickSecond,
   tickXianyu,
+  toggleLock,
   unlistCopy,
   canPrestige,
   insightGain,
@@ -136,9 +138,9 @@ export const useGameStore = defineStore('game', {
     shopTab: 'taobao' as ShopTabKey,
     playFilter: null as Attr | null,
     shelfFilter: null as Attr | null,
-    playTiredOnly: false,
+    playNotTiredOnly: false,
     playUnmasteredOnly: false,
-    shelfTiredOnly: false,
+    shelfNotTiredOnly: false,
     shelfUnmasteredOnly: false,
     session: null as PlaySession | null,
     playLog: [] as LogLine[],
@@ -238,7 +240,7 @@ export const useGameStore = defineStore('game', {
       if (xy.refreshed) this.toast('🔄 某鱼自动到货一批新货源');
       for (const sold of xy.sold) this.toast(`《${sold.name}》已售出，到账 ¥${sold.gain}`);
       const rot = tickRotation(this.s);
-      if (rot.changed && rot.theme) this.toast(`轮换赏池更新：${rotatingThemeText(rot.theme)}`);
+      if (rot.changed && rot.theme) this.toast(`桌游池更新：${rotatingThemeText(rot.theme)}`);
       const fresh = checkAchievements(this.s);
       if (fresh.length) {
         const names = fresh.map(a => `「${a.name}」`).join('');
@@ -539,7 +541,7 @@ export const useGameStore = defineStore('game', {
     // ---------- 某赏 ----------
 
     logGachaOutcome(r: Exclude<ReturnType<typeof gachaDraw>, { error: string }>) {
-      const poolTag = r.pool === 'rot' ? '（轮换池）' : '';
+      const poolTag = r.pool === 'rot' ? '（桌游池）' : r.pool === 'master' ? '（精通池）' : '';
       if (r.kind === 'sleeves') {
         this.gachaLog.unshift({
           rar: '🎴',
@@ -547,6 +549,15 @@ export const useGameStore = defineStore('game', {
           name: `${r.packs} 包牌套`,
           text: `+${r.sleeves} 张牌套${poolTag}`,
           cls: '',
+        });
+      } else if (r.kind === 'prof') {
+        const g = gameById(r.gameId);
+        this.gachaLog.unshift({
+          rar: r.rarity,
+          dup: false,
+          name: g.name,
+          text: `熟练 +${r.prof}${r.masteredNow ? '，已精通！' : ''}${poolTag}`,
+          cls: r.rarity === 'N' ? '' : 'hit',
         });
       } else {
         const g = gameById(r.gameId);
@@ -585,6 +596,17 @@ export const useGameStore = defineStore('game', {
     pullGachaTen(pool: GachaPool, pay: GachaPay) {
       if (!isFeatureUnlocked(this.s, 'tenPull')) {
         this.toast('十连抽尚未解锁（达成 10 个成就）');
+        return;
+      }
+      if (pool === 'master') {
+        if (this.s.sleeves < MASTER_POOL_SLEEVES * 10) return this.toast(`牌套不够十连（需要 ${MASTER_POOL_SLEEVES * 10} 张）`);
+        for (let i = 0; i < 10; i++) {
+          const r = gachaDraw(this.s, 'master', 'sleeves');
+          if ('error' in r) break;
+          this.logGachaOutcome(r);
+        }
+        this.toast('🎰 精通池十连完成！');
+        this.saveGame();
         return;
       }
       const price = pool === 'perm' ? GACHA_PRICE : ROTATION_PRICE;
@@ -735,6 +757,26 @@ export const useGameStore = defineStore('game', {
       const label = mode === 'fatigue' ? '疲劳自动更换' : '精通自动更换';
       this.toast(this.s.settings.autoSwitch === mode ? `已开启${label}` : `已关闭${label}`);
       this.saveGame();
+    },
+
+    /** 某鱼快速上架开关（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按 100% 市价上架 */
+    toggleQuickList() {
+      if (!isFeatureUnlocked(this.s, 'quickList')) {
+        this.toast('该功能尚未解锁（达成 30 个成就）');
+        return;
+      }
+      this.s.settings.quickList = !this.s.settings.quickList;
+      this.toast(this.s.settings.quickList
+        ? '已开启某鱼快速上架：收藏架点「某鱼上架」直接按行情价 100% 上架'
+        : '已关闭某鱼快速上架');
+      this.saveGame();
+    },
+
+    /** 收藏架锁定/解锁实体 */
+    toggleCopyLock(uid: number) {
+      const r = toggleLock(this.s, uid);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
     },
 
     sleeveAllCopies() {

@@ -4,8 +4,8 @@ import {
   SELL_FEE, SELL_SLOT_COSTS, STORE_WEAR_ONCE, XY_REFRESH_MS, XY_SELL_MS,
   accumulateOffline, applySleeve, applyStorage, buyTaobao, buyXianyu,
   copyValue, defaultState, exchangeHiTickets, expandMarketSlots, expandSellSlots, expMult, gachaDraw,
-  gameById, initTaobaoStock, listCopy, pickStarter, quitJob, refreshXianyu, rollGachaOutcome, rotatingPool, settleRound,
-  takeJob, tickRotation, tickSecond, tickXianyu, unlistCopy,
+  gameById, initTaobaoStock, listCopy, listWornCopies, pickStarter, quitJob, refreshXianyu, rollGachaOutcome, rollGameRarity, rotatingPool, settleRound,
+  takeJob, tickRotation, tickSecond, tickXianyu, toggleLock, unlistCopy,
 } from '../src/core';
 import { lcg, own, uidOf } from './helpers';
 
@@ -156,6 +156,24 @@ describe('某鱼：购买与出售', () => {
     expect(s.money).toBe(0);
   });
 
+  it('实体锁定：锁定后不可上架，解锁恢复；一键上架磨光件跳过锁定实体', () => {
+    const s = defaultState();
+    const a = own(s, 'guoyuan', { durability: 0 });
+    const b = own(s, 'kafei', { durability: 0 });
+    s.money = 999;
+    expandSellSlots(s); // 2 槽
+    expect(toggleLock(s, a.uid).ok).toBe(true);
+    expect(s.copies.find(c => c.uid === a.uid)!.locked).toBe(true);
+    expect(listCopy(s, a.uid, 1.0).ok).toBe(false); // 锁定不可出售
+    const r = listWornCopies(s);
+    expect(r.count).toBe(1); // 只上架未锁定的磨光件
+    expect(s.listings[0].copyUid).toBe(b.uid);
+    expect(toggleLock(s, a.uid).ok).toBe(true); // 解锁
+    expect(listCopy(s, a.uid, 1.0).ok).toBe(true);
+    // 上架中的实体不可锁定/解锁
+    expect(toggleLock(s, a.uid).ok).toBe(false);
+  });
+
   it('成交判定：全新×50% 必卖（扣 5% 手续费）；0耐久×200% 必不卖', () => {
     // 必卖：上架后手动把耐久打满、定价倍率 0.5
     const s = defaultState();
@@ -272,18 +290,35 @@ describe('某赏（常驻池 + 轮换池）', () => {
     expect(s.sleeves).toBe(100); // 牌套不变
   });
 
-  it('轮换池：仅出主题属性桌游；高级券抽取；独立保底', () => {
+  it('桌游池：仅出桌游（N60/R30/SR8/SSR2）；高级券抽取；独立保底', () => {
     const s = defaultState();
     s.rotTheme = '演算';
     s.hiTickets = 1;
     expect(rotatingPool('演算').every(g => g.attrs.includes('演算'))).toBe(true);
-    const r = gachaDraw(s, 'rot', 'hiTicket', () => 0.7); // → N 档
+    const r = gachaDraw(s, 'rot', 'hiTicket', () => 0.7); // 0.7 → R 档
     if ('error' in r || r.kind !== 'game') throw new Error('unexpected');
-    expect(r.rarity).toBe('N');
-    expect(rotatingPool('演算').some(g2 => g2.id === r.gameId)).toBe(true);
+    expect(r.rarity).toBe('R');
+    // R × 演算 = 欢迎来到月球 / 奋进号：深海 / 大搜查系列
+    expect(['yueliang', 'fende', 'dasoucha']).toContain(r.gameId);
     expect(s.hiTickets).toBe(0);
-    expect(s.pityRot).toBe(1);
+    expect(s.pityRot).toBe(1); // R 不计 SR+，保底 +1
     expect(s.pity).toBe(0);
+    // 不出牌套：各区间 rng 均为桌游结果（桌游池单抽 ¥200）
+    s.money = 1e9;
+    for (const v of [0.1, 0.5, 0.65, 0.95, 0.99]) {
+      const r2 = gachaDraw(s, 'rot', 'money', () => v);
+      if ('error' in r2) throw new Error('unexpected');
+      expect(r2.kind).toBe('game');
+    }
+  });
+
+  it('桌游池概率边界：0.5→N / 0.7→R / 0.95→SR / 0.99→SSR；保底 3:1', () => {
+    expect(rollGameRarity(() => 0.5, false)).toBe('N');
+    expect(rollGameRarity(() => 0.7, false)).toBe('R');
+    expect(rollGameRarity(() => 0.95, false)).toBe('SR');
+    expect(rollGameRarity(() => 0.99, false)).toBe('SSR');
+    expect(rollGameRarity(() => 0.1, true)).toBe('SSR');
+    expect(rollGameRarity(() => 0.5, true)).toBe('SR');
   });
 
   it('轮换池保底必出 SR 及以上且限定主题内', () => {
@@ -296,6 +331,43 @@ describe('某赏（常驻池 + 轮换池）', () => {
     expect(r.rarity).toBe('SSR');
     expect(['aoding', 'fangzhou']).toContain(r.gameId); // 带演算的 SSR
     expect(s.pityRot).toBe(0);
+  });
+
+  it('精通池：牌套支付、只加熟练值；稀有度全精通回退 +100 牌套；全精通拒绝', () => {
+    const s = defaultState();
+    // 只拥有 N 款（guoyuan 熟练 18），其余未入手
+    own(s, 'guoyuan', { prof: 18 });
+    s.sleeves = 500;
+    // 0.5 → N 档：guoyuan 熟练 18+5=23（允许溢出），并标记本次精通
+    const r = gachaDraw(s, 'master', 'sleeves', () => 0.5);
+    if ('error' in r || r.kind !== 'prof') throw new Error('unexpected');
+    expect(r.gameId).toBe('guoyuan');
+    expect(r.prof).toBe(5);
+    expect(r.masteredNow).toBe(true);
+    expect(s.collections['guoyuan'].prof).toBe(23);
+    expect(s.sleeves).toBe(300); // 500 - 200
+    expect(s.stats.pulls).toBe(1);
+    // guoyuan 已精通 → 精通池只剩空集 → 拒绝且不扣牌套
+    const r2 = gachaDraw(s, 'master', 'sleeves', () => 0.5);
+    expect('error' in r2).toBe(true);
+    expect(s.sleeves).toBe(300);
+    // 0.7 → R 档：未拥有任何 R 款 → 回退 +100 牌套
+    const s2 = defaultState();
+    own(s2, 'guoyuan');
+    s2.sleeves = 300;
+    const r3 = gachaDraw(s2, 'master', 'sleeves', () => 0.7);
+    if ('error' in r3 || r3.kind !== 'sleeves') throw new Error('unexpected');
+    expect(r3.sleeves).toBe(100);
+    expect(s2.sleeves).toBe(200); // 300 - 200 + 100
+    expect(s2.collections['guoyuan'].prof).toBe(0); // 熟练值不变
+    // 未入手的桌游不在奖池：只有 boendi（N）时抽 N 档必中 boendi
+    const s3 = defaultState();
+    own(s3, 'boendi');
+    s3.sleeves = 200;
+    const r4 = gachaDraw(s3, 'master', 'sleeves', () => 0.1); // 0.1 → N
+    if ('error' in r4 || r4.kind !== 'prof') throw new Error('unexpected');
+    expect(r4.gameId).toBe('boendi');
+    expect(s3.collections['boendi'].prof).toBe(5);
   });
 
   it('高级券兑换：批量，普通券+牌套不足时拒绝', () => {
@@ -430,6 +502,20 @@ describe('tick 与离线（工作周期制）', () => {
     expect(s2.offlineBank.playRounds).toBeGreaterThan(0);
   });
 
+  it('离线自动更换（玩腻了换）：粘性目标——未玩腻期间不碰高价值已腻款', () => {
+    // boendi/xueyuan 基础经验高但已玩腻；guoyuan 未腻。粘性盯着 guoyuan 玩到腻（4 局，疲劳 0→8）为止，
+    // 期间已腻的高价值款一局都不该出现（旧实现每轮贪心重选，已腻款会反复蹭局）
+    const s = defaultState();
+    own(s, 'boendi', { fatigue: 9 });
+    own(s, 'xueyuan', { fatigue: 9 });
+    own(s, 'guoyuan');
+    s.settings.autoSwitch = 'fatigue';
+    accumulateOffline(s, 100 * 1000, lcg(3)); // 恰好 3 局，guoyuan 疲劳到 6 尚未腻
+    expect(s.offlineBank.playRounds).toBe(3);
+    expect(s.offlineBank.games.map(g => g.gameId)).toEqual(['guoyuan']);
+    expect(s.collections['guoyuan'].fatigue).toBeLessThan(7);
+  });
+
   it('离线自动更换（精通后换）：已精通收藏被跳过', () => {
     // boendi 熟练 25（N 需求 20，已精通）；guoyuan 熟练 0
     const s = defaultState();
@@ -438,16 +524,17 @@ describe('tick 与离线（工作周期制）', () => {
     s.settings.autoSwitch = 'mastery';
     accumulateOffline(s, 10 * 60 * 1000, lcg(3));
     expect(s.offlineBank.playRounds).toBeGreaterThan(0);
-    // guoyuan 一直玩到精通（熟练≥20）才换 boendi
-    expect(s.offlineBank.games.map(g => g.gameId)).toEqual(['guoyuan', 'boendi']);
-    expect(s.collections['guoyuan'].prof).toBeGreaterThanOrEqual(20);
-    // 全部精通 → 仍可游玩（退回贪心）
+    // guoyuan 精通后已无任何未精通候选（boendi 也已精通）→ 与在线一致：维持当前继续玩
+    expect(s.offlineBank.games.map(g => g.gameId)).toEqual(['guoyuan']);
+    expect(s.collections['guoyuan'].prof).toBe(s.offlineBank.playRounds);
+    // 开局就已全部精通 → 退回贪心挑最高收益款（boendi 基础经验更高）
     const s2 = defaultState();
     own(s2, 'boendi', { prof: 25 });
     own(s2, 'guoyuan', { prof: 25 });
     s2.settings.autoSwitch = 'mastery';
     accumulateOffline(s2, 10 * 60 * 1000, lcg(3));
     expect(s2.offlineBank.playRounds).toBeGreaterThan(0);
+    expect(s2.offlineBank.games.map(g => g.gameId)).toEqual(['boendi']);
   });
 });
 

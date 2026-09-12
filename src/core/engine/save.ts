@@ -78,6 +78,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
       pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
     },
   }),
+  // v9 → v10（实体锁定 + 快速上架开关）：均为新增可选字段，归一化时补默认值，无需改写数据
+  9: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -214,6 +216,7 @@ function normalize(data: Record<string, unknown>): GameState {
         durability: typeof c.durability === 'number' ? Math.max(0, c.durability) : DURABILITY[gameById(c.gameId).rarity],
         sleeved: c.sleeved === true,
         stored: c.stored === true,
+        ...(c.locked === true ? { locked: true } : {}),
       });
     }
   }
@@ -314,6 +317,7 @@ function normalize(data: Record<string, unknown>): GameState {
       autoSwitch: (isRecord(data.settings) && data.settings.autoSwitch === 'fatigue') || (isRecord(data.settings) && data.settings.autoSwitch === 'mastery')
         ? data.settings.autoSwitch
         : 'off',
+      quickList: isRecord(data.settings) && data.settings.quickList === true,
     },
   };
 }

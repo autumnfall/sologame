@@ -49,9 +49,10 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
 /**
  * 离线累积（收益直接入账，统计写入 offlineBank 供总结弹窗展示）：
  * ① 工作：按完成的整周期入账（期望酬劳 × 离线折算），不足一周期的余量转回 jobProgress；
- * ② 游玩：离线期间自动连刷——每轮挑「基础经验 × 疲劳修正」最高的可玩实体结算一局
- * （真实消耗回合时长，无时机条加成）；开启自动更换时优先挑未疲劳/未精通的实体。
- * 金钱/经验/熟练度/疲劳/磨损全部照常结算。
+ * ② 游玩：离线期间自动连刷——与在线连刷一致，选定一款桌游后一直玩到它
+ * 「玩腻了 / 精通」（取决于自动更换设置）再换下一款；未开启自动更换则全程玩同一款。
+ * 每轮在该收藏的可用实体里结算一局（真实消耗回合时长，无时机条加成）；
+ * 金钱/经验/熟练度/疲劳/磨损全部照常结算。全部候选都不符合条件时退回贪心挑收益最高的。
  * 总上限 1 小时、bank 满则不再累积。
  */
 export function accumulateOffline(
@@ -80,6 +81,16 @@ export function accumulateOffline(
   let secs = addT / 1000;
   let guard = 0; // 防御上限：单轮最短约 10s，1 小时最多 ~360 局
   const mode = state.settings.autoSwitch;
+  /** 当前目标是否符合继续游玩的条件（玩腻了换 = 未疲劳；精通后换 = 未精通；关 = 永远继续） */
+  const keepPlaying = (gameId: string): boolean =>
+    mode === 'fatigue'
+      ? (state.collections[gameId]?.fatigue ?? 99) < 7
+      : mode === 'mastery'
+        ? !isMastered(state, gameId)
+        : true;
+  // 粘性目标：像在线连刷一样盯着一款玩，直到它不符合条件再换，避免疲劳在阈值附近振荡时
+  // 高基础经验的「玩腻了」款每轮被贪心重新选中；全部候选都不符合条件时维持当前（与在线一致）
+  let current: { gameId: string; uid: number } | null = null;
   while (secs > 0 && guard < 500) {
     const listed = new Set(state.listings.map(l => l.copyUid));
     const cands: { gameId: string; uid: number; score: number }[] = [];
@@ -91,18 +102,31 @@ export function accumulateOffline(
       cands.push({ gameId: c.gameId, uid: c.uid, score });
     }
     if (!cands.length) break;
-    // 自动更换设置：优先挑未疲劳（<7）/未精通的实体；无候选则退回全部
-    const fresh =
-      mode === 'fatigue'
-        ? cands.filter(x => (state.collections[x.gameId]?.fatigue ?? 99) < 7)
-        : mode === 'mastery'
-          ? cands.filter(x => !isMastered(state, x.gameId))
-          : cands;
-    const pool = fresh.length ? fresh : cands;
-    let best = pool[0];
-    for (const x of pool) if (x.score > best.score) best = x;
-    const g = gameById(best.gameId);
-    const copy = copyByUid(state, best.uid)!;
+    const cur = current && cands.find(x => x.uid === current!.uid);
+    let target: { gameId: string; uid: number };
+    if (cur && keepPlaying(cur.gameId)) {
+      // 当前目标仍符合条件：继续连刷
+      target = { gameId: cur.gameId, uid: cur.uid };
+    } else {
+      const fresh = cands.filter(x => keepPlaying(x.gameId));
+      if (fresh.length) {
+        // 换到符合条件（未疲劳/未精通）中收益最高的
+        let best = fresh[0];
+        for (const x of fresh) if (x.score > best.score) best = x;
+        target = { gameId: best.gameId, uid: best.uid };
+      } else if (cur) {
+        // 全部候选都不符合条件：维持当前（在线 autoSwitchTarget 无候选时同样维持当前）
+        target = { gameId: cur.gameId, uid: cur.uid };
+      } else {
+        // 当前实体不可用且全部不符合：退回贪心挑收益最高的可用实体
+        let best = cands[0];
+        for (const x of cands) if (x.score > best.score) best = x;
+        target = { gameId: best.gameId, uid: best.uid };
+      }
+    }
+    current = target;
+    const g = gameById(target.gameId);
+    const copy = copyByUid(state, target.uid)!;
     const roundSec =
       ruleDuration(state, g) + setupDuration(state, g, copy) + playDuration(state, g, copy) + 4;
     if (secs < roundSec) break;

@@ -59,6 +59,9 @@ describe('成就：功能里程碑解锁', () => {
     expect(isFeatureUnlocked(s, 'listWorn')).toBe(true);
     s.achievements = n(25);
     expect(isFeatureUnlocked(s, 'autoMastery')).toBe(true);
+    expect(isFeatureUnlocked(s, 'quickList')).toBe(false);
+    s.achievements = n(30);
+    expect(isFeatureUnlocked(s, 'quickList')).toBe(true);
   });
 
   it('expMult 吃成就加成（挂钩验证）', () => {
@@ -196,6 +199,26 @@ describe('成就：存档迁移', () => {
     expect(s!.stats.plays).toBe(3);
     expect(s!.stats.tbBought).toBe(0);
     expect(s!.collections['guoyuan'].resold).toBe(true);
+  });
+
+  it('v9 → v10：实体锁定与快速上架开关归一化', () => {
+    const v9 = {
+      saveVersion: 9,
+      money: 100,
+      collections: { guoyuan: { firstOpened: true, prof: 1, fatigue: 2, rulesRead: true } },
+      copies: [
+        { uid: 1, gameId: 'guoyuan', durability: 5, sleeved: false, stored: false, locked: true },
+        { uid: 2, gameId: 'guoyuan', durability: 5, sleeved: false, stored: false },
+      ],
+      settings: { autoSwitch: 'fatigue', quickList: true },
+    };
+    const s = parseSave(JSON.stringify(v9));
+    expect(s).not.toBeNull();
+    expect(s!.saveVersion).toBe(SAVE_VERSION);
+    expect(s!.copies[0].locked).toBe(true);
+    expect(s!.copies[1].locked).toBeUndefined();
+    expect(s!.settings.autoSwitch).toBe('fatigue');
+    expect(s!.settings.quickList).toBe(true);
   });
 });
 

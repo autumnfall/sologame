@@ -34,7 +34,7 @@ function ratioCls(pct: number): string {
 
 // ---------- 卖 ----------
 const listedUids = computed(() => new Set(store.s.listings.map(l => l.copyUid)));
-const sellable = computed(() => store.s.copies.filter(c => !listedUids.value.has(c.uid)));
+const sellable = computed(() => store.s.copies.filter(c => !listedUids.value.has(c.uid) && !c.locked));
 
 const sellUid = ref<number | null>(store.sellPickUid);
 watch(
@@ -55,7 +55,7 @@ function circled(i: number): string {
 function copyLabel(c: Copy): string {
   const g = gameById(c.gameId);
   const idx = store.s.copies.filter(x => x.gameId === c.gameId).findIndex(x => x.uid === c.uid);
-  return `实体${circled(idx)} · ${conditionText(c.durability, g.rarity)} · 耐久 ${durText(c.durability)}`;
+  return `《${g.name}》 实体${circled(idx)} · ${conditionText(c.durability, g.rarity)} · 耐久 ${durText(c.durability)}`;
 }
 
 /** 出售候选：按游戏分组（组名排序），组内低耐久在前，磨光件标 🔧 */
@@ -98,7 +98,7 @@ const marketCost = computed(() =>
 /** 一键上架磨光件（成就 20 个解锁） */
 const listWornUnlocked = computed(() => isFeatureUnlocked(store.s, 'listWorn'));
 const wornCount = computed(() =>
-  store.s.copies.filter(c => c.durability <= 0 && !store.s.listings.some(l => l.copyUid === c.uid)).length,
+  store.s.copies.filter(c => c.durability <= 0 && !c.locked && !store.s.listings.some(l => l.copyUid === c.uid)).length,
 );
 
 /** 在售列表展示行（游戏名/成色、定价、预计成交率） */

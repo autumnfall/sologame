@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ATTR_ICON, ATTRS, JOBS, ROMAN } from '../../core';
+import { ATTR_ICON, ATTRS } from '../../core';
 import type { Attr } from '../../core';
 import { useGameStore } from '../stores/game';
 
@@ -24,12 +24,6 @@ const GUIDE_EFFECT: Record<Attr, string> = {
   洞察: '抽赏券掉得更多；时机条金色区更宽、更容易命中',
   沉浸: '游玩收入更高；主播带货的酬劳下限更高',
 };
-
-function jobReq(req: Partial<Record<Attr, number>>): string {
-  const entries = Object.entries(req);
-  if (!entries.length) return '无门槛';
-  return entries.map(([a, lv]) => `${ATTR_ICON[a as Attr]}${a} ${ROMAN[lv as number]}`).join(' + ');
-}
 
 // ---------- 存档管理 ----------
 const importInput = ref<HTMLInputElement | null>(null);
@@ -77,7 +71,8 @@ function onImportPicked(e: Event) {
       <h3>🛒 四个获得渠道</h3>
       <p class="mut">① <b>开局三选一</b>：决定前期的属性方向；② <b>某宝</b>：按稀有度逐级解锁，集齐当前级别才能买下一级，每款限量、售完不补；③ <b>某鱼</b>：二手货源，都是带成色的实体、价格有赚有亏，<b>唯一能跨级别淘到高级桌游的渠道</b>，还有机会刷出「隐藏款」（各带独特词条，商店与某赏均不出）；每批另附 <b>1 件一口价盲买</b>——只看得到名字，成色全凭运气；④ <b>某赏</b>：扭蛋机，主要出牌套、也有机会直接抽出桌游（越稀有越难出，有保底），不受级别解锁限制；抽出重复款会得到一个新实体，可以挂某鱼出售。收藏的种类越多，全局经验加成越高。</p>
       <p class="mut" style="margin-top:4px"><b>🐟 某鱼买卖</b>：自己用过的实体也能上架（占用出售槽位，可花钱扩充），成色越新越好卖、定价越接近行情越快成交；平台收取手续费，运筹属性可以减免。市场上架数量也可以花钱扩充。</p>
-      <p class="mut" style="margin-top:4px"><b>🌀 某赏轮换池</b>：除了常驻池，每隔一段时间会轮换一个主题属性的限定池，只能用金钱或「高级券」抽取（保底独立计数）。<b>高级券</b>用普通券加牌套兑换，可批量。</p>
+      <p class="mut" style="margin-top:4px"><b>🌀 某赏桌游池</b>：仅出桌游（不出牌套），每 10 分钟轮换一个主题属性，只能用金钱或「高级券」抽取（保底独立计数，50 抽必出 SR 及以上）。<b>高级券</b>用普通券加牌套兑换，可批量。</p>
+      <p class="mut" style="margin-top:4px"><b>🎯 某赏精通池</b>：花 200 张牌套抽一次，范围是你已入手且尚未精通的桌游（概率 N60 / R30 / SR8 / SSR2），抽到不获得新实体，而是直接加对应收藏的熟练值（N+5 / R+10 / SR+20 / SSR+40）；若抽中的稀有度你已全部精通，则该次改为 +100 牌套。</p>
     </div>
     <div class="panel" style="margin-bottom:12px">
       <h3>🏆 成就</h3>
@@ -86,18 +81,6 @@ function onImportPicked(e: Event) {
     <div class="panel" style="margin-bottom:12px">
       <h3>🌅 退坑转生</h3>
       <p class="mut">当精通足够多的桌游后，可以选择「退坑出清」：本周目的收藏、实体、金钱、属性、职业都会重置，但会换来「桌游阅历」——精通越多、图鉴越全，阅历越多。阅历可以在转生页投资<b>永久天赋</b>（收藏、效率、商业三条线），之后的每个新周目都带着天赋重新三选一开局，越玩越强；生涯统计始终保留。天赋随时可以洗点重分，放心试错。</p>
-    </div>
-    <div class="panel">
-      <h3>💼 职业阶梯</h3>
-      <table style="width:100%;font-size:13px;line-height:2">
-        <tr class="mut"><td>职业</td><td>门槛</td><td>特点</td></tr>
-        <tr v-for="j in JOBS" :key="j.id">
-          <td>{{ j.name }}</td>
-          <td class="mut">{{ jobReq(j.req) }}</td>
-          <td class="mut">{{ j.volatile ? '收入大起大落' : j.auto ? '稳定自动收入' : '手动游玩的本职' }}</td>
-        </tr>
-      </table>
-      <p class="mut" style="margin-top:4px">工作是<b>周期制</b>：进度条走满一个周期就自动发一次酬劳，和玩桌游互不耽误；职业越高级，周期越长、单次酬劳越丰厚（具体数值见工作页）。换工作会放弃当前周期进度；离线时也会按整周期累积收益，回来连同自动游玩的战报一起结算。打工与游玩都有概率掉落某赏抽赏券。</p>
     </div>
     <div class="panel" style="margin-top:12px">
       <h3 style="margin:0 0 6px">💾 存档管理</h3>

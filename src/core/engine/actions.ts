@@ -117,11 +117,11 @@ export function sleeveAll(state: GameState): { count: number; used: number } {
   return { count, used };
 }
 
-/** 一键上架磨光件：所有耐久 0 的未上架实体按行情价（100%）上架，占满槽位为止 */
+/** 一键上架磨光件：所有耐久 0 的未上架未锁定实体按行情价（100%）上架，占满槽位为止 */
 export function listWornCopies(state: GameState): { count: number } {
   let count = 0;
   for (const c of state.copies) {
-    if (c.durability > 0) continue;
+    if (c.durability > 0 || c.locked) continue;
     if (state.listings.length >= state.sellSlots) break;
     if (state.listings.some(l => l.copyUid === c.uid)) continue;
     if (listCopy(state, c.uid, 1.0).ok) count++;
@@ -142,10 +142,21 @@ export function quitJob(state: GameState): ActionResult {
   return ok('已辞职休息');
 }
 
+/** 收藏架锁定/解锁实体：锁定的实体不可出售，也不会被一键上架磨光件卖掉 */
+export function toggleLock(state: GameState, uid: number): ActionResult {
+  const copy = copyByUid(state, uid);
+  if (!copy) return fail('实体不存在');
+  if (state.listings.some(l => l.copyUid === uid)) return fail('上架中的实体不可操作');
+  copy.locked = !copy.locked;
+  const g = gameById(copy.gameId);
+  return ok(copy.locked ? `《${g.name}》已锁定：不可出售、不会被一键上架` : `《${g.name}》已解锁`);
+}
+
 /** 某鱼出售：上架实体（定价 = 总价值 × 倍率，50%~200%），占用出售槽位 */
 export function listCopy(state: GameState, uid: number, priceMult: number): ActionResult {
   const copy = copyByUid(state, uid);
   if (!copy) return fail('实体不存在');
+  if (copy.locked) return fail('该实体已锁定，不可出售（可在收藏架解锁）');
   if (state.listings.some(l => l.copyUid === uid)) return fail('已在上架中');
   if (state.listings.length >= state.sellSlots) return fail('出售槽位已满，可花钱扩充');
   const g = gameById(copy.gameId);

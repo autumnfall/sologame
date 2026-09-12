@@ -4,8 +4,12 @@ import {
   GACHA_PITY,
   GACHA_PRICE,
   HI_TICKET_SLEEVES,
+  MASTER_FALLBACK_SLEEVES,
+  MASTER_POOL_SLEEVES,
+  MASTER_PROF_GAIN,
   ROTATION_PRICE,
   isFeatureUnlocked,
+  masterPool,
   rotatingPool,
   rotatingThemeText,
 } from '../../../core';
@@ -13,7 +17,7 @@ import { useGameStore } from '../../stores/game';
 
 const store = useGameStore();
 
-const sub = ref<'perm' | 'rot'>('perm');
+const sub = ref<'perm' | 'rot' | 'master'>('perm');
 
 const RAR_COLOR: Record<string, string> = {
   N: 'var(--N)',
@@ -21,6 +25,10 @@ const RAR_COLOR: Record<string, string> = {
   SR: 'var(--SR)',
   SSR: 'var(--SSR)',
 };
+
+// ---------- 精通池 ----------
+const masterTargets = computed(() => masterPool(store.s));
+const masterCount = computed(() => masterTargets.value.length);
 
 // ---------- 兑换高级券 ----------
 const maxExchange = computed(() =>
@@ -36,7 +44,8 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
   <div>
     <div class="subtabs">
       <button :class="{ active: sub === 'perm' }" @click="sub = 'perm'">🎁 常驻池</button>
-      <button :class="{ active: sub === 'rot' }" @click="sub = 'rot'">🌀 轮换池</button>
+      <button :class="{ active: sub === 'rot' }" @click="sub = 'rot'">🎮 桌游池</button>
+      <button :class="{ active: sub === 'master' }" @click="sub = 'master'">🎯 精通池</button>
     </div>
 
     <!-- ========== 常驻池 ========== -->
@@ -57,13 +66,13 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
       <small>不受某宝级别解锁限制。桌游结果均为全新实体，重复款直接获得新实体（收藏级进度保留，可挂某鱼出售）；抽出 SR/SSR 时保底进度归零。</small>
     </div>
 
-    <!-- ========== 轮换池 ========== -->
-    <div v-else class="gacha-banner">
+    <!-- ========== 桌游池（原轮换池） ========== -->
+    <div v-else-if="sub === 'rot'" class="gacha-banner">
       <div style="font-size:18px;font-weight:800;color:var(--gold)">
         {{ rotatingThemeText(store.s.rotTheme) }}
-        <small class="mut" style="font-weight:400">· 下次轮换 {{ store.rotCd }}</small>
+        <small class="mut" style="font-weight:400">· 下次换主题 {{ store.rotCd }}</small>
       </div>
-      <div class="mut" style="margin:6px 0">本池仅出「{{ store.s.rotTheme ?? '—' }}」主题的桌游 · 与常驻池同一奖池表 · 50 抽保底 SR 及以上（与常驻池独立计数）</div>
+      <div class="mut" style="margin:6px 0">本池仅出「{{ store.s.rotTheme ?? '—' }}」主题的桌游 · 不出牌套 · 桌游 N60 / R30 / SR8 / SSR2 · 50 抽保底 SR 及以上（与常驻池独立计数）</div>
       <div>SR+ 保底进度：<b class="warn">{{ store.s.pityRot }} / {{ GACHA_PITY }}</b></div>
       <div v-if="store.s.rotTheme" class="mut" style="margin-top:8px;line-height:2">
         池内桌游：{{ rotatingPool(store.s.rotTheme).map(g => `${g.icon}${g.name}`).join('　') }}
@@ -88,7 +97,39 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
           <button :disabled="store.s.hiTickets < 10" @click="store.pullGachaTen('rot', 'hiTicket')">十连（🎟️10）</button>
         </template>
       </div>
-      <small>轮换池每 10 分钟换一个主题属性，仅能用金钱或高级券抽取；重复同样直接获得新实体。</small>
+      <small>桌游池每 10 分钟换一个主题属性，仅能用金钱或高级券抽取；重复同样直接获得新实体。</small>
+    </div>
+
+    <!-- ========== 精通池 ========== -->
+    <div v-else class="gacha-banner">
+      <div style="font-size:18px;font-weight:800;color:var(--gold)">🎯 某赏 · 精通池</div>
+      <div class="mut" style="margin:6px 0">
+        花费 {{ MASTER_POOL_SLEEVES }} 张牌套抽一次 · 范围为你已入手且未精通的桌游（当前 <b>{{ masterCount }}</b> 款）
+        · 概率 N60 / R30 / SR8 / SSR2 · 熟练度 N+{{ MASTER_PROF_GAIN.N }} / R+{{ MASTER_PROF_GAIN.R }} / SR+{{ MASTER_PROF_GAIN.SR }} / SSR+{{ MASTER_PROF_GAIN.SSR }}
+      </div>
+      <div class="mut" style="margin:6px 0">
+        抽到不获得新实体，直接加对应收藏的熟练值；若抽中的稀有度你已全部精通，则改为 +{{ MASTER_FALLBACK_SLEEVES }} 牌套。每次抽取独立确定奖池，十连可能让同一款熟练值溢出。
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button
+          class="primary"
+          :disabled="masterCount === 0 || store.s.sleeves < MASTER_POOL_SLEEVES"
+          @click="store.pullGacha('master', 'sleeves')"
+        >
+          单抽（🎴{{ MASTER_POOL_SLEEVES }}）
+        </button>
+        <button
+          v-if="tenUnlocked"
+          :disabled="masterCount === 0 || store.s.sleeves < MASTER_POOL_SLEEVES * 10"
+          @click="store.pullGachaTen('master', 'sleeves')"
+        >
+          十连（🎴{{ MASTER_POOL_SLEEVES * 10 }}）
+        </button>
+      </div>
+      <small v-if="masterCount && masterTargets.length <= 12" style="display:block;margin-top:8px;line-height:2">
+        池内：{{ masterTargets.map(g => `${g.icon}${g.name}`).join('　') }}
+      </small>
+      <small v-else-if="!masterCount">全部桌游均已精通，精通池已关闭。</small>
     </div>
 
     <!-- ========== 兑换高级券 ========== -->

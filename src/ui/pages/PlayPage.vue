@@ -8,13 +8,19 @@ import GameCard from '../components/GameCard.vue';
 const store = useGameStore();
 const ps = computed(() => store.session);
 
+/** 面板收起态：收起后只剩标题栏，不再遮挡下方的筛选与桌游列表 */
+const panelCollapsed = ref(false);
+watch(ps, (v, old) => {
+  if (v && !old) panelCollapsed.value = false; // 新开局自动展开
+});
+
 const ownedIds = computed(() =>
   Object.keys(store.s.collections).filter(
     id =>
       store.s.collections[id].firstOpened &&
       copiesOf(store.s, id).length > 0 &&
       (!store.playFilter || gameById(id).attrs.includes(store.playFilter)) &&
-      (!store.playTiredOnly || store.s.collections[id].fatigue >= 7) &&
+      (!store.playNotTiredOnly || store.s.collections[id].fatigue < 7) &&
       (!store.playUnmasteredOnly || !isMastered(store.s, id)),
   ),
 );
@@ -72,9 +78,15 @@ watch(
 
 <template>
   <div>
-    <!-- 游玩中：进度面板固定在页面顶部，选游戏列表在下方 -->
+    <!-- 游玩中：进度面板吸顶但可收起，选游戏列表在下方 -->
     <div v-if="ps" id="play-panel">
-      <h3 style="margin-top:0">{{ panelTitle }}</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3 style="margin:0">{{ panelTitle }}</h3>
+        <button style="padding:2px 10px;font-size:12px;flex-shrink:0" @click="panelCollapsed = !panelCollapsed">
+          {{ panelCollapsed ? '⤵ 展开面板' : '⤒ 收起面板' }}
+        </button>
+      </div>
+      <template v-if="!panelCollapsed">
       <div>
         <div v-for="(p, i) in ps.phases" :key="p.key" class="phase-row">
           <span class="plabel">{{ p.name }}</span>
@@ -112,12 +124,13 @@ watch(
         <button class="danger" @click="store.cancelPlay()">立即放弃本轮（无收益）</button>
         <small class="mut">连刷中：在下方列表点「下轮换它」即可在本轮结束后换游戏</small>
       </div>
+      </template>
     </div>
 
     <h2>选择一款桌游开玩</h2>
     <FilterBar
       v-model="store.playFilter"
-      v-model:tired-only="store.playTiredOnly"
+      v-model:not-tired-only="store.playNotTiredOnly"
       v-model:unmastered-only="store.playUnmasteredOnly"
     />
     <div v-if="fatigueUnlocked || masteryUnlocked" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -140,7 +153,7 @@ watch(
     </div>
 
     <div v-if="!ownedIds.length" class="mut">
-      {{ store.playFilter || store.playTiredOnly || store.playUnmasteredOnly ? '没有符合筛选的可玩桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}
+      {{ store.playFilter || store.playNotTiredOnly || store.playUnmasteredOnly ? '没有符合筛选的可玩桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}
     </div>
     <div v-else class="grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">

@@ -23,6 +23,8 @@ export interface Copy {
   durability: number;
   sleeved: boolean;
   stored: boolean;
+  /** 收藏架锁定：锁定的实体不可出售（含一键上架磨光件） */
+  locked?: boolean;
 }
 
 /** 离线期间单款桌游的自动游玩统计 */
@@ -153,6 +155,8 @@ export interface GameState {
   settings: {
     /** 连刷自动更换：关 / 疲劳后换 / 精通后换（两档互斥） */
     autoSwitch: 'off' | 'fatigue' | 'mastery';
+    /** 某鱼快速上架（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按行情价 100% 上架，不跳转 */
+    quickList: boolean;
   };
 }
 
@@ -197,7 +201,7 @@ export function defaultState(): GameState {
       pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
     },
     achievements: [],
-    settings: { autoSwitch: 'off' },
+    settings: { autoSwitch: 'off', quickList: false },
   };
 }
 

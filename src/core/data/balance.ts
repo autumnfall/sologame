@@ -38,9 +38,22 @@ export const GACHA_TABLE: readonly (
 /** 保底触发时 SR/SSR 的比例（与基础 3:1 一致） */
 export const GACHA_PITY_SSR_SHARE = 0.25;
 
-/** 轮换赏池：周期与单抽价（金钱，与常驻同价） */
+/** 桌游池（原轮换池）奖池：仅桌游，N60 / R30 / SR8 / SSR2 */
+export const GAME_POOL_TABLE: readonly { rarity: Rarity; p: number }[] = [
+  { rarity: 'N', p: 0.60 },
+  { rarity: 'R', p: 0.30 },
+  { rarity: 'SR', p: 0.08 },
+  { rarity: 'SSR', p: 0.02 },
+];
+
+/** 桌游池：周期与单抽价（金钱） */
 export const ROTATION_MS = 10 * 60 * 1000;
-export const ROTATION_PRICE = 100; // = GACHA_PRICE，这里独立常量避免循环依赖
+export const ROTATION_PRICE = 200;
+
+/** 精通池：单抽固定 200 张牌套；熟练奖励 N5/R10/SR20/SSR40；抽中稀有度全部已精通时改为 +100 牌套 */
+export const MASTER_POOL_SLEEVES = 200;
+export const MASTER_PROF_GAIN: Record<Rarity, number> = { N: 5, R: 10, SR: 20, SSR: 40 };
+export const MASTER_FALLBACK_SLEEVES = 100;
 
 /** 兑换：1 普通券 + 50 牌套 = 1 高级券 */
 export const HI_TICKET_SLEEVES = 50;

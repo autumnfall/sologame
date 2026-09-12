@@ -3,12 +3,12 @@ import { ATTR_ICON, ATTRS } from '../../core';
 import type { Attr } from '../../core';
 
 const props = withDefaults(
-  defineProps<{ modelValue: Attr | null; tiredOnly?: boolean; unmasteredOnly?: boolean }>(),
-  { tiredOnly: false, unmasteredOnly: false },
+  defineProps<{ modelValue: Attr | null; notTiredOnly?: boolean; unmasteredOnly?: boolean }>(),
+  { notTiredOnly: false, unmasteredOnly: false },
 );
 const emit = defineEmits<{
   'update:modelValue': [value: Attr | null];
-  'update:tiredOnly': [value: boolean];
+  'update:notTiredOnly': [value: boolean];
   'update:unmasteredOnly': [value: boolean];
 }>();
 
@@ -38,11 +38,11 @@ function chipStyle(on: boolean): Record<string, string> {
     <span style="width:1px;height:16px;background:var(--line);margin:0 4px"></span>
     <button
       style="padding:3px 10px;font-size:12px"
-      title="只看疲劳≥7（玩腻了）的收藏，可与属性筛选叠加"
-      :style="chipStyle(props.tiredOnly)"
-      @click="emit('update:tiredOnly', !props.tiredOnly)"
+      title="只看未玩腻（疲劳<7）的收藏，可与属性筛选叠加"
+      :style="chipStyle(props.notTiredOnly)"
+      @click="emit('update:notTiredOnly', !props.notTiredOnly)"
     >
-      😩 玩腻了的
+      😌 未玩腻的
     </button>
     <button
       style="padding:3px 10px;font-size:12px"

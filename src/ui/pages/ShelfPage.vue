@@ -30,7 +30,7 @@ const ownedIds = computed(() =>
     id =>
       store.s.collections[id].firstOpened &&
       (!store.shelfFilter || gameById(id).attrs.includes(store.shelfFilter)) &&
-      (!store.shelfTiredOnly || store.s.collections[id].fatigue >= 7) &&
+      (!store.shelfNotTiredOnly || store.s.collections[id].fatigue < 7) &&
       (!store.shelfUnmasteredOnly || !isMastered(store.s, id)),
   ),
 );
@@ -44,6 +44,15 @@ const sleeveAllable = computed(() =>
     return !!cards && cards > 0;
   }),
 );
+
+/** 某鱼快速上架（成就 30 个解锁） */
+const quickListUnlocked = computed(() => isFeatureUnlocked(store.s, 'quickList'));
+
+/** 收藏架「某鱼上架」：快速上架开启时直接按行情价 100% 上架，否则跳转某鱼出售区 */
+function sellCopy(c: { uid: number }) {
+  if (store.s.settings.quickList) store.listForSale(c.uid, 1.0);
+  else store.gotoSell(c.uid);
+}
 
 /** 实体序号：①②③…（超过 10 用 (11) 兜底） */
 function circled(i: number): string {
@@ -64,11 +73,19 @@ function copies(id: string) {
     <h2>收藏架 <small>{{ shelfCount }}</small></h2>
     <FilterBar
       v-model="store.shelfFilter"
-      v-model:tired-only="store.shelfTiredOnly"
+      v-model:not-tired-only="store.shelfNotTiredOnly"
       v-model:unmastered-only="store.shelfUnmasteredOnly"
     />
-    <div v-if="sleeveAllUnlocked" style="margin:0 0 10px">
-      <button :disabled="!sleeveAllable" @click="store.sleeveAllCopies()">🎴 一键套牌套（逐盒扣牌套）</button>
+    <div v-if="sleeveAllUnlocked || quickListUnlocked" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button v-if="sleeveAllUnlocked" :disabled="!sleeveAllable" @click="store.sleeveAllCopies()">🎴 一键套牌套</button>
+      <button
+        v-if="quickListUnlocked"
+        :class="{ primary: store.s.settings.quickList }"
+        @click="store.toggleQuickList()"
+      >
+        {{ store.s.settings.quickList ? '✓ ' : '' }}🐟 某鱼快速上架
+      </button>
+      <small v-if="store.s.settings.quickList" class="mut">开启中：点「某鱼上架」直接按行情价 100% 上架，不再跳转</small>
     </div>
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
     <div v-else class="grid">
@@ -94,7 +111,7 @@ function copies(id: string) {
           >
             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
               <span>
-                <b>实体{{ circled(i) }}</b> · {{ conditionText(c.durability, gameById(id).rarity) }}
+                <b>实体{{ circled(i) }}</b>{{ c.locked ? ' 🔒已锁定' : '' }} · {{ conditionText(c.durability, gameById(id).rarity) }}
                 {{ c.sleeved ? '🎴已套(×0.85)' : (gameById(id).cards ? `🎴未套（需 ${gameById(id).cards} 张）` : '🎴无卡牌') }}
                 {{ canStore(gameById(id)) ? (c.stored ? '📦已收纳(Setup×0.5·磨损×0.75)' : '📦未收纳') : '' }}
               </span>
@@ -113,7 +130,8 @@ function copies(id: string) {
                 >
                   收纳 ¥{{ storageCost(gameById(id)) }}
                 </button>
-                <button @click="store.gotoSell(c.uid)">某鱼上架</button>
+                <button @click="store.toggleCopyLock(c.uid)">{{ c.locked ? '🔓 解锁' : '🔒 锁定' }}</button>
+                <button v-if="!c.locked" @click="sellCopy(c)">某鱼上架</button>
               </span>
             </div>
             <div class="bar" title="耐久">
