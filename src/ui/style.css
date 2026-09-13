@@ -88,6 +88,7 @@ small{color:var(--dim)}
 .gacha-banner{background:linear-gradient(135deg,#3a2c14,#241d12);border:1px solid var(--gold);border-radius:10px;padding:18px;text-align:center;margin-bottom:14px}
 /* 浮动提示 */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2b241b;border:1px solid var(--gold);color:var(--txt);padding:10px 20px;border-radius:8px;z-index:200;box-shadow:0 4px 20px #000}
+#pwa-update{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--gold);color:var(--txt);padding:10px 16px;border-radius:10px;z-index:210;box-shadow:0 4px 20px #000}
 .mut{color:var(--dim)} .ok{color:var(--green)} .warn{color:#e8a13c} .bad2{color:var(--red)}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.two-col{grid-template-columns:1fr}}

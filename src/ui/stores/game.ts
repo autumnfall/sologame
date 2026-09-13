@@ -167,6 +167,8 @@ export const useGameStore = defineStore('game', {
     pendingCopyPick: null as string | null,
     /** 收藏架「某鱼上架」跳转时预选的要上架实体 uid */
     sellPickUid: null as number | null,
+    /** PWA 新版本就绪后的刷新回调（null = 无更新） */
+    pwaUpdate: null as null | (() => Promise<void>),
   }),
   getters: {
     /** 离线时长文本（总结弹窗用） */
@@ -218,15 +220,23 @@ export const useGameStore = defineStore('game', {
       } else {
         if (!this.s.xyNext) this.s.xyNext = Date.now() + XY_REFRESH_MS;
         if (!this.s.xianyuBuys.length) refreshXianyu(this.s, false);
-        const away = Date.now() - this.s.lastSeen;
-        if (away > 60000) {
-          accumulateOffline(this.s, away);
-          const b = this.s.offlineBank;
-          if (b.workMoney > 0 || b.playRounds > 0) this.showOffline = true;
-        }
+        this.settleAway();
       }
       this.lastTick = 0;
       this.secAcc = 0;
+    },
+
+    /**
+     * 离屏结算：离开超过 1 分钟回来即累积离线收益并弹总结。
+     * boot（重进页面）与 PWA 切后台回前台（visibilitychange，页面没死不会重走 boot）共用。
+     */
+    settleAway() {
+      const away = Date.now() - this.s.lastSeen;
+      if (away <= 60000) return;
+      accumulateOffline(this.s, away);
+      const b = this.s.offlineBank;
+      if (b.workMoney > 0 || b.playRounds > 0) this.showOffline = true;
+      this.saveGame(); // 落档同时刷新 lastSeen，避免重复结算
     },
 
     /** 每帧推进（rAF 主循环）：play session + 每秒 tick */

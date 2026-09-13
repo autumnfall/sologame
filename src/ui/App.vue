@@ -25,6 +25,19 @@ function loop(now: number) {
 
 const onUnload = () => store.saveGame();
 
+// 切后台立即存档，回前台补离线结算（PWA/手机端切后台页面仍存活，不会触发 boot）
+const onVis = () => {
+  if (document.hidden) store.saveGame();
+  else store.settleAway();
+};
+
+// PWA 新版本刷新
+const applyUpdate = () => {
+  const f = store.pwaUpdate;
+  store.pwaUpdate = null;
+  f?.();
+};
+
 // 状态栏+标签页吸顶高度写入 --topbar-h，供 #play-panel 的 sticky top 避让
 function syncTopbarH() {
   const el = document.getElementById('topbar');
@@ -50,6 +63,7 @@ onMounted(() => {
   window.addEventListener('beforeunload', onUnload);
   window.addEventListener('keydown', onKey);
   window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', onVis);
 });
 
 onUnmounted(() => {
@@ -58,6 +72,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', onUnload);
   window.removeEventListener('keydown', onKey);
   window.removeEventListener('resize', onResize);
+  document.removeEventListener('visibilitychange', onVis);
 });
 </script>
 
@@ -75,4 +90,8 @@ onUnmounted(() => {
   <OfflineModal />
   <PrestigeSetupModal />
   <Toast />
+  <div v-if="store.pwaUpdate" id="pwa-update">
+    <span>🎉 发现新版本</span>
+    <button class="primary" @click="applyUpdate">刷新更新</button>
+  </div>
 </template>
