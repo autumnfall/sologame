@@ -52,6 +52,11 @@ export function taobaoPrice(state: GameState, g: Game): number {
   return Math.max(1, Math.round(taobaoBase(g) * (1 - 0.05 * perkLv(state, 'tbDiscount'))));
 }
 
+/** 出售槽位上限：基础 5；商路亨通（商业线封顶）解锁到 8 */
+export function sellSlotsMax(state: GameState): number {
+  return perkLv(state, 'sellHaste') > 0 ? 8 : 5;
+}
+
 /** 时机条金色区宽度（基础 14%，洞察每级 +2%，上限 40%） */
 export function goldZoneWidth(state: GameState): number {
   return Math.min(40, 14 + 2 * attrLevel(state, '洞察'));

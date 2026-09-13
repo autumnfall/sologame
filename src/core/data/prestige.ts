@@ -78,7 +78,7 @@ export const PERKS: readonly PerkDef[] = [
   { id: 'sellboost', key: 'sellBoost', branch: 'commerce', name: '好口碑', desc: '每级：某鱼成交率 +10%', max: 3, base: 4, step: 3, after: 'sellslot' },
   { id: 'tbdiscount', key: 'tbDiscount', branch: 'commerce', name: '会员折扣', desc: '每级：某宝价格 -5%', max: 3, base: 4, step: 3, after: 'sellboost' },
   { id: 'ticketup', key: 'ticketUp', branch: 'commerce', name: '欧气满满', desc: '每级：抽赏券掉落率 +25%', max: 2, base: 4, step: 4, after: 'tbdiscount' },
-  { id: 'hustle', key: 'sellHaste', branch: 'commerce', name: '商路亨通', desc: '某鱼挂售成交判定提速一倍（30 秒 → 15 秒）；新周目起始出售槽位 +3', max: 1, base: 15, step: 0, after: 'ticketup' },
+  { id: 'hustle', key: 'sellHaste', branch: 'commerce', name: '商路亨通', desc: '某鱼挂售成交判定提速一倍（30 秒 → 15 秒）；新周目起始出售槽位 +3，且出售槽位上限 5 → 8（未点此天赋金钱最高只能扩到 5）', max: 1, base: 15, step: 0, after: 'ticketup' },
 ];
 
 const PERK_MAP = new Map(PERKS.map(p => [p.id, p]));

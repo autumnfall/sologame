@@ -1,10 +1,10 @@
-import { TAOBAO_STOCK, SELL_SLOT_COSTS, MARKET_SLOT_COSTS, SELL_SLOTS_MAX, MARKET_SLOTS_MAX, SELL_PRICE_MIN, SELL_PRICE_MAX, STORE_WEAR_ONCE, copyValue } from '../data/balance';
+import { TAOBAO_STOCK, SELL_SLOT_COSTS, MARKET_SLOT_COSTS, MARKET_SLOTS_MAX, SELL_PRICE_MIN, SELL_PRICE_MAX, STORE_WEAR_ONCE, copyValue } from '../data/balance';
 import { gameById, gamesByRarity, nextTier, REGULAR_GAMES } from '../data/games';
 import type { GameState } from '../state';
 import { copyByUid } from '../state';
 import { tierOwned, tierUnlocked } from '../mechanics/collection';
 import { storageCost, canStore } from '../mechanics/play';
-import { sellFeeRate, taobaoPrice } from '../mechanics/economy';
+import { sellFeeRate, sellSlotsMax, taobaoPrice } from '../mechanics/economy';
 import { perkLevel, perkLv } from '../mechanics/prestige';
 import { acquireGame } from './acquire';
 import type { AcquireResult } from './acquire';
@@ -29,8 +29,8 @@ export function pickStarter(state: GameState, id: string, rng: () => number = Ma
   state.started = true;
   // 天赋的开局加成在此结算：转生后、开新周目前购买的天赋同样生效（不会与转生结算重复）
   state.money += 300 * perkLv(state, 'fund');
-  // 起始槽位 = 1 + 老主顾 + 商路亨通(+3)，扩槽仍可花钱到 SELL_SLOTS_MAX
-  state.sellSlots = Math.min(SELL_SLOTS_MAX, 1 + perkLv(state, 'sellSlot') + 3 * perkLv(state, 'sellHaste'));
+  // 起始槽位 = 1 + 老主顾 + 商路亨通(+3)，扩槽上限受 sellSlotsMax 限制（未点商路亨通最高 5）
+  state.sellSlots = Math.min(sellSlotsMax(state), 1 + perkLv(state, 'sellSlot') + 3 * perkLv(state, 'sellHaste'));
   const gifts: string[] = [];
   for (let i = 0; i < perkLevel(state, 'gift'); i++) {
     const pool = REGULAR_GAMES.filter(g => !state.collections[g.id]?.firstOpened);
@@ -181,10 +181,12 @@ export function unlistCopy(state: GameState, uid: number): ActionResult {
   return ok('已下架');
 }
 
-/** 扩充出售槽位（1→5） */
+/** 扩充出售槽位（1→5，商路亨通解锁后可达 8） */
 export function expandSellSlots(state: GameState): ActionResult {
   const i = state.sellSlots - 1; // 当前槽位 1 对应下标 0
-  if (state.sellSlots >= SELL_SLOTS_MAX) return fail('出售槽位已达上限');
+  if (state.sellSlots >= sellSlotsMax(state)) {
+    return fail(perkLv(state, 'sellHaste') > 0 ? '出售槽位已达上限' : '出售槽位已达上限（商路亨通天赋可解锁至 8 个）');
+  }
   const cost = SELL_SLOT_COSTS[i];
   if (state.money < cost) return fail(`钱不够（需要 ¥${cost}）`);
   state.money -= cost;

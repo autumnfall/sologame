@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GACHA_PITY, MASTERY, PERKS, SAVE_VERSION, XY_SELL_MS,
-  autoHitChance, buyPerk, canPrestige, defaultState, doPrestige, expMult, fatigueIncMult, gachaDraw, gameById,
+  autoHitChance, buyPerk, canPrestige, defaultState, doPrestige, expandSellSlots, expMult, fatigueIncMult, gachaDraw, gameById,
   insightGain, insightSpent, isMastered, listCopy, makeRunRecord, masteredCount, mergeBoard, parseSave, perkCost, perkDefById,
   perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, recordLocalRun, respecPerks, taobaoPrice,
   masteryText, tickXianyu,
@@ -311,6 +311,19 @@ describe('天赋树：封顶天赋', () => {
     s.prestige.perks['hustle'] = 1;
     pickStarter(s, 'guoyuan');
     expect(s.sellSlots).toBe(6); // 1 + 2 + 3
+  });
+
+  it('商路亨通：未点天赋金钱扩槽上限 5，点了才可继续到 8', () => {
+    const s = defaultState();
+    s.money = 99999;
+    for (let i = 0; i < 4; i++) expect(expandSellSlots(s).ok).toBe(true);
+    expect(s.sellSlots).toBe(5);
+    const r = expandSellSlots(s);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('商路亨通');
+    s.prestige.perks['hustle'] = 1;
+    expect(expandSellSlots(s).ok).toBe(true);
+    expect(s.sellSlots).toBe(6);
   });
 });
 

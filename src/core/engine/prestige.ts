@@ -1,7 +1,7 @@
-import { SELL_SLOTS_MAX } from '../data/balance';
 import { perkDefById } from '../data/prestige';
 import { defaultState } from '../state';
 import type { GameState } from '../state';
+import { sellSlotsMax } from '../mechanics/economy';
 import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, perkPrereqMet, prestigeUnlockCount } from '../mechanics/prestige';
 
 export interface PrestigeResult {
@@ -56,7 +56,7 @@ export function buyPerk(state: GameState, id: string): { ok: boolean; reason?: s
   if (state.prestige.insight < cost) return { ok: false, reason: `阅历不够（需要 ${cost}）` };
   state.prestige.insight -= cost;
   state.prestige.perks[id] = lv + 1;
-  if (def.key === 'sellSlot') state.sellSlots = Math.min(SELL_SLOTS_MAX, state.sellSlots + 1);
+  if (def.key === 'sellSlot') state.sellSlots = Math.min(sellSlotsMax(state), state.sellSlots + 1);
   return { ok: true };
 }
 

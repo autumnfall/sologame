@@ -6,7 +6,6 @@ import {
   SELL_PRICE_MAX,
   SELL_PRICE_MIN,
   SELL_SLOT_COSTS,
-  SELL_SLOTS_MAX,
   conditionText,
   copyByUid,
   copyValue,
@@ -15,6 +14,7 @@ import {
   isFeatureUnlocked,
   marketItemValue,
   sellChance,
+  sellSlotsMax,
 } from '../../../core';
 import type { Copy } from '../../../core';
 import { useGameStore } from '../../stores/game';
@@ -89,7 +89,7 @@ const sellOdds = computed(() =>
 );
 
 const sellCost = computed(() =>
-  store.s.sellSlots >= SELL_SLOTS_MAX ? null : SELL_SLOT_COSTS[store.s.sellSlots - 1],
+  store.s.sellSlots >= sellSlotsMax(store.s) ? null : SELL_SLOT_COSTS[store.s.sellSlots - 1],
 );
 const marketCost = computed(() =>
   store.s.marketSlots >= MARKET_SLOTS_MAX ? null : MARKET_SLOT_COSTS[store.s.marketSlots - 3],
