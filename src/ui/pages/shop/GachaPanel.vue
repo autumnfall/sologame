@@ -54,7 +54,7 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
       <div class="mut" style="margin:6px 0">牌套 30%（4包）/ 15%（10包）/ 5%（20包）· 桌游 N30 / R15 / SR4 / SSR1 · 50 抽保底 SR 及以上</div>
       <div>SR+ 保底进度：<b class="warn">{{ store.s.pity }} / {{ GACHA_PITY }}</b></div>
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <button class="primary" @click="store.pullGacha('perm', 'money')">单抽（¥{{ GACHA_PRICE }}）</button>
+        <button class="primary" :disabled="store.s.money < GACHA_PRICE" @click="store.pullGacha('perm', 'money')">单抽（¥{{ GACHA_PRICE }}）</button>
         <button class="primary" :disabled="store.s.tickets < 1" @click="store.pullGacha('perm', 'ticket')">
           用抽赏券 ×1 抽（🎫{{ store.s.tickets }}）
         </button>
@@ -80,7 +80,7 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button
           class="primary"
-          :disabled="!store.s.rotTheme"
+          :disabled="!store.s.rotTheme || store.s.money < ROTATION_PRICE"
           @click="store.pullGacha('rot', 'money')"
         >
           单抽（¥{{ ROTATION_PRICE }}）
