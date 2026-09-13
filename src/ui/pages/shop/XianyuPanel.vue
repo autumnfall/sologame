@@ -13,7 +13,7 @@ import {
   gainText,
   isFeatureUnlocked,
   marketItemValue,
-  sellChance,
+  sellChanceFinal,
   sellSlotsMax,
 } from '../../../core';
 import type { Copy } from '../../../core';
@@ -85,7 +85,7 @@ function listedPrice(c: Copy, mult: number): number {
 
 const sellPrice = computed(() => (sellCopy.value ? listedPrice(sellCopy.value, priceMult.value) : 0));
 const sellOdds = computed(() =>
-  sellCopy.value ? sellChance(priceMult.value, sellCopy.value.durability, gameById(sellCopy.value.gameId).rarity) : 0,
+  sellCopy.value ? sellChanceFinal(store.s, priceMult.value, sellCopy.value.durability, gameById(sellCopy.value.gameId).rarity) : 0,
 );
 
 const sellCost = computed(() =>
@@ -112,7 +112,7 @@ const listingRows = computed(() =>
       uid: l.copyUid,
       label: copyLabel(c),
       price: l.price,
-      odds: sellChance(l.price / value, c.durability, g.rarity),
+      odds: sellChanceFinal(store.s, l.price / value, c.durability, g.rarity),
     };
   }),
 );

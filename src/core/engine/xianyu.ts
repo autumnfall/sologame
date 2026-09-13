@@ -2,7 +2,7 @@ import { XY_REFRESH_MS, XY_SELL_MS } from '../data/constants';
 import { DURABILITY, copyValue, sellChance } from '../data/balance';
 import { XY_REFRESH_COST } from '../data/prices';
 import { GAMES, REGULAR_GAMES, gameById } from '../data/games';
-import type { Game } from '../data/types';
+import type { Game, Rarity } from '../data/types';
 import type { GameState, MarketItem } from '../state';
 import { copyByUid } from '../state';
 import { isMastered } from '../mechanics/collection';
@@ -110,6 +110,14 @@ export interface XianyuTickResult {
 }
 
 /**
+ * 某鱼成交率（含好口碑天赋加成，封顶 100%）：
+ * 挂售判定与「预计成交率」展示共用此函数，保证看见的就是掷骰用的。
+ */
+export function sellChanceFinal(state: GameState, ratio: number, durability: number, rarity: Rarity): number {
+  return Math.min(1, sellChance(ratio, durability, rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
+}
+
+/**
  * 某鱼计时（两个独立时钟）：
  * 1) 货源刷新：xyNext 到点自动刷新（5 分钟）；
  * 2) 成交判定：xySellNext 每 30 秒对每件上架商品按「定价倍率 × 成色」掷一次骰
@@ -140,7 +148,7 @@ export function tickXianyu(
       }
       const g = gameById(copy.gameId);
       const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
-      const chance = Math.min(1, sellChance(l.price / value, copy.durability, g.rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
+      const chance = sellChanceFinal(state, l.price / value, copy.durability, g.rarity);
       if (rng() < chance) {
         const gain = Math.round(l.price * (1 - sellFeeRate(state)));
         state.money += gain;
