@@ -1,4 +1,5 @@
 import type { GameState, RunRecord } from '../state';
+import { totalInsight } from '../mechanics/prestige';
 
 /** 本地榜容量 */
 export const LOCAL_BOARD_SIZE = 10;
@@ -6,6 +7,7 @@ export const LOCAL_BOARD_SIZE = 10;
 /**
  * 构造一条周目完成记录：调用时机为 doPrestige 已结算之后
  *（runs/insight 已含本次转生增量，runStartedAt 仍是本周目开局时间——doPrestige 会重置它，需先快照）。
+ * insight 记总阅历（剩余 + 已投入，封顶点满所有天赋所需），而非剩余阅历。
  */
 export function makeRunRecord(
   state: GameState,
@@ -15,7 +17,7 @@ export function makeRunRecord(
     name: state.playerName.trim().slice(0, 24),
     ms: Math.max(0, opts.finishedAt - opts.startedAt),
     runs: state.prestige.runs,
-    insight: state.prestige.insight,
+    insight: totalInsight(state),
     achievements: state.achievements.length,
     at: opts.finishedAt,
     clientId: state.clientId,

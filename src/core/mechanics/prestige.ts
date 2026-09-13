@@ -46,6 +46,18 @@ export function insightSpent(state: GameState): number {
   return n;
 }
 
+/** 点满当前所有天赋所需阅历总和（总阅历的展示上限） */
+export function maxInsightTotal(): number {
+  let n = 0;
+  for (const p of PERKS) for (let i = 0; i < p.max; i++) n += perkCost(p, i);
+  return n;
+}
+
+/** 总阅历 = 剩余 + 已投入，封顶为点满所有天赋所需（排行榜记录用） */
+export function totalInsight(state: GameState): number {
+  return Math.min(maxInsightTotal(), state.prestige.insight + insightSpent(state));
+}
+
 /** 已精通桌游数（遍历游戏清单而非存档键，天然兼容清单增删） */
 export function masteredCount(state: GameState): number {
   return GAMES.filter(g => isMastered(state, g.id)).length;

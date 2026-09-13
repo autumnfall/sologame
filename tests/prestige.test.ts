@@ -4,7 +4,7 @@ import {
   autoHitChance, buyPerk, canPrestige, defaultState, doPrestige, expandSellSlots, expMult, fatigueIncMult, gachaDraw, gameById,
   insightGain, insightSpent, isMastered, listCopy, makeRunRecord, mergeBoard, parseSave, perkCost, perkDefById,
   perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, recordLocalRun, respecPerks, taobaoPrice,
-  masteryText, tickXianyu,
+  masteryText, tickXianyu, totalInsight, maxInsightTotal,
 } from '../src/core';
 import { expToReach, lcg, own } from './helpers';
 import type { GameState } from '../src/core';
@@ -202,19 +202,30 @@ describe('转生：存档迁移', () => {
 });
 
 describe('转生：周目成绩记录（本地/在线排行榜）', () => {
-  it('makeRunRecord：耗时 = 完成 - 开局，数据取转生结算后的周目数/阅历/成就', () => {
+  it('makeRunRecord：耗时 = 完成 - 开局；阅历记总阅历（剩余+已投入）而非剩余', () => {
     const s = stateWithEightMastered();
     s.playerName = '  测试玩家  ';
     s.achievements = ['a1', 'a2', 'a3'];
     s.runStartedAt = 1_000_000;
+    s.prestige.perks['fund'] = 1; // 已投入 2 点
     expect(doPrestige(s).ok).toBe(true);
     const rec = makeRunRecord(s, { startedAt: 1_000_000, finishedAt: 4_600_000 });
     expect(rec.name).toBe('测试玩家');
     expect(rec.ms).toBe(3_600_000);
     expect(rec.runs).toBe(1);
-    expect(rec.insight).toBe(10);
+    expect(rec.insight).toBe(12); // 剩余 10 + 已投入 2
     expect(rec.achievements).toBe(3);
     expect(rec.clientId).toBe(s.clientId);
+  });
+
+  it('totalInsight：剩余 + 已投入，封顶为点满所有天赋所需', () => {
+    const s = defaultState();
+    s.prestige.insight = 100;
+    expect(totalInsight(s)).toBe(100);
+    s.prestige.perks['fund'] = 2; // 投入 2+3=5
+    expect(totalInsight(s)).toBe(105);
+    s.prestige.insight = 99999;
+    expect(totalInsight(s)).toBe(maxInsightTotal()); // 封顶（当前天赋表 = 299）
   });
 
   it('recordLocalRun：按耗时升序，只保留前 10 条', () => {
