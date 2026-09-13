@@ -21,9 +21,9 @@ export function expMult(state: GameState): number {
     * Math.pow(1.1, perkLv(state, 'expAll')) * achievementExpMult(state);
 }
 
-/** 疲劳增长倍率（沉浸 × 科学作息，下限 ×0.60） */
+/** 疲劳增长倍率（沉浸先过 0.60 地板，科学作息在地板之后再乘——永远生效） */
 export function fatigueIncMult(state: GameState): number {
-  return Math.max(0.60, (1 - 0.04 * attrLevel(state, '沉浸' as Attr)) * Math.pow(0.9, perkLv(state, 'fatigueCut')));
+  return Math.max(0.60, 1 - 0.04 * attrLevel(state, '沉浸' as Attr)) * Math.pow(0.9, perkLv(state, 'fatigueCut'));
 }
 
 /** 某鱼价格倍率（运筹砍价，下限 ×0.80） */
@@ -55,6 +55,11 @@ export function taobaoPrice(state: GameState, g: Game): number {
 /** 时机条金色区宽度（基础 14%，洞察每级 +2%，上限 40%） */
 export function goldZoneWidth(state: GameState): number {
   return Math.min(40, 14 + 2 * attrLevel(state, '洞察'));
+}
+
+/** 心流自动命中概率：基础 20%，金区宽度每 +2%（洞察 1 级）再 +1%，上限 33% */
+export function autoHitChance(state: GameState): number {
+  return Math.min(0.33, 0.20 + Math.max(0, goldZoneWidth(state) - 14) * 0.005);
 }
 
 /**

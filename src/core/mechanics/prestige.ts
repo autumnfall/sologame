@@ -29,6 +29,12 @@ export function perkCost(def: PerkDef, curLv: number): number {
   return def.base + def.step * curLv;
 }
 
+/** 前置是否满足：无前置 = 线首永远可点；否则需前置天赋 ≥1 级 */
+export function perkPrereqMet(state: GameState, def: PerkDef): boolean {
+  if (!def.after) return true;
+  return perkLevel(state, def.after) >= 1;
+}
+
 /** 已投入的阅历总额（洗点返还；跳过未知天赋 id，兼容旧档脏数据） */
 export function insightSpent(state: GameState): number {
   let n = 0;

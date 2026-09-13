@@ -125,10 +125,12 @@ export function tickXianyu(
     const r = refreshXianyu(state, false, rng, now);
     result.refreshed = r.ok;
   }
+  // 商路亨通：成交判定提速一倍（30 秒 → 15 秒）
+  const sellCd = XY_SELL_MS / (perkLv(state, 'sellHaste') > 0 ? 2 : 1);
   if (!state.xySellNext) {
-    state.xySellNext = now + XY_SELL_MS; // 判定时钟未初始化：本 tick 只武装不判定
+    state.xySellNext = now + sellCd; // 判定时钟未初始化：本 tick 只武装不判定
   } else if (now >= state.xySellNext) {
-    state.xySellNext = now + XY_SELL_MS;
+    state.xySellNext = now + sellCd;
     for (let i = state.listings.length - 1; i >= 0; i--) {
       const l = state.listings[i];
       const copy = copyByUid(state, l.copyUid);

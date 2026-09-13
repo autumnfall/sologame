@@ -2,7 +2,7 @@ import { SELL_SLOTS_MAX } from '../data/balance';
 import { perkDefById } from '../data/prestige';
 import { defaultState } from '../state';
 import type { GameState } from '../state';
-import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, prestigeUnlockCount } from '../mechanics/prestige';
+import { canPrestige, insightGain, insightSpent, perkCost, perkLevel, perkPrereqMet, prestigeUnlockCount } from '../mechanics/prestige';
 
 export interface PrestigeResult {
   ok: boolean;
@@ -44,9 +44,12 @@ export function doPrestige(state: GameState): PrestigeResult {
   return { ok: true, gain };
 }
 
-/** 购买天赋（阅历支付；老主顾当周目立即 +1 出售槽位） */
+/** 购买天赋（阅历支付；老主顾当周目立即 +1 出售槽位）；同线链式：需前置天赋 ≥1 级 */
 export function buyPerk(state: GameState, id: string): { ok: boolean; reason?: string } {
   const def = perkDefById(id);
+  if (!perkPrereqMet(state, def)) {
+    return { ok: false, reason: `需先学习前置天赋「${perkDefById(def.after!).name}」1 级` };
+  }
   const lv = perkLevel(state, id);
   if (lv >= def.max) return { ok: false, reason: '已满级' };
   const cost = perkCost(def, lv);

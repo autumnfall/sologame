@@ -91,7 +91,7 @@ describe('价格派生', () => {
     expect(GACHA_PITY).toBe(50);
     expect(TAOBAO_STOCK).toEqual({ N: 4, R: 3, SR: 2, SSR: 1 });
     expect(XY_REFRESH_COST).toBe(20);
-    expect(SELL_SLOT_COSTS).toEqual([60, 60, 60, 60]);
+    expect(SELL_SLOT_COSTS).toEqual([60, 60, 60, 60, 80, 100, 120]); // 上限 8：前 4 级 ¥60，后 3 级递增
     expect(MARKET_SLOT_COSTS).toEqual([50, 50, 50, 50]);
   });
 

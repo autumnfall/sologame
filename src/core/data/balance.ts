@@ -73,13 +73,13 @@ export const SELL_FEE = 0.05;
 /** 离线收益折算比例（离线只按 50% 计入 bank，上限 1 小时不变） */
 export const OFFLINE_RATE = 0.5;
 
-/** 出售槽位扩充价格：扩到 2/3/4/5 个（初始 1 个，上限 5） */
-export const SELL_SLOT_COSTS: readonly number[] = [60, 60, 60, 60];
+/** 出售槽位扩充价格：扩到 2~8 个（初始 1 个；前 4 级 ¥60，后 3 级递增） */
+export const SELL_SLOT_COSTS: readonly number[] = [60, 60, 60, 60, 80, 100, 120];
 
 /** 市场刷新商品数扩充价格：扩到 4/5/6/7 件（初始 3 件，上限 7） */
 export const MARKET_SLOT_COSTS: readonly number[] = [50, 50, 50, 50];
 
-export const SELL_SLOTS_MAX = 5;
+export const SELL_SLOTS_MAX = 8;
 export const MARKET_SLOTS_MAX = 7;
 
 /** 市场上架定价范围（相对实体总价值） */

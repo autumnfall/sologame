@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GACHA_PITY, MASTERY, SAVE_VERSION,
-  buyPerk, canPrestige, defaultState, doPrestige, expMult, gachaDraw, gameById,
-  insightGain, insightSpent, makeRunRecord, masteredCount, mergeBoard, parseSave, perkCost, perkDefById,
+  GACHA_PITY, MASTERY, PERKS, SAVE_VERSION, XY_SELL_MS,
+  autoHitChance, buyPerk, canPrestige, defaultState, doPrestige, expMult, fatigueIncMult, gachaDraw, gameById,
+  insightGain, insightSpent, isMastered, listCopy, makeRunRecord, masteredCount, mergeBoard, parseSave, perkCost, perkDefById,
   perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, recordLocalRun, respecPerks, taobaoPrice,
+  masteryText, tickXianyu,
 } from '../src/core';
-import { lcg, own } from './helpers';
+import { expToReach, lcg, own } from './helpers';
 import type { GameState } from '../src/core';
 
 /** 前 8 款 N 档常规款（精通权重各 1） */
@@ -241,5 +242,84 @@ describe('转生：周目成绩记录（本地/在线排行榜）', () => {
       { name: 'c', ms: 1000, runs: 1, insight: 0, achievements: 0, at: 4 },
     ], 10);
     expect(merged.map(r => r.ms)).toEqual([1000, 3000, 4000]);
+  });
+});
+
+describe('天赋树：链式解锁', () => {
+  it('前置未满足拒绝购买并给出提示；线首永远可点', () => {
+    const s = defaultState();
+    s.prestige.insight = 100;
+    expect(buyPerk(s, 'gift').ok).toBe(false); // 需先点启动资金
+    expect(buyPerk(s, 'gift').reason).toContain('启动资金');
+    expect(buyPerk(s, 'flow').ok).toBe(false); // 效率线链尾需整条链
+    expect(buyPerk(s, 'fund').ok).toBe(true); // 各线线首无前置
+    expect(buyPerk(s, 'expall').ok).toBe(true);
+    expect(buyPerk(s, 'sellslot').ok).toBe(true);
+    expect(buyPerk(s, 'gift').ok).toBe(true); // 前置 1 级即可（不要求满级）
+  });
+
+  it('PERKS 链完整性：after 引用存在且不成环，各线仅线首无前置', () => {
+    for (const p of PERKS) {
+      if (p.after) expect(perkDefById(p.after).branch).toBe(p.branch); // 前置必须同线
+    }
+    for (const b of ['collect', 'efficiency', 'commerce'] as const) {
+      const line = PERKS.filter(p => p.branch === b);
+      expect(line.filter(p => !p.after)).toHaveLength(1); // 每条线恰好一个线首
+      // 从线首出发能遍历整条链（顺序即数组顺序）
+      for (let i = 1; i < line.length; i++) expect(line[i].after).toBe(line[i - 1].id);
+    }
+  });
+});
+
+describe('天赋树：封顶天赋', () => {
+  it('收藏家之眼：精通门槛 -20%，isMastered/masteryText 同步生效', () => {
+    const s = defaultState();
+    own(s, 'guoyuan', { prof: 16 });
+    own(s, 'mofa', { prof: 128 }); // SSR 160 → 128
+    own(s, 'lingji'); // 仅开箱的 SSR，用于文案断言
+    expect(isMastered(s, 'guoyuan')).toBe(false);
+    expect(isMastered(s, 'mofa')).toBe(false);
+    s.prestige.perks['masteryeye'] = 1;
+    expect(isMastered(s, 'guoyuan')).toBe(true);
+    expect(isMastered(s, 'mofa')).toBe(true);
+    expect(masteryText(s, gameById('guoyuan'))).toContain('已精通');
+    expect(masteryText(s, gameById('lingji'))).toContain('/128'); // SSR 显示门槛
+  });
+
+  it('心流：基础 20%，洞察每级 +1%，33% 封顶', () => {
+    const s = defaultState();
+    expect(autoHitChance(s)).toBeCloseTo(0.20);
+    s.attrExp['洞察'] = expToReach(10); // 金区 14→34：洞察 10 级 +10%
+    expect(autoHitChance(s)).toBeCloseTo(0.30);
+    s.attrExp['洞察'] = expToReach(30); // 金区已封 40 顶：+26 宽度 → +13%
+    expect(autoHitChance(s)).toBeCloseTo(0.33);
+  });
+
+  it('商路亨通：挂售判定间隔减半（30s → 15s）', () => {
+    const s = defaultState();
+    const c = own(s, 'guoyuan');
+    expect(listCopy(s, c.uid, 0.5).ok).toBe(true);
+    s.prestige.perks['hustle'] = 1;
+    s.xySellNext = 1;
+    tickXianyu(s, () => 0.3, 100);
+    expect(s.xySellNext).toBe(100 + XY_SELL_MS / 2);
+  });
+
+  it('商路亨通：新周目起始出售槽位 +3（与老主顾叠加，封顶 8）', () => {
+    const s = defaultState();
+    s.prestige.perks['sellslot'] = 2;
+    s.prestige.perks['hustle'] = 1;
+    pickStarter(s, 'guoyuan');
+    expect(s.sellSlots).toBe(6); // 1 + 2 + 3
+  });
+});
+
+describe('天赋与属性叠加', () => {
+  it('科学作息改为地板之后生效：沉浸到 0.60 下限后天赋依然叠乘', () => {
+    const s = defaultState();
+    s.attrExp['沉浸'] = expToReach(10); // 沉浸 10 级：attr 部分触 0.60 地板
+    expect(fatigueIncMult(s)).toBeCloseTo(0.60);
+    s.prestige.perks['fatigue'] = 3;
+    expect(fatigueIncMult(s)).toBeCloseTo(0.60 * 0.9 ** 3); // 0.4374：不再被地板吃掉
   });
 });

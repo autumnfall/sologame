@@ -1,5 +1,5 @@
 import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
-import { DURABILITY } from '../data/balance';
+import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { gameById } from '../data/games';
 import { defaultState, genClientId } from '../state';
@@ -276,7 +276,7 @@ function normalize(data: Record<string, unknown>): GameState {
     taobaoStock: (isRecord(data.taobaoStock) ? data.taobaoStock : {}) as GameState['taobaoStock'],
     xianyuBuys,
     listings,
-    sellSlots: clampInt(data.sellSlots, 1, 5, 1),
+    sellSlots: clampInt(data.sellSlots, 1, SELL_SLOTS_MAX, 1),
     marketSlots: clampInt(data.marketSlots, 3, 7, 3),
     xyNext: num(data.xyNext, 0),
     xySellNext: num(data.xySellNext, 0),

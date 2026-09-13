@@ -227,7 +227,7 @@ describe('存档系统', () => {
     expect(s).not.toBeNull();
     expect(s!.money).toBe(200); // 非法值回退默认
     expect(s!.sleeves).toBe(0); // 负值归零
-    expect(s!.sellSlots).toBe(5); // 越界收敛
+    expect(s!.sellSlots).toBe(8); // 越界收敛（上限 8）
     expect(s!.marketSlots).toBe(3);
     expect(s!.copies).toHaveLength(1);
     expect(s!.copies[0].durability).toBe(0); // 负值耐久归零（视为磨光）

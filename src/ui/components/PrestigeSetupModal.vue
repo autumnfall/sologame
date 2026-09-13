@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PERKS, PERK_BRANCH_NAME, insightSpent, perkCost } from '../../core';
+import { PERKS, PERK_BRANCH_NAME, insightSpent, perkCost, perkPrereqMet } from '../../core';
 import type { PerkBranch } from '../../core';
 import { useGameStore } from '../stores/game';
 
@@ -17,7 +17,14 @@ function defOf(id: string) {
 
 function canBuy(id: string): boolean {
   const def = defOf(id);
-  return lv(id) < def.max && store.s.prestige.insight >= perkCost(def, lv(id));
+  return perkPrereqMet(store.s, def) && lv(id) < def.max && store.s.prestige.insight >= perkCost(def, lv(id));
+}
+
+/** 前置未满足：显示 🔒 与前置名 */
+function lockText(id: string): string {
+  const def = defOf(id);
+  if (!def.after || perkPrereqMet(store.s, def)) return '';
+  return `🔒 需先点「${defOf(def.after).name}」1 级`;
 }
 
 const perksByBranch = (b: PerkBranch) => PERKS.filter(p => p.branch === b);
@@ -44,9 +51,11 @@ const perksByBranch = (b: PerkBranch) => PERKS.filter(p => p.branch === b);
             <small class="mut" style="margin-left:6px">{{ lv(p.id) }}/{{ p.max }}</small>
           </span>
           <small class="mut" style="flex:1;min-width:220px">{{ p.desc }}</small>
+          <small v-if="lockText(p.id)" class="mut" style="flex-shrink:0;color:var(--dim);font-size:11px">{{ lockText(p.id) }}</small>
           <button
             style="padding:3px 12px;font-size:12px;flex-shrink:0"
             :disabled="!canBuy(p.id)"
+            :title="lockText(p.id) || undefined"
             @click="store.buyPerk(p.id)"
           >
             <template v-if="lv(p.id) >= p.max">已满级</template>

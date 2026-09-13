@@ -29,11 +29,13 @@ import {
   gachaDraw,
   GACHA_PRICE,
   goldZoneWidth,
+  autoHitChance,
   initTaobaoStock,
   listCopy,
   load,
   jobById,
   parseSave,
+  perkLv,
   pickStarter as corePickStarter,
   playDuration,
   quitJob,
@@ -358,15 +360,23 @@ export const useGameStore = defineStore('game', {
       const durMs = Math.max(1200, p.total * 1000); // 游戏内 1 分 = 现实 1 秒
       if (!p.timingStarted) {
         p.timingStarted = true;
-        ps.timing = {
-          phaseIdx: ps.idx,
-          t0: Date.now(),
-          durMs,
-          zl: 15 + Math.random() * 50,
-          zw: goldZoneWidth(this.s),
-          pos: 0,
-          judged: false,
-        };
+        // 心流（效率线封顶）：每阶段开始按金区宽度掷自动命中——命中则从 50% 进度直接开始、不出现金条
+        if (perkLv(this.s, 'flow') > 0 && Math.random() < autoHitChance(this.s)) {
+          p.hit = true;
+          p.t = 0.5 * durMs;
+          ps.timing = null;
+          this.logPlay(`${p.name}：心流触发！从 50% 进度直接开始`, 'hit');
+        } else {
+          ps.timing = {
+            phaseIdx: ps.idx,
+            t0: Date.now(),
+            durMs,
+            zl: 15 + Math.random() * 50,
+            zw: goldZoneWidth(this.s),
+            pos: 0,
+            judged: false,
+          };
+        }
       }
       const tm = ps.timing;
       if (tm && !tm.judged) {

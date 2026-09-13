@@ -1,9 +1,9 @@
-import { FATIGUE_SOFTCAP, MASTERY, PLAY_CAP_MIN } from '../data/constants';
+import { FATIGUE_SOFTCAP, PLAY_CAP_MIN } from '../data/constants';
 import { taobaoBase } from '../data/prices';
 import type { Game } from '../data/types';
 import type { Copy, GameState } from '../state';
 import { attrLevel } from './attrs';
-import { hasAffix } from './collection';
+import { hasAffix, masteryNeed } from './collection';
 import { perkLv } from './prestige';
 
 /** 疲劳收益修正 = 1/(1+疲劳×0.15)（软上限外不再加重）；疲劳为收藏级 */
@@ -23,7 +23,7 @@ export function playDuration(state: GameState, g: Game, copy?: Copy): number {
   const prof = c?.prof ?? 0;
   let m = Math.min(g.playTime, PLAY_CAP_MIN);
   m *= prof === 0 ? 1.8 : Math.max(0.65, 1 - 0.02 * prof);
-  if (prof >= MASTERY[g.rarity]) m *= 0.5;
+  if (prof >= masteryNeed(state, g.rarity)) m *= 0.5;
   if (copy?.sleeved) m *= 0.85;
   if (hasAffix(state, 'timeCut')) m *= 0.90;
   m *= Math.max(0.80, 1 - 0.02 * attrLevel(state, '演算'));
@@ -45,7 +45,7 @@ export function ruleDuration(state: GameState, g: Game): number {
 export function masteryText(state: GameState, g: Game): string {
   const c = state.collections[g.id];
   if (!c) return '';
-  const need = MASTERY[g.rarity];
+  const need = masteryNeed(state, g.rarity);
   return c.prof >= need ? '⭐已精通（时长×0.5）' : `熟练 ${c.prof}/${need}`;
 }
 

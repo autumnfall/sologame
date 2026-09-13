@@ -1,4 +1,5 @@
 import { GLOBAL_PER_KIND, GLOBAL_SOFTCAP, MASTERY } from '../data/constants';
+import { PERKS } from '../data/prestige';
 import type { Rarity } from '../data/types';
 import { gamesByRarity } from '../data/games';
 import { gameById } from '../data/games';
@@ -44,11 +45,21 @@ export function tierUnlocked(state: GameState, rarity: Rarity): boolean {
   return tierOwned(state, prev) >= gamesByRarity(prev).length;
 }
 
+/**
+ * 精通所需局数（收藏家之眼：-20%）。
+ * 用 data 层的 PERKS 查等级而非 mechanics/prestige 的 perkLv，避免模块循环依赖。
+ */
+export function masteryNeed(state: GameState, rarity: Rarity): number {
+  const def = PERKS.find(p => p.key === 'masteryCut');
+  const cut = def ? (state.prestige.perks[def.id] ?? 0) : 0;
+  return Math.max(1, Math.ceil(MASTERY[rarity] * (cut > 0 ? 0.8 : 1)));
+}
+
 /** 是否已精通（不再出现在某鱼货源中） */
 export function isMastered(state: GameState, id: string): boolean {
   const c = state.collections[id];
   if (!c) return false;
-  return c.prof >= MASTERY[gameById(id).rarity];
+  return c.prof >= masteryNeed(state, gameById(id).rarity);
 }
 
 /** 当前某宝货架应展示的稀有度：已解锁的最高级 */

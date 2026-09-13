@@ -14,6 +14,7 @@ import {
   masteredCount,
   perkCost,
   perkLevel,
+  perkPrereqMet,
   prestigeUnlockCount,
   prestigeWeight,
 } from '../../core';
@@ -40,6 +41,13 @@ function lv(id: string): number {
 function cost(id: string): number {
   const def = PERKS.find(p => p.id === id)!;
   return perkCost(def, lv(id));
+}
+
+/** 前置未满足时的提示文案（线首永远满足） */
+function prereqText(id: string): string {
+  const def = PERKS.find(p => p.id === id)!;
+  if (!def.after || perkPrereqMet(store.s, def)) return '';
+  return `🔒 需先点「${PERKS.find(p => p.id === def.after)!.name}」1 级`;
 }
 
 // ---------- 成就 ----------
@@ -199,6 +207,7 @@ function boardName(r: RunRecord): string {
             <span class="mut" style="font-size:11px">{{ lv(p.id) }}/{{ p.max }}</span>
           </div>
           <div class="tagline" style="margin:4px 0">{{ p.desc }}</div>
+          <div v-if="prereqText(p.id)" class="mut" style="font-size:11px">{{ prereqText(p.id) }}</div>
           <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
             <span v-if="lv(p.id) >= p.max" class="ok" style="font-size:12px">已满级</span>
             <template v-else>
