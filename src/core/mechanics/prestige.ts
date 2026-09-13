@@ -5,11 +5,11 @@ import {
   PRESTIGE_HIDDEN_BONUS,
   PRESTIGE_KIND_EVERY,
   PRESTIGE_UNLOCK_BASE,
-  PRESTIGE_UNLOCK_RATIO,
+  PRESTIGE_UNLOCK_STEP,
   PRESTIGE_WEIGHT,
 } from '../data/prestige';
 import type { PerkDef, PerkKey } from '../data/prestige';
-import { GAMES, REGULAR_GAMES } from '../data/games';
+import { GAMES } from '../data/games';
 import type { GameState } from '../state';
 import { isMastered, kindCount } from './collection';
 
@@ -64,13 +64,13 @@ export function prestigeWeight(state: GameState): number {
   return w;
 }
 
-/** 解锁转生所需的精通数：基础值与常规款总数按比例伸缩，取较大者 */
-export function prestigeUnlockCount(): number {
-  return Math.max(PRESTIGE_UNLOCK_BASE, Math.ceil(REGULAR_GAMES.length * PRESTIGE_UNLOCK_RATIO));
+/** 解锁转生所需精通数：首周目 4，之后每完成一周目 +2，封顶桌游总数 */
+export function prestigeUnlockCount(state: GameState): number {
+  return Math.min(GAMES.length, PRESTIGE_UNLOCK_BASE + PRESTIGE_UNLOCK_STEP * state.prestige.runs);
 }
 
 export function canPrestige(state: GameState): boolean {
-  return masteredCount(state) >= prestigeUnlockCount();
+  return masteredCount(state) >= prestigeUnlockCount(state);
 }
 
 /**

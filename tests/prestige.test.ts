@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GACHA_PITY, MASTERY, PERKS, SAVE_VERSION, XY_SELL_MS,
+  GACHA_PITY, GAMES, MASTERY, PERKS, SAVE_VERSION, XY_SELL_MS,
   autoHitChance, buyPerk, canPrestige, defaultState, doPrestige, expandSellSlots, expMult, fatigueIncMult, gachaDraw, gameById,
-  insightGain, insightSpent, isMastered, listCopy, makeRunRecord, masteredCount, mergeBoard, parseSave, perkCost, perkDefById,
+  insightGain, insightSpent, isMastered, listCopy, makeRunRecord, mergeBoard, parseSave, perkCost, perkDefById,
   perkLevel, pickStarter, prestigeUnlockCount, prestigeWeight, recordLocalRun, respecPerks, taobaoPrice,
   masteryText, tickXianyu,
 } from '../src/core';
@@ -19,12 +19,19 @@ function stateWithEightMastered(): GameState {
 }
 
 describe('转生：解锁与收益', () => {
-  it('解锁门槛随常规款数量伸缩（基础值与 20% 取大）', () => {
-    expect(prestigeUnlockCount()).toBeGreaterThanOrEqual(8);
-    expect(canPrestige(defaultState())).toBe(false);
-    const s = stateWithEightMastered();
-    expect(masteredCount(s)).toBe(8);
-    expect(canPrestige(s)).toBe(prestigeUnlockCount() <= 8);
+  it('解锁门槛：首周目 4 款，之后每完成一周目 +2，封顶桌游总数', () => {
+    const s = defaultState();
+    expect(prestigeUnlockCount(s)).toBe(4);
+    expect(canPrestige(s)).toBe(false);
+    own(s, 'guoyuan', { prof: MASTERY.N });
+    expect(canPrestige(s)).toBe(false); // 1 < 4
+    s.prestige.runs = 1;
+    expect(prestigeUnlockCount(s)).toBe(6);
+    s.prestige.runs = 2;
+    expect(prestigeUnlockCount(s)).toBe(8);
+    s.prestige.runs = 100;
+    expect(prestigeUnlockCount(s)).toBe(GAMES.length); // 封顶
+    expect(canPrestige(s)).toBe(false); // 只精通 1 款
   });
 
   it('权重 = 精通按稀有度累计 + 图鉴加成；隐藏款有额外权重', () => {

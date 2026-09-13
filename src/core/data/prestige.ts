@@ -14,9 +14,10 @@ export const PRESTIGE_KIND_EVERY = 5;
 export const PRESTIGE_GAIN_MULT = 3;
 /** 首次转生保底阅历 */
 export const PRESTIGE_FIRST_GAIN = 10;
-/** 解锁转生：精通数 ≥ max(基础值, 常规款总数 × 比例)（向上取整） */
-export const PRESTIGE_UNLOCK_BASE = 8;
-export const PRESTIGE_UNLOCK_RATIO = 0.2;
+/** 解锁转生：首周目需精通的桌游数 */
+export const PRESTIGE_UNLOCK_BASE = 4;
+/** 之后每完成一周目，门槛 +2（封顶桌游总数） */
+export const PRESTIGE_UNLOCK_STEP = 2;
 
 /** 天赋效果键：机制层按 key 读取乘区，新增天赋只需在此登记 + 在对应机制处挂钩 */
 export type PerkKey =

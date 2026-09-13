@@ -24,7 +24,7 @@ import { LEADERBOARD_API, fetchBoard } from '../leaderboard';
 
 const store = useGameStore();
 
-const unlockNeed = prestigeUnlockCount();
+const unlockNeed = computed(() => prestigeUnlockCount(store.s));
 const mastered = computed(() => masteredCount(store.s));
 const unlocked = computed(() => canPrestige(store.s));
 const gain = computed(() => insightGain(store.s));

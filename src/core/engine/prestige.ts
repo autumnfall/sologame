@@ -18,7 +18,7 @@ export interface PrestigeResult {
  */
 export function doPrestige(state: GameState): PrestigeResult {
   if (!canPrestige(state)) {
-    return { ok: false, reason: `需要精通至少 ${prestigeUnlockCount()} 款桌游才能退坑` };
+    return { ok: false, reason: `需要精通至少 ${prestigeUnlockCount(state)} 款桌游才能退坑` };
   }
   const gain = insightGain(state);
   const { insight, perks, runs } = state.prestige;
