@@ -197,7 +197,7 @@ describe('存档系统', () => {
   it('v10 → v11（排行榜字段）：playerName/localBoard/clientId 补默认，runStartedAt 填充', () => {
     const s = stateWithLastSeen(1234567890);
     s.playerName = '测试玩家';
-    s.localBoard.push({ name: '测试玩家', ms: 60000, runs: 1, insight: 10, achievements: 2, at: 999 });
+    s.localBoard.push({ name: '测试玩家', ms: 60000, runs: 1, insight: 10, achievements: 2, mastered: 4, at: 999 });
     const v10 = JSON.parse(serialize(s)) as Record<string, unknown>;
     v10.saveVersion = 10;
     delete v10.playerName;

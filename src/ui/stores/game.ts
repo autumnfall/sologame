@@ -15,6 +15,7 @@ import {
   sleeveAll,
   listWornCopies,
   MASTER_POOL_SLEEVES,
+  masteredCount,
   conditionText,
   copyByUid,
   copiesOf,
@@ -737,13 +738,14 @@ export const useGameStore = defineStore('game', {
       if (!window.confirm('再确认一次：阅历和天赋会保留，但本周目的一切进度将消失。')) return;
       const startedAt = this.s.runStartedAt;
       const finishedAt = Date.now();
+      const masteredNow = masteredCount(this.s); // doPrestige 会清空收藏，先快照
       const r = doPrestige(this.s);
       if (!r.ok) {
         this.toast(r.reason ?? '无法退坑');
         return;
       }
       // 周目成绩：runs/insight 已含本次转生增量；doPrestige 已重置 runStartedAt，所以上面先快照
-      const rec = makeRunRecord(this.s, { startedAt, finishedAt });
+      const rec = makeRunRecord(this.s, { startedAt, finishedAt, mastered: masteredNow });
       recordLocalRun(this.s, rec);
       void submitRun(rec).then(ok => {
         if (!ok && LEADERBOARD_API) this.toast('在线排行榜上传失败（服务器不可达），已保留本地记录');

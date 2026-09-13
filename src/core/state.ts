@@ -92,6 +92,8 @@ export interface RunRecord {
   insight: number;
   /** 完成时的总计成就数 */
   achievements: number;
+  /** 本周目精通的桌游数量（转生瞬间的精通数） */
+  mastered: number;
   /** 完成时间戳 */
   at: number;
   /** 客户端唯一 id（在线榜按此去重，取最好成绩） */

@@ -126,7 +126,7 @@ function boardName(r: RunRecord): string {
 
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-        <h3 style="margin:0">🥇 排行榜 <small class="mut">周目完成耗时最短的前 10 名</small></h3>
+        <h3 style="margin:0">🥇 排行榜 <small class="mut">按 精通数量 ÷ 耗时 排名（效率最高前 10）</small></h3>
         <button v-if="LEADERBOARD_API" style="margin-left:auto;padding:3px 10px;font-size:12px" @click="refreshBoard()">🔄 刷新在线榜</button>
       </div>
       <div :class="LEADERBOARD_API ? 'two-col' : ''">
@@ -134,11 +134,12 @@ function boardName(r: RunRecord): string {
           <h3 style="margin:0 0 6px;font-size:13px">本存档 <small class="mut">{{ store.s.localBoard.length }}/10</small></h3>
           <table v-if="store.s.localBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
             <tr class="mut" style="text-align:left">
-              <th style="padding:3px 4px">#</th><th>名称</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+              <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
             </tr>
             <tr v-for="(r, i) in store.s.localBoard" :key="r.at + '-' + i" style="border-top:1px solid var(--line)">
               <td style="padding:3px 4px">{{ i + 1 }}</td>
               <td>{{ boardName(r) }}</td>
+              <td>{{ r.mastered }}</td>
               <td>{{ fmtDuration(r.ms) }}</td>
               <td>{{ r.runs }}</td>
               <td>{{ r.insight }}</td>
@@ -151,11 +152,12 @@ function boardName(r: RunRecord): string {
           <h3 style="margin:0 0 6px;font-size:13px">在线 <small class="mut">全部玩家</small></h3>
           <table v-if="onlineBoard && onlineBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
             <tr class="mut" style="text-align:left">
-              <th style="padding:3px 4px">#</th><th>名称</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+              <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
             </tr>
             <tr v-for="(r, i) in onlineBoard" :key="(r.clientId ?? r.at) + '-' + i" style="border-top:1px solid var(--line)">
               <td style="padding:3px 4px">{{ i + 1 }}</td>
               <td>{{ boardName(r) }}</td>
+              <td>{{ r.mastered }}</td>
               <td>{{ fmtDuration(r.ms) }}</td>
               <td>{{ r.runs }}</td>
               <td>{{ r.insight }}</td>

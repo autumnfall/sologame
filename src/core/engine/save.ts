@@ -3,6 +3,7 @@ import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { gameById } from '../data/games';
 import { defaultState, genClientId } from '../state';
+import { rankCmp } from './records';
 import type { CollectionEntry, Copy, GameState, Listing, MarketItem, OfflineBank, RunRecord } from '../state';
 import type { Attr } from '../data/constants';
 
@@ -341,10 +342,11 @@ function normalizeBoard(raw: unknown): RunRecord[] {
     runs: Math.floor(num(r.runs, 0)),
     insight: num(r.insight, 0),
     achievements: Math.floor(num(r.achievements, 0)),
+    mastered: Math.floor(num(r.mastered, 0)),
     at: num(r.at, 0),
     ...(typeof r.clientId === 'string' && r.clientId ? { clientId: r.clientId } : {}),
   })).filter(r => r.ms > 0);
-  list.sort((a, b) => a.ms - b.ms);
+  list.sort(rankCmp);
   return list.slice(0, 10);
 }
 

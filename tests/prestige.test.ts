@@ -209,12 +209,13 @@ describe('转生：周目成绩记录（本地/在线排行榜）', () => {
     s.runStartedAt = 1_000_000;
     s.prestige.perks['fund'] = 1; // 已投入 2 点
     expect(doPrestige(s).ok).toBe(true);
-    const rec = makeRunRecord(s, { startedAt: 1_000_000, finishedAt: 4_600_000 });
+    const rec = makeRunRecord(s, { startedAt: 1_000_000, finishedAt: 4_600_000, mastered: 8 });
     expect(rec.name).toBe('测试玩家');
     expect(rec.ms).toBe(3_600_000);
     expect(rec.runs).toBe(1);
     expect(rec.insight).toBe(12); // 剩余 10 + 已投入 2
     expect(rec.achievements).toBe(3);
+    expect(rec.mastered).toBe(8); // 开清空前快照的精通数
     expect(rec.clientId).toBe(s.clientId);
   });
 
@@ -228,22 +229,24 @@ describe('转生：周目成绩记录（本地/在线排行榜）', () => {
     expect(totalInsight(s)).toBe(maxInsightTotal()); // 封顶（当前天赋表 = 299）
   });
 
-  it('recordLocalRun：按耗时升序，只保留前 10 条', () => {
+  it('recordLocalRun：按 精通/耗时 降序，只保留前 10 条', () => {
     const s = defaultState();
-    const mk = (ms: number) => ({ name: 'n', ms, runs: 1, insight: 1, achievements: 0, at: ms });
-    for (let i = 1; i <= 12; i++) recordLocalRun(s, mk(i * 1000));
+    const mk = (ms: number, mastered: number) => ({ name: 'n', ms, runs: 1, insight: 1, achievements: 0, mastered, at: ms });
+    recordLocalRun(s, mk(1000, 1)); // 1/1000
+    recordLocalRun(s, mk(5000, 10)); // 1/500 → 比值更高排最前
+    expect(s.localBoard[0].mastered).toBe(10);
+    // 批量低比值记录：同值按耗时升序，最慢的 2 条被裁掉
+    for (let i = 3; i <= 12; i++) recordLocalRun(s, mk(i * 1000, 1));
     expect(s.localBoard).toHaveLength(10);
-    expect(s.localBoard[0].ms).toBe(1000);
-    expect(s.localBoard[9].ms).toBe(10000); // 最大的 2 条被裁掉
-    recordLocalRun(s, mk(500)); // 更快的成绩插到榜首
-    expect(s.localBoard[0].ms).toBe(500);
+    expect(s.localBoard[0].mastered).toBe(10); // 高比值仍在榜首
+    expect(s.localBoard[s.localBoard.length - 1].ms).toBe(10000); // 11000/12000 被裁
   });
 
   it('doPrestige：重置本周目开始时间，保留玩家名/本地榜/clientId', () => {
     const s = stateWithEightMastered();
     s.playerName = '老玩家';
     s.runStartedAt = 1;
-    recordLocalRun(s, { name: '老玩家', ms: 999, runs: 0, insight: 0, achievements: 0, at: 2 });
+    recordLocalRun(s, { name: '老玩家', ms: 999, runs: 0, insight: 0, achievements: 0, mastered: 4, at: 2 });
     const cid = s.clientId;
     expect(doPrestige(s).ok).toBe(true);
     expect(s.playerName).toBe('老玩家');
@@ -252,14 +255,15 @@ describe('转生：周目成绩记录（本地/在线排行榜）', () => {
     expect(s.runStartedAt).toBeGreaterThan(1); // 重置为转生时刻
   });
 
-  it('mergeBoard：按 clientId 去重取最好成绩，耗时升序截断', () => {
+  it('mergeBoard：按 clientId 去重取最高比值，精通/耗时降序截断', () => {
     const merged = mergeBoard([
-      { name: 'a', ms: 5000, runs: 1, insight: 0, achievements: 0, at: 1, clientId: 'x' },
-      { name: 'a', ms: 3000, runs: 2, insight: 5, achievements: 1, at: 2, clientId: 'x' }, // 同 client 取 3000
-      { name: 'b', ms: 4000, runs: 1, insight: 0, achievements: 0, at: 3, clientId: 'y' },
-      { name: 'c', ms: 1000, runs: 1, insight: 0, achievements: 0, at: 4 },
+      { name: 'a', ms: 5000, runs: 1, insight: 0, achievements: 0, mastered: 5, at: 1, clientId: 'x' },
+      { name: 'a', ms: 3000, runs: 2, insight: 5, achievements: 1, mastered: 6, at: 2, clientId: 'x' }, // 同 client 取比值高者（6/3000）
+      { name: 'b', ms: 4000, runs: 1, insight: 0, achievements: 0, mastered: 4, at: 3, clientId: 'y' },
+      { name: 'c', ms: 1000, runs: 1, insight: 0, achievements: 0, mastered: 1, at: 4 },
     ], 10);
-    expect(merged.map(r => r.ms)).toEqual([1000, 3000, 4000]);
+    // 比值：a 6/3000=1/500，b 4/4000=1/1000，c 1/1000；c 与 b 同值按耗时升序
+    expect(merged.map(r => r.mastered)).toEqual([6, 1, 4]);
   });
 });
 
