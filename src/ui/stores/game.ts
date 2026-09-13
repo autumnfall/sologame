@@ -145,10 +145,11 @@ export const useGameStore = defineStore('game', {
     shelfFilter: null as Attr | null,
     playNotTiredOnly: false,
     playUnmasteredOnly: false,
-    /** 收藏架筛选：只看已精通 / 稀有度 / 价值排序 */
+    /** 收藏架筛选：只看已精通 / 只看有实体的收藏 / 稀有度 / 排序 */
     shelfMasteredOnly: false,
+    shelfOwnedOnly: false,
     shelfRarity: null as Rarity | null,
-    shelfSort: 'default' as 'default' | 'valueAsc' | 'valueDesc',
+    shelfSort: 'default' as 'default' | 'valueAsc' | 'valueDesc' | 'copiesDesc',
     session: null as PlaySession | null,
     playLog: [] as LogLine[],
     gachaLog: [] as GachaEntry[],

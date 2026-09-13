@@ -9,10 +9,12 @@ const props = withDefaults(
     unmasteredOnly?: boolean;
     /** 收藏架用：只看已精通（不传则不显示该筛选） */
     masteredOnly?: boolean;
+    /** 收藏架用：只看当前拥有实体的收藏（不传则不显示） */
+    ownedOnly?: boolean;
     /** 收藏架用：稀有度筛选（null = 全部；不传则不显示） */
     rarity?: Rarity | null;
-    /** 收藏架用：价值排序（不传则不显示排序框） */
-    sort?: 'default' | 'valueAsc' | 'valueDesc';
+    /** 收藏架用：排序（不传则不显示排序框） */
+    sort?: 'default' | 'valueAsc' | 'valueDesc' | 'copiesDesc';
   }>(),
   { notTiredOnly: false, unmasteredOnly: false },
 );
@@ -21,8 +23,9 @@ const emit = defineEmits<{
   'update:notTiredOnly': [value: boolean];
   'update:unmasteredOnly': [value: boolean];
   'update:masteredOnly': [value: boolean];
+  'update:ownedOnly': [value: boolean];
   'update:rarity': [value: Rarity | null];
-  'update:sort': [value: 'default' | 'valueAsc' | 'valueDesc'];
+  'update:sort': [value: 'default' | 'valueAsc' | 'valueDesc' | 'copiesDesc'];
 }>();
 
 function chipStyle(on: boolean): Record<string, string> {
@@ -74,6 +77,15 @@ function chipStyle(on: boolean): Record<string, string> {
     >
       🏆 已精通
     </button>
+    <button
+      v-if="props.ownedOnly !== undefined"
+      style="padding:3px 10px;font-size:12px"
+      title="只看当前拥有实体的收藏（实体卖光的不显示）"
+      :style="chipStyle(props.ownedOnly)"
+      @click="emit('update:ownedOnly', !props.ownedOnly)"
+    >
+      📦 已拥有
+    </button>
     <template v-if="props.rarity !== undefined">
       <span style="width:1px;height:16px;background:var(--line);margin:0 4px"></span>
       <button
@@ -98,11 +110,12 @@ function chipStyle(on: boolean): Record<string, string> {
       :value="props.sort"
       title="按桌游本身价值（市价）排序"
       style="margin-left:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px"
-      @change="emit('update:sort', ($event.target as HTMLSelectElement).value as 'default' | 'valueAsc' | 'valueDesc')"
+      @change="emit('update:sort', ($event.target as HTMLSelectElement).value as 'default' | 'valueAsc' | 'valueDesc' | 'copiesDesc')"
     >
       <option value="default">默认排序</option>
       <option value="valueDesc">价值 高→低</option>
       <option value="valueAsc">价值 低→高</option>
+      <option value="copiesDesc">实体数量 多→少</option>
     </select>
   </div>
 </template>

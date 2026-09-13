@@ -36,9 +36,14 @@ const ownedIds = computed(() => {
     if (store.shelfFilter && !g.attrs.includes(store.shelfFilter)) return false;
     if (store.shelfRarity && g.rarity !== store.shelfRarity) return false;
     if (store.shelfMasteredOnly && !isMastered(store.s, id)) return false;
+    if (store.shelfOwnedOnly && copiesOf(store.s, id).length === 0) return false;
     return true;
   });
-  if (store.shelfSort !== 'default') {
+  if (store.shelfSort === 'copiesDesc') {
+    // 实体数量降序（可用实体数，同数量按价值降序兜底）
+    list.sort((a, b) => copiesOf(store.s, b).length - copiesOf(store.s, a).length
+      || gameById(b).marketPrice - gameById(a).marketPrice);
+  } else if (store.shelfSort !== 'default') {
     const dir = store.shelfSort === 'valueAsc' ? 1 : -1;
     list.sort((a, b) => dir * (gameById(a).marketPrice - gameById(b).marketPrice));
   }
@@ -99,6 +104,7 @@ function durText(n: number): string {
     <FilterBar
       v-model="store.shelfFilter"
       v-model:mastered-only="store.shelfMasteredOnly"
+      v-model:owned-only="store.shelfOwnedOnly"
       v-model:rarity="store.shelfRarity"
       v-model:sort="store.shelfSort"
     />
