@@ -49,7 +49,7 @@ describe('数据集完整性', () => {
     expect(gameById('kafei').cards).toBeNull();
   });
 
-  it('职业阶梯：11 个职业（游玩本身产出入门收入）、六维均衡各属性有岗、终点全属性 Ⅳ、id 唯一', () => {
+  it('职业阶梯：11 个职业（游玩本身产出入门收入）、六维均衡各属性有岗、终点全属性 4、id 唯一', () => {
     expect(JOBS).toHaveLength(11);
     const master = jobById('master');
     expect(master?.req).toEqual({ 谋略: 4, 演算: 4, 应变: 4, 运筹: 4, 洞察: 4, 沉浸: 4 });

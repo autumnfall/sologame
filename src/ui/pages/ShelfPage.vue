@@ -3,6 +3,8 @@ import { computed, reactive } from 'vue';
 import {
   DURABILITY,
   GAMES,
+  SELL_PRICE_MAX,
+  SELL_PRICE_MIN,
   canStore,
   conditionText,
   copiesOf,
@@ -82,9 +84,9 @@ const sleeveAllable = computed(() =>
 /** 某鱼快速上架（成就 30 个解锁） */
 const quickListUnlocked = computed(() => isFeatureUnlocked(store.s, 'quickList'));
 
-/** 收藏架「某鱼上架」：快速上架开启时直接按行情价 100% 上架，否则跳转某鱼出售区 */
+/** 收藏架「某鱼上架」：快速上架开启时直接按当前比例上架，否则跳转某鱼出售区 */
 function sellCopy(c: { uid: number }) {
-  if (store.s.settings.quickList) store.listForSale(c.uid, 1.0);
+  if (store.s.settings.quickList) store.listForSale(c.uid, store.s.settings.quickListPct / 100);
   else store.gotoSell(c.uid);
 }
 
@@ -117,7 +119,21 @@ function durText(n: number): string {
       >
         {{ store.s.settings.quickList ? '✓ ' : '' }}🐟 某鱼快速上架
       </button>
-      <small v-if="store.s.settings.quickList" class="mut">开启中：点「某鱼上架」直接按行情价 100% 上架，不再跳转</small>
+      <label v-if="quickListUnlocked" class="mut" style="display:flex;gap:6px;align-items:center">
+        比例
+        <input
+          type="range"
+          :min="SELL_PRICE_MIN * 100"
+          :max="SELL_PRICE_MAX * 100"
+          step="5"
+          :value="store.s.settings.quickListPct"
+          :disabled="!store.s.settings.quickList"
+          style="vertical-align:middle"
+          @input="store.setQuickListPct(Number(($event.target as HTMLInputElement).value))"
+        />
+        <b>{{ store.s.settings.quickListPct }}%</b>
+      </label>
+      <small v-if="store.s.settings.quickList" class="mut">开启中：点「某鱼上架」直接按行情价 {{ store.s.settings.quickListPct }}% 上架，不再跳转</small>
     </div>
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
     <div v-else class="grid">

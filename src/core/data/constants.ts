@@ -12,8 +12,9 @@ import type { Rarity } from './types';
  * v9 = 成就系统（achievements/settings）+ stats 事件计数器 + 收藏 resold 标记。
  * v10 = 实体锁定（copies.locked）+ 某鱼快速上架开关（settings.quickList）；均为新增可选字段，归一化补默认。
  * v11 = 排行榜（playerName/runStartedAt/localBoard/clientId）；均为新增可选字段，归一化补默认。
+ * v12 = 快速上架比例（settings.quickListPct，50~200，默认 100）；新增可选字段，归一化补默认。
  */
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */
@@ -64,8 +65,6 @@ export const EXP_SHARES: Readonly<Record<number, readonly number[]>> = {
   4: [0.4, 0.3, 0.2, 0.1],
   6: [0.2, 0.2, 0.15, 0.15, 0.15, 0.15],
 };
-
-export const ROMAN = ['0', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ'] as const;
 
 // ---------- 稀有度阶梯 ----------
 

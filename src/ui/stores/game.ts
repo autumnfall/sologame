@@ -814,7 +814,7 @@ export const useGameStore = defineStore('game', {
       this.saveGame();
     },
 
-    /** 某鱼快速上架开关（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按 100% 市价上架 */
+    /** 某鱼快速上架开关（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按当前比例市价上架 */
     toggleQuickList() {
       if (!isFeatureUnlocked(this.s, 'quickList')) {
         this.toast('该功能尚未解锁（达成 30 个成就）');
@@ -822,8 +822,16 @@ export const useGameStore = defineStore('game', {
       }
       this.s.settings.quickList = !this.s.settings.quickList;
       this.toast(this.s.settings.quickList
-        ? '已开启某鱼快速上架：收藏架点「某鱼上架」直接按行情价 100% 上架'
+        ? `已开启某鱼快速上架：收藏架点「某鱼上架」直接按行情价 ${this.s.settings.quickListPct}% 上架`
         : '已关闭某鱼快速上架');
+      this.saveGame();
+    },
+
+    /** 快速上架比例（行情价百分比，50~200，步进 5） */
+    setQuickListPct(pct: number) {
+      const v = Math.min(200, Math.max(50, Math.round(pct / 5) * 5));
+      if (v === this.s.settings.quickListPct) return;
+      this.s.settings.quickListPct = v;
       this.saveGame();
     },
 

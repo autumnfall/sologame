@@ -620,7 +620,7 @@ describe('游玩结算（含磨损与 0 耐久惩罚）', () => {
     expect(() => settleRound(s, 'kafei', 999, 1, () => 0.5)).toThrow();
   });
 
-  it('掉券：洞察 Ⅰ + 黑色奏鸣曲 → 0.06×1.2×1.25=0.09，rng 0 必掉', () => {
+  it('掉券：洞察 1 级 + 黑色奏鸣曲 → 0.06×1.2×1.25=0.09，rng 0 必掉', () => {
     const s = defaultState();
     const copy = own(s, 'guoyuan');
     s.attrExp['洞察'] = 60;

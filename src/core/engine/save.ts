@@ -83,6 +83,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   9: raw => ({ ...raw }),
   // v10 → v11（排行榜：玩家名/本周目开始时间/本地榜/客户端 id）：均为新增可选字段，归一化时补默认值
   10: raw => ({ ...raw }),
+  // v11 → v12（快速上架比例 settings.quickListPct）：新增可选字段，归一化时补默认值，无需改写数据
+  11: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -324,6 +326,10 @@ function normalize(data: Record<string, unknown>): GameState {
         ? data.settings.autoSwitch
         : 'off',
       quickList: isRecord(data.settings) && data.settings.quickList === true,
+      quickListPct: (() => {
+        const v = num(isRecord(data.settings) ? data.settings.quickListPct : undefined, 100);
+        return Math.min(200, Math.max(50, Math.round(v / 5) * 5));
+      })(),
     },
   };
 }

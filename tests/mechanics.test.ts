@@ -29,6 +29,16 @@ describe('属性曲线与经验分摊', () => {
     expect(attrProgress(s, '谋略')).toEqual({ lv: 2, cur: 0, need: 312 });
   });
 
+  it('高等级（10 级以上）依旧返回正常进度', () => {
+    const s = defaultState();
+    s.attrExp['沉浸'] = 20000;
+    const p = attrProgress(s, '沉浸');
+    expect(p.lv).toBeGreaterThan(10);
+    expect(p.cur).toBeGreaterThanOrEqual(0);
+    expect(p.need).toBeGreaterThan(p.cur);
+    expect(attrLevel(s, '沉浸')).toBe(p.lv);
+  });
+
   it('经验分摊比例：单/双/三/四/六属性', () => {
     expect(attrShares(gameById('guoyuan'))).toEqual([1]);
     expect(attrShares(gameById('boendi'))).toEqual([0.65, 0.35]);

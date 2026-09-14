@@ -40,7 +40,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'first-mastery', name: '精通大师', desc: '第一次精通一款桌游', check: s => masteredN(s) >= 1 },
   { id: 'mastery-10', name: '精通十款', desc: '精通 10 款桌游', check: s => masteredN(s) >= 10 },
   { id: 'mastery-all', name: '全精通', desc: '精通全部桌游', check: s => masteredN(s) >= GAMES.length },
-  { id: 'hexagon', name: '六边形战士', desc: '六维属性全部达到 Ⅳ 级', check: s => (Object.keys(s.attrExp) as (keyof GameState['attrExp'])[]).every(a => attrLevel(s, a) >= 4) },
+  { id: 'hexagon', name: '六边形战士', desc: '六维属性全部达到 4 级', check: s => (Object.keys(s.attrExp) as (keyof GameState['attrExp'])[]).every(a => attrLevel(s, a) >= 4) },
   { id: 'worn-out', name: '物尽其用', desc: '把一盒桌游磨光（耐久归 0）', check: s => s.copies.some(c => c.durability <= 0) },
   { id: 'devoted', name: '一盒传世', desc: '单款桌游玩满 50 局', check: s => Object.values(s.collections).some(c => c.prof >= 50) },
   // ---------- 工作线 ----------
@@ -90,7 +90,7 @@ export const FEATURE_UNLOCKS: readonly FeatureUnlock[] = [
   { key: 'sleeveAll', need: 15, name: '一键套牌套', desc: '收藏架一键给所有未套实体套上牌套' },
   { key: 'listWorn', need: 20, name: '一键上架磨光件', desc: '某鱼一键把所有磨光实体按行情价上架' },
   { key: 'autoMastery', need: 25, name: '精通自动更换', desc: '连刷中当前游戏精通后，自动随机换一款未精通的（可开关）' },
-  { key: 'quickList', need: 30, name: '某鱼快速上架', desc: '收藏架一键开关：开启后点「某鱼上架」直接按行情价 100% 上架，不再跳转某鱼页' },
+  { key: 'quickList', need: 30, name: '某鱼快速上架', desc: '收藏架一键开关：开启后点「某鱼上架」直接按行情价上架（比例 50%~200% 可调，默认 100%），不再跳转某鱼页' },
 ];
 
 /** 全部解锁所需成就数（最后一个里程碑） */

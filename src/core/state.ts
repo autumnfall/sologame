@@ -183,8 +183,10 @@ export interface GameState {
   settings: {
     /** 连刷自动更换：关 / 疲劳后换 / 精通后换（两档互斥） */
     autoSwitch: 'off' | 'fatigue' | 'mastery';
-    /** 某鱼快速上架（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按行情价 100% 上架，不跳转 */
+    /** 某鱼快速上架（成就 30 个解锁）：开启后收藏架点「某鱼上架」直接按行情价上架，不跳转 */
     quickList: boolean;
+    /** 快速上架比例（行情价百分比，50~200，默认 100） */
+    quickListPct: number;
   };
 }
 
@@ -233,7 +235,7 @@ export function defaultState(): GameState {
     runStartedAt: Date.now(),
     localBoard: [],
     clientId: genClientId(),
-    settings: { autoSwitch: 'off', quickList: false },
+    settings: { autoSwitch: 'off', quickList: false, quickListPct: 100 },
   };
 }
 

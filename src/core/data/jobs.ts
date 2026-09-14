@@ -1,6 +1,6 @@
 import type { Job } from './types';
 
-// ---------- 职业阶梯（周期制；六维均衡，每属性一条线，终点全属性 Ⅳ） ----------
+// ---------- 职业阶梯（周期制；六维均衡，每属性一条线，终点全属性 4） ----------
 // 周期最长 5 分钟（300s）；酬劳按周期时长等比设定，等效速率 0.3/s → 3.33/s。
 // 游玩只积累经验，职业与桌游买卖是金钱的两大来源。
 export const JOBS: readonly Job[] = [
@@ -14,7 +14,7 @@ export const JOBS: readonly Job[] = [
   { id: 'streamer', name: '主播带货', req: { 沉浸: 3, 应变: 2 }, auto: true, cycleSec: 200, cyclePay: 200, volatile: true, desc: '每 200 秒结算一次，酬劳在（应变下限~1.5）间波动，触发直播事件' },
   { id: 'scenarist', name: '推理剧本策划', req: { 洞察: 3, 演算: 1 }, auto: true, cycleSec: 240, cyclePay: 280, desc: '洞察线 · 每 240 秒 ¥280' },
   { id: 'consultant', name: '桌游顾问', req: { 谋略: 3, 演算: 2 }, auto: true, cycleSec: 240, cyclePay: 330, desc: '谋略线 · 每 240 秒 ¥330' },
-  { id: 'master', name: '桌游设计师', req: { 谋略: 4, 演算: 4, 应变: 4, 运筹: 4, 洞察: 4, 沉浸: 4 }, auto: true, cycleSec: 300, cyclePay: 1000, desc: '全属性 Ⅳ 方可胜任 · 每 300 秒 ¥1000' },
+  { id: 'master', name: '桌游设计师', req: { 谋略: 4, 演算: 4, 应变: 4, 运筹: 4, 洞察: 4, 沉浸: 4 }, auto: true, cycleSec: 300, cyclePay: 1000, desc: '全属性 4 方可胜任 · 每 300 秒 ¥1000' },
 ];
 
 const JOB_MAP = new Map(JOBS.map(j => [j.id, j]));

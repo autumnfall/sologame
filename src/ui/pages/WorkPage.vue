@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ATTR_ICON, JOBS, ROMAN, jobById, jobCyclePayExpected, jobUnlocked } from '../../core';
+import { ATTR_ICON, JOBS, jobById, jobCyclePayExpected, jobUnlocked } from '../../core';
 import { useGameStore } from '../stores/game';
 
 const store = useGameStore();
@@ -8,7 +8,7 @@ const store = useGameStore();
 function reqStr(req: Partial<Record<string, number>>): string {
   const entries = Object.entries(req);
   if (!entries.length) return '无门槛';
-  return entries.map(([a, lv]) => `${ATTR_ICON[a as keyof typeof ATTR_ICON]}${a} ${ROMAN[lv as number]}`).join(' + ');
+  return entries.map(([a, lv]) => `${ATTR_ICON[a as keyof typeof ATTR_ICON]}${a} ${lv}`).join(' + ');
 }
 
 /** 展示用周期酬劳（已含应变收入乘区；主播按期望显示） */

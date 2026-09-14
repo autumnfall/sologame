@@ -219,6 +219,19 @@ describe('成就：存档迁移', () => {
     expect(s!.copies[1].locked).toBeUndefined();
     expect(s!.settings.autoSwitch).toBe('fatigue');
     expect(s!.settings.quickList).toBe(true);
+    expect(s!.settings.quickListPct).toBe(100);
+  });
+
+  it('v12：快速上架比例归一化（缺省 100，越界收敛到 50~200 且对齐步进 5）', () => {
+    const base = { saveVersion: 12, money: 100 };
+    const norm = (settings: unknown) =>
+      parseSave(JSON.stringify({ ...base, settings }))!.settings.quickListPct;
+    expect(norm(undefined)).toBe(100);
+    expect(norm({ quickListPct: 150 })).toBe(150);
+    expect(norm({ quickListPct: 10 })).toBe(50);
+    expect(norm({ quickListPct: 999 })).toBe(200);
+    expect(norm({ quickListPct: 133 })).toBe(135);
+    expect(norm({ quickListPct: 'abc' })).toBe(100);
   });
 });
 
