@@ -2,12 +2,11 @@
 import { computed, ref } from 'vue';
 import {
   GACHA_PITY,
-  GACHA_PRICE,
   HI_TICKET_SLEEVES,
   MASTER_FALLBACK_SLEEVES,
   MASTER_POOL_SLEEVES,
   MASTER_PROF_GAIN,
-  ROTATION_PRICE,
+  gachaMoneyPrice,
   isFeatureUnlocked,
   masterPool,
   rotatingPool,
@@ -18,6 +17,10 @@ import { useGameStore } from '../../stores/game';
 const store = useGameStore();
 
 const sub = ref<'perm' | 'rot' | 'master'>('perm');
+
+/** 某赏金钱单抽价（含挑战价格倍率，如「柠檬佬」×1.5） */
+const permPrice = computed(() => gachaMoneyPrice(store.s, 'perm'));
+const rotPrice = computed(() => gachaMoneyPrice(store.s, 'rot'));
 
 const RAR_COLOR: Record<string, string> = {
   N: 'var(--N)',
@@ -54,12 +57,12 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
       <div class="mut" style="margin:6px 0">牌套 30%（4包）/ 15%（10包）/ 5%（20包）· 桌游 N30 / R15 / SR4 / SSR1 · 50 抽保底 SR 及以上</div>
       <div>SR+ 保底进度：<b class="warn">{{ store.s.pity }} / {{ GACHA_PITY }}</b></div>
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <button class="primary" :disabled="store.s.money < GACHA_PRICE" @click="store.pullGacha('perm', 'money')">单抽（¥{{ GACHA_PRICE }}）</button>
+        <button class="primary" :disabled="store.s.money < permPrice" @click="store.pullGacha('perm', 'money')">单抽（¥{{ permPrice }}）</button>
         <button class="primary" :disabled="store.s.tickets < 1" @click="store.pullGacha('perm', 'ticket')">
           用抽赏券 ×1 抽（🎫{{ store.s.tickets }}）
         </button>
         <template v-if="tenUnlocked">
-          <button :disabled="store.s.money < GACHA_PRICE * 10" @click="store.pullGachaTen('perm', 'money')">十连（¥{{ GACHA_PRICE * 10 }}）</button>
+          <button :disabled="store.s.money < permPrice * 10" @click="store.pullGachaTen('perm', 'money')">十连（¥{{ permPrice * 10 }}）</button>
           <button :disabled="store.s.tickets < 10" @click="store.pullGachaTen('perm', 'ticket')">十连（🎫10）</button>
         </template>
       </div>
@@ -80,10 +83,10 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button
           class="primary"
-          :disabled="!store.s.rotTheme || store.s.money < ROTATION_PRICE"
+          :disabled="!store.s.rotTheme || store.s.money < rotPrice"
           @click="store.pullGacha('rot', 'money')"
         >
-          单抽（¥{{ ROTATION_PRICE }}）
+          单抽（¥{{ rotPrice }}）
         </button>
         <button
           class="primary"
@@ -93,7 +96,7 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
           用高级券 ×1 抽（🎟️{{ store.s.hiTickets }}）
         </button>
         <template v-if="tenUnlocked && store.s.rotTheme">
-          <button :disabled="store.s.money < ROTATION_PRICE * 10" @click="store.pullGachaTen('rot', 'money')">十连（¥{{ ROTATION_PRICE * 10 }}）</button>
+          <button :disabled="store.s.money < rotPrice * 10" @click="store.pullGachaTen('rot', 'money')">十连（¥{{ rotPrice * 10 }}）</button>
           <button :disabled="store.s.hiTickets < 10" @click="store.pullGachaTen('rot', 'hiTicket')">十连（🎟️10）</button>
         </template>
       </div>

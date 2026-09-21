@@ -1,6 +1,7 @@
 import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
+import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
 import { gameById } from '../data/games';
 import { defaultState, genClientId } from '../state';
 import { rankCmp } from './records';
@@ -85,6 +86,9 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   10: raw => ({ ...raw }),
   // v11 → v12（快速上架比例 settings.quickListPct）：新增可选字段，归一化时补默认值，无需改写数据
   11: raw => ({ ...raw }),
+  // v12 → v13（挑战场景）：新增 challenge/prestige.coins/shop/challengeDone/stats.xyEarned，
+  // 均为新增可选字段，归一化时补默认值并剔除未知 id，无需改写数据
+  12: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -258,6 +262,23 @@ function normalize(data: Record<string, unknown>): GameState {
     const n = typeof lv === 'number' && Number.isFinite(lv) ? Math.floor(lv) : 0;
     if (n > 0) perks[id] = n;
   }
+  // 挑战场景：挑战币/商店等级/已完成挑战（跨周目保留）；未知商店 id 剔除
+  const shopRaw = isRecord(presRaw.shop) ? presRaw.shop : {};
+  const knownShop = new Set(CHALLENGE_SHOP.map(p => p.id));
+  const shop: Record<string, number> = {};
+  for (const [id, lv] of Object.entries(shopRaw)) {
+    if (!knownShop.has(id)) continue;
+    const n = typeof lv === 'number' && Number.isFinite(lv) ? Math.floor(lv) : 0;
+    if (n > 0) shop[id] = n;
+  }
+  const knownChallenges = new Set(CHALLENGES.map(c => c.id));
+  const challengeDone = Array.isArray(presRaw.challengeDone)
+    ? presRaw.challengeDone.filter((id): id is string => typeof id === 'string' && knownChallenges.has(id))
+    : [];
+  // 进行中的挑战：只接受已登记挑战 id；若已领过奖励（脏数据）则视为无激活
+  const chRaw = isRecord(data.challenge) ? data.challenge : {};
+  const activeRaw = typeof chRaw.active === 'string' ? chRaw.active : null;
+  const active = activeRaw && knownChallenges.has(activeRaw) && !challengeDone.includes(activeRaw) ? activeRaw : null;
   return {
     ...s,
     ...data,
@@ -267,6 +288,9 @@ function normalize(data: Record<string, unknown>): GameState {
       perks,
       runs: Math.floor(num(presRaw.runs, 0)),
       lastGain: num(presRaw.lastGain, 0),
+      coins: num(presRaw.coins, 0),
+      shop,
+      challengeDone,
     },
     money: num(data.money, s.money),
     sleeves: num(data.sleeves, s.sleeves),
@@ -290,6 +314,7 @@ function normalize(data: Record<string, unknown>): GameState {
     job: typeof data.job === 'string' ? data.job : null,
     jobProgress: num(data.jobProgress, 0),
     started: data.started === true,
+    challenge: { active, progress: active ? num(chRaw.progress, 0) : 0 },
     offlineBank: {
       t: num(bank.t, 0),
       workMoney: num(bank.workMoney, 0),
@@ -311,6 +336,7 @@ function normalize(data: Record<string, unknown>): GameState {
       pityHits: Math.floor(num(stats.pityHits, 0)),
       highPriceSold: Math.floor(num(stats.highPriceSold, 0)),
       bargainBuys: Math.floor(num(stats.bargainBuys, 0)),
+      xyEarned: num(stats.xyEarned, 0),
       comeback: stats.comeback === true,
       respecCount: Math.floor(num(stats.respecCount, 0)),
     },

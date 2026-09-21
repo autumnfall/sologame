@@ -10,6 +10,7 @@ import { hasAffix, isMastered } from '../mechanics/collection';
 import { currentJob, expMult, fatigueIncMult, jobCyclePay, jobCyclePayExpected, ticketRateMult } from '../mechanics/economy';
 import { fatigueMod, playDuration, ruleDuration, setupDuration } from '../mechanics/play';
 import { perkLv } from '../mechanics/prestige';
+import { challengeMods } from '../mechanics/challenge';
 
 export interface TickResult {
   /** 本 tick 完成的工作周期数（0 或 1） */
@@ -32,10 +33,11 @@ export function tickSecond(state: GameState, rng: () => number = Math.random): T
   result.ticketDrop = ticketDrop;
   const j = currentJob(state);
   if (!j || !j.auto) return result;
+  const noSalary = challengeMods(state).noJobIncome === true; // 挑战「无薪挑战」：周期照走但不发薪
   state.jobProgress += 1;
   if (state.jobProgress < j.cycleSec) return result;
   state.jobProgress -= j.cycleSec;
-  const pay = jobCyclePay(state, j, rng);
+  const pay = noSalary ? 0 : jobCyclePay(state, j, rng);
   state.money += pay;
   state.stats.workCycles++;
   result.payout = 1;
@@ -66,18 +68,21 @@ export function accumulateOffline(
   const addT = Math.min(t, OFFLINE_CAP_MS - state.offlineBank.t);
   state.offlineBank.t += addT;
   const rate = OFFLINE_RATE + 0.15 * perkLv(state, 'offlineUp'); // 挂机心得：离线折算提升
-  // ① 工作整周期
+  // ① 工作整周期（挑战「无薪挑战」同样生效：周期照走、不发薪）
   if (j?.auto) {
     const total = state.jobProgress + addT / 1000;
     const cycles = Math.floor(total / j.cycleSec);
     state.jobProgress = total - cycles * j.cycleSec;
-    const pay = Math.round(cycles * jobCyclePayExpected(state, j) * rate);
+    const pay = challengeMods(state).noJobIncome === true
+      ? 0
+      : Math.round(cycles * jobCyclePayExpected(state, j) * rate);
     state.money += pay;
     state.offlineBank.workMoney += pay;
     state.offlineBank.workCycles += cycles;
     state.stats.workCycles += cycles;
   }
-  // ② 自动游玩
+  // ② 自动游玩（挑战「花佬」禁止游玩：离线自动游玩一并跳过）
+  if (challengeMods(state).noPlay === true) return;
   let secs = addT / 1000;
   let guard = 0; // 防御上限：单轮最短约 10s，1 小时最多 ~360 局
   const mode = state.settings.autoSwitch;

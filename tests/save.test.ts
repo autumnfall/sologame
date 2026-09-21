@@ -235,7 +235,7 @@ describe('存档系统', () => {
     expect(s!.collections['bad']).toBeUndefined();
     expect(s!.stats).toEqual({
       plays: 0, pulls: 0, workCycles: 0, soldCount: 0, tbBought: 0, xyBought: 0,
-      pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
+      pityHits: 0, highPriceSold: 0, bargainBuys: 0, xyEarned: 0, comeback: false, respecCount: 0,
     });
   });
 });

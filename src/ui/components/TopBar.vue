@@ -10,6 +10,7 @@ const TABS = [
   { key: 'work', label: '💼 工作' },
   { key: 'shop', label: '🛒 商店' },
   { key: 'shelf', label: '📚 收藏架' },
+  { key: 'challenge', label: '🎯 挑战' },
   { key: 'prestige', label: '🌅 转生' },
   { key: 'guide', label: '📖 教程' },
 ] as const;

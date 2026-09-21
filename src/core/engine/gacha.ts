@@ -9,9 +9,16 @@ import { acquireGame } from './acquire';
 import type { AcquireResult } from './acquire';
 import { isMastered } from '../mechanics/collection';
 import { perkLv } from '../mechanics/prestige';
+import { challengeMods, distinctCapBlock } from '../mechanics/challenge';
 
 export type GachaPool = 'perm' | 'rot' | 'master';
 export type GachaPay = 'money' | 'ticket' | 'hiTicket' | 'sleeves';
+
+/** 某赏金钱单抽价（含挑战价格倍率，如「柠檬佬」×1.5；常驻池与桌游池） */
+export function gachaMoneyPrice(state: GameState, pool: 'perm' | 'rot'): number {
+  const base = pool === 'perm' ? GACHA_PRICE : ROTATION_PRICE;
+  return Math.max(1, Math.round(base * (challengeMods(state).gachaPriceMult ?? 1)));
+}
 
 /** 一次抽取的原始结果（牌套包 或 某稀有度桌游） */
 export type GachaRoll =
@@ -85,6 +92,8 @@ export function masterPool(state: GameState) {
  * 精通池：固定 200 张牌套，范围为本局已入手且未精通的桌游，抽到直接加熟练值（N5/R10/SR20/SSR40），
  * 抽中的稀有度已全部精通时改为 +100 牌套；不参与保底计数。
  * 保底：常驻池与桌游池各 50 抽独立计数，抽出 SR/SSR 重置，其余结果 +1。
+ * 挑战修饰：金钱单抽价乘 gachaPriceMult（柠檬佬）；款数上限（叉叉）到限时若抽出的是架上新款桌游则拒抽
+ * （不扣费、不计抽数、不动保底）。
  */
 export function gachaDraw(
   state: GameState,
@@ -110,36 +119,25 @@ export function gachaDraw(
     state.collections[g.id].prof += prof;
     return { kind: 'prof', pool, rarity, gameId: g.id, prof, masteredNow: isMastered(state, g.id) };
   }
-  // —— 扣费 ——
-  if (pool === 'perm') {
-    if (pay === 'ticket') {
-      if (state.tickets < 1) return { error: '没有普通券' };
-      state.tickets--;
-    } else {
-      if (state.money < GACHA_PRICE) return { error: '钱不够抽赏' };
-      state.money -= GACHA_PRICE;
-    }
-  } else {
-    if (!state.rotTheme) return { error: '桌游池尚未开启' };
-    if (pay === 'hiTicket') {
-      if (state.hiTickets < 1) return { error: '没有高级券' };
-      state.hiTickets--;
-    } else {
-      if (state.money < ROTATION_PRICE) return { error: '钱不够抽赏' };
-      state.money -= ROTATION_PRICE;
-    }
-  }
-  state.stats.pulls++;
-  // —— 判定与保底（欧非守恒天赋可缩短保底） ——
+  // —— 预检与判定（扣费后置：挑战「款数上限」拒抽新款时不损失金钱/券/保底） ——
+  if (pool === 'rot' && !state.rotTheme) return { error: '桌游池尚未开启' };
+  const price = gachaMoneyPrice(state, pool);
+  if (pay === 'ticket' && state.tickets < 1) return { error: '没有普通券' };
+  if (pay === 'hiTicket' && state.hiTickets < 1) return { error: '没有高级券' };
+  if (pay === 'money' && state.money < price) return { error: '钱不够抽赏' };
   const pityKey = pool === 'perm' ? 'pity' : 'pityRot';
   const pityNeed = Math.max(10, GACHA_PITY - 5 * perkLv(state, 'pityCut'));
   const forcePity = state[pityKey] >= pityNeed - 1;
-  if (forcePity) state.stats.pityHits++;
   const roll = pool === 'rot' ? { kind: 'game', rarity: rollGameRarity(rng, forcePity) } as const : rollGachaOutcome(rng, forcePity);
-  const hitSRplus = roll.kind === 'game' && (roll.rarity === 'SR' || roll.rarity === 'SSR');
-  state[pityKey] = hitSRplus ? 0 : state[pityKey] + 1;
-  // —— 发放 ——
+  const charge = (): void => {
+    if (pay === 'ticket') state.tickets--;
+    else if (pay === 'hiTicket') state.hiTickets--;
+    else state.money -= price;
+  };
   if (roll.kind === 'sleeves') {
+    charge();
+    state.stats.pulls++;
+    state[pityKey]++; // 牌套结果也计保底
     const sleeves = roll.packs * SLEEVE_PACK;
     state.sleeves += sleeves;
     return { kind: 'sleeves', pool, packs: roll.packs, sleeves };
@@ -150,6 +148,14 @@ export function gachaDraw(
     if (themed.length) candidates = themed;
   }
   const g = candidates[Math.floor(rng() * candidates.length)] ?? REGULAR_GAMES[0];
+  // 挑战「款数上限」：到限且抽出的是架上没有的新款桌游 → 拒抽
+  const block = distinctCapBlock(state, g.id);
+  if (block) return { error: block };
+  charge();
+  state.stats.pulls++;
+  if (forcePity) state.stats.pityHits++;
+  const hitSRplus = roll.rarity === 'SR' || roll.rarity === 'SSR';
+  state[pityKey] = hitSRplus ? 0 : state[pityKey] + 1;
   const duplicate = state.collections[g.id]?.firstOpened === true;
   const acquire = acquireGame(state, g.id);
   return { kind: 'game', pool, rarity: roll.rarity, gameId: g.id, duplicate, acquire };

@@ -184,7 +184,9 @@ describe('转生：存档迁移', () => {
     const s = parseSave(JSON.stringify({ saveVersion: 6, money: 5 }));
     expect(s).not.toBeNull();
     expect(s!.saveVersion).toBe(SAVE_VERSION);
-    expect(s!.prestige).toEqual({ insight: 0, perks: {}, runs: 0, lastGain: 0 });
+    expect(s!.prestige).toEqual({
+      insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [],
+    });
     expect(s!.money).toBe(5);
   });
 

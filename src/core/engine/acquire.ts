@@ -5,6 +5,7 @@ import type { Attr } from '../data/constants';
 import type { Copy, GameState } from '../state';
 import { globalBonus } from '../mechanics/collection';
 import { perkLv } from '../mechanics/prestige';
+import { distinctCapBlock } from '../mechanics/challenge';
 
 export interface AcquireResult {
   /** 是否首次收藏（触发开箱奖励） */
@@ -20,9 +21,12 @@ export interface AcquireResult {
  * 获得一款桌游的实体：push 一个全新满耐久副本；
  * 首次收藏（firstOpened）时按稀有度发放一次性开箱属性奖励（N15/R30/SR60/SSR120，吃图鉴加成）。
  * 熟练度/疲劳/读规则在收藏级保留，卖光重买不重复给开箱奖励。
+ * 挑战「款数上限」拦截在此处兜底：到限时获得「新款」桌游抛错（购买渠道应先预检，避免先扣款）。
  */
 export function acquireGame(state: GameState, id: string): AcquireResult {
   const g = gameById(id);
+  const block = distinctCapBlock(state, id);
+  if (block) throw new Error(block);
   let c = state.collections[id];
   const first = !c || !c.firstOpened;
   if (!c) {

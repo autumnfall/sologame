@@ -10,6 +10,7 @@ import PlayPage from './pages/PlayPage.vue';
 import WorkPage from './pages/WorkPage.vue';
 import ShopPage from './pages/ShopPage.vue';
 import ShelfPage from './pages/ShelfPage.vue';
+import ChallengePage from './pages/ChallengePage.vue';
 import PrestigePage from './pages/PrestigePage.vue';
 import GuidePage from './pages/GuidePage.vue';
 
@@ -83,6 +84,7 @@ onUnmounted(() => {
     <WorkPage v-else-if="store.tab === 'work'" />
     <ShopPage v-else-if="store.tab === 'shop'" />
     <ShelfPage v-else-if="store.tab === 'shelf'" />
+    <ChallengePage v-else-if="store.tab === 'challenge'" />
     <PrestigePage v-else-if="store.tab === 'prestige'" />
     <GuidePage v-else />
   </div>

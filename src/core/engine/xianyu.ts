@@ -9,6 +9,7 @@ import { isMastered } from '../mechanics/collection';
 import { canStore } from '../mechanics/play';
 import { sellFeeRate, xyPriceMult } from '../mechanics/economy';
 import { perkLv } from '../mechanics/prestige';
+import { challengeMods, challengeShopLv, distinctCapBlock } from '../mechanics/challenge';
 import { acquireGame } from './acquire';
 
 export interface RefreshResult {
@@ -24,8 +25,9 @@ export function marketItemValue(item: MarketItem): number {
 }
 
 /**
- * 刷新一批某鱼货源：件数 = marketSlots（3~7）+ 1 件一口价盲买，批内不重复。
+ * 刷新一批某鱼货源：件数 = (marketSlots + 1) × 挑战件数倍率（1~15）+ 1 件一口价盲买，批内不重复。
  * 每件是一个实体：随机成色（3~10成新的耐久）、概率带牌套/收纳；
+ * 火眼金睛（挑战商店）提高高成色/带牌套概率；
  * 普通货价格 = 总价值 ×(50%~200%)×运筹砍价（最低 ¥10）；
  * 一口价只显示桌游名称，成色/牌套/收纳不可见，价格 = 总价值 ×(80%~120%)。
  * 8% 概率刷出隐藏款；已精通的桌游不再出现；可与玩家已拥有（未精通）的重复。
@@ -43,7 +45,13 @@ export function refreshXianyu(
   const hidden = GAMES.filter(g => g.hidden && !isMastered(state, g.id));
   const normal = REGULAR_GAMES.filter(g => !isMastered(state, g.id));
   if (!normal.length && !hidden.length) return { ok: false, reason: '所有桌游均已精通，暂无货源' };
-  const n = state.marketSlots;
+  // 挑战件数倍率（<1 更少 / >1 更多）作用于本批总件数（含 1 件一口价），clamp 1~15
+  const total = Math.min(15, Math.max(1, Math.round((state.marketSlots + 1) * (challengeMods(state).xyCountMult ?? 1))));
+  const n = Math.max(0, total - 1); // 普通货源件数 = 总件数 − 1 件必出的一口价
+  // 火眼金睛：每级 +8% 带牌套概率（封顶 100%）、成色下限 +15%
+  const eye = challengeShopLv(state, 'xyEye');
+  const sleeveP = Math.min(1, 0.25 + 0.08 * eye);
+  const condFloor = 0.3 + 0.15 * eye;
   const items: MarketItem[] = [];
   const used = new Set<string>();
   for (let i = 0; i < n; i++) {
@@ -58,8 +66,8 @@ export function refreshXianyu(
     if (used.has(g.id)) continue;
     used.add(g.id);
     const maxDur = DURABILITY[g.rarity];
-    const durability = Math.max(1, Math.round(maxDur * (0.3 + rng() * 0.7)));
-    const sleeved = !!g.cards && rng() < 0.25;
+    const durability = Math.max(1, Math.round(maxDur * Math.min(1, condFloor + rng() * 0.7)));
+    const sleeved = !!g.cards && rng() < sleeveP;
     const stored = canStore(g) && rng() < 0.2;
     const value = copyValue(g.marketPrice, g.cards, durability, g.rarity, sleeved, stored);
     const price = Math.max(10, Math.round(value * (0.5 + rng() * 1.5) * xyPriceMult(state)));
@@ -79,8 +87,8 @@ export function refreshXianyu(
   };
   const bg = pickOne(true);
   used.add(bg.id);
-  const bDurability = Math.max(1, Math.round(DURABILITY[bg.rarity] * (0.3 + rng() * 0.7)));
-  const bSleeved = !!bg.cards && rng() < 0.25;
+  const bDurability = Math.max(1, Math.round(DURABILITY[bg.rarity] * Math.min(1, condFloor + rng() * 0.7)));
+  const bSleeved = !!bg.cards && rng() < sleeveP;
   const bStored = canStore(bg) && rng() < 0.2;
   const bValue = copyValue(bg.marketPrice, bg.cards, bDurability, bg.rarity, bSleeved, bStored);
   items.push({
@@ -92,7 +100,8 @@ export function refreshXianyu(
     blind: true,
   });
   state.xianyuBuys = items;
-  state.xyNext = now + XY_REFRESH_MS;
+  // 挑战刷新间隔倍率（<1 更快）
+  state.xyNext = now + XY_REFRESH_MS * (challengeMods(state).xyRefreshMult ?? 1);
   return { ok: true, items };
 }
 
@@ -110,11 +119,12 @@ export interface XianyuTickResult {
 }
 
 /**
- * 某鱼成交率（含好口碑天赋加成，封顶 100%）：
+ * 某鱼成交率（含好口碑天赋与挑战成交率倍率，封顶 100%）：
  * 挂售判定与「预计成交率」展示共用此函数，保证看见的就是掷骰用的。
  */
 export function sellChanceFinal(state: GameState, ratio: number, durability: number, rarity: Rarity): number {
-  return Math.min(1, sellChance(ratio, durability, rarity) * (1 + 0.1 * perkLv(state, 'sellBoost')));
+  return Math.min(1, sellChance(ratio, durability, rarity)
+    * (1 + 0.1 * perkLv(state, 'sellBoost')) * (challengeMods(state).sellChanceMult ?? 1));
 }
 
 /**
@@ -155,6 +165,7 @@ export function tickXianyu(
         state.copies = state.copies.filter(c => c.uid !== l.copyUid);
         state.listings.splice(i, 1);
         state.stats.soldCount++;
+        state.stats.xyEarned += gain; // 某鱼卖出净额累计（挑战「无薪挑战」目标）
         if (l.price >= value * 2) state.stats.highPriceSold++; // 200% 定价成交
         // 唯一副本卖光 → 打回头客标记
         const col = state.collections[g.id];
@@ -174,6 +185,8 @@ export function buyXianyu(
   const it = state.xianyuBuys[index];
   if (!it) return { ok: false, reason: '货源不存在' };
   if (state.money < it.price) return { ok: false, reason: '钱不够' };
+  const block = distinctCapBlock(state, it.gameId); // 挑战「款数上限」：到限拒购新款（先扣款前拦截）
+  if (block) return { ok: false, reason: block };
   state.money -= it.price;
   state.xianyuBuys.splice(index, 1);
   // 复用 acquire 的开箱奖励逻辑，但实体成色以货源为准

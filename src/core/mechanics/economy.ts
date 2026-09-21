@@ -8,22 +8,25 @@ import { attrLevel } from './attrs';
 import { computeSetBonus, globalBonus, hasAffix } from './collection';
 import { achievementExpMult } from './achievements';
 import { perkLv } from './prestige';
+import { challengeMods, challengeShopLv } from './challenge';
 
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
 // 谋略：游玩经验 +2.5%/级  演算：游玩时间 -2%/级（下限 ×0.80）
 // 沉浸：游玩疲劳增长 -4%/级（下限 ×0.60）  运筹：某鱼砍价 -2%/级（下限 ×0.80）、手续费 -0.5%/级（10 级全免）
 // 洞察：掉券率 +10%/级、时机条金区 +2%/级宽（上限 40%）  应变：工作酬劳 +4%/级、主播酬劳下限上移
 
-/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 × 触类旁通 × 成就 */
+/** 游玩经验倍率 = 图鉴加成 × 谋略 × 隐藏款词条 × 套装 × 触类旁通 × 成就 × 挑战修饰 × 博览群玩 */
 export function expMult(state: GameState): number {
   return (1 + globalBonus(state)) * (1 + 0.025 * attrLevel(state, '谋略'))
     * (hasAffix(state, 'expAll') ? 1.05 : 1) * computeSetBonus()
-    * Math.pow(1.1, perkLv(state, 'expAll')) * achievementExpMult(state);
+    * Math.pow(1.1, perkLv(state, 'expAll')) * achievementExpMult(state)
+    * (challengeMods(state).expMult ?? 1) * (1 + 0.05 * challengeShopLv(state, 'expBoost'));
 }
 
-/** 疲劳增长倍率（沉浸先过 0.60 地板，科学作息在地板之后再乘——永远生效） */
+/** 疲劳增长倍率（沉浸先过 0.60 地板，科学作息与挑战修饰在地板之后再乘——永远生效） */
 export function fatigueIncMult(state: GameState): number {
-  return Math.max(0.60, 1 - 0.04 * attrLevel(state, '沉浸' as Attr)) * Math.pow(0.9, perkLv(state, 'fatigueCut'));
+  return Math.max(0.60, 1 - 0.04 * attrLevel(state, '沉浸' as Attr))
+    * Math.pow(0.9, perkLv(state, 'fatigueCut')) * (challengeMods(state).fatigueIncMult ?? 1);
 }
 
 /** 某鱼价格倍率（运筹砍价，下限 ×0.80） */

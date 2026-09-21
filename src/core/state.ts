@@ -78,6 +78,12 @@ export interface PrestigeState {
   runs: number;
   /** 上周目获得的阅历（保底递增用） */
   lastGain: number;
+  /** 挑战币（完成挑战一次性获得，跨周目保留） */
+  coins: number;
+  /** 挑战商店等级：id -> 等级 */
+  shop: Record<string, number>;
+  /** 已完成（领过币）的挑战 id，一次性奖励的依据 */
+  challengeDone: string[];
 }
 
 /** 一个已完成周目的成绩记录（本地榜与在线榜共用结构） */
@@ -147,6 +153,8 @@ export interface GameState {
   jobProgress: number;
   /** 是否已完成开局三选一 */
   started: boolean;
+  /** 挑战场景（周目级）：当前激活的挑战 id 与目标进度 */
+  challenge: { active: string | null; progress: number };
   /** 离线总结（收益已自动入账；>1 分钟离线回来时弹窗展示，关闭后清空） */
   offlineBank: OfflineBank;
   lastSeen: number;
@@ -165,6 +173,8 @@ export interface GameState {
     pityHits: number;
     highPriceSold: number;
     bargainBuys: number;
+    /** 某鱼卖出净额累计（成交价 − 手续费；挑战「无薪挑战」目标） */
+    xyEarned: number;
     /** 回头客：唯一副本卖光后重新入手 */
     comeback: boolean;
     respecCount: number;
@@ -195,7 +205,7 @@ export function emptyOfflineBank(): OfflineBank {
 }
 
 export function defaultPrestige(): PrestigeState {
-  return { insight: 0, perks: {}, runs: 0, lastGain: 0 };
+  return { insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [] };
 }
 
 export function defaultState(): GameState {
@@ -224,11 +234,12 @@ export function defaultState(): GameState {
     job: null,
     jobProgress: 0,
     started: false,
+    challenge: { active: null, progress: 0 },
     offlineBank: emptyOfflineBank(),
     lastSeen: Date.now(),
     stats: {
       plays: 0, pulls: 0, workCycles: 0, soldCount: 0, tbBought: 0, xyBought: 0,
-      pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
+      pityHits: 0, highPriceSold: 0, bargainBuys: 0, xyEarned: 0, comeback: false, respecCount: 0,
     },
     achievements: [],
     playerName: '',

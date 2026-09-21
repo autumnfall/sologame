@@ -9,6 +9,11 @@ import {
   buyXianyu,
   buyPerk,
   checkAchievements,
+  checkChallenge,
+  challengeMods,
+  startChallenge as coreStartChallenge,
+  abandonChallenge as coreAbandonChallenge,
+  buyChallengeShop as coreBuyChallengeShop,
   autoSwitchTarget,
   isFeatureUnlocked,
   isMastered,
@@ -28,7 +33,7 @@ import {
   fmt,
   gameById,
   gachaDraw,
-  GACHA_PRICE,
+  gachaMoneyPrice,
   goldZoneWidth,
   autoHitChance,
   initTaobaoStock,
@@ -41,7 +46,6 @@ import {
   playDuration,
   quitJob,
   refreshXianyu,
-  ROTATION_PRICE,
   respecPerks,
   rotatingThemeText,
   ruleDuration,
@@ -64,7 +68,7 @@ import {
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 import { LEADERBOARD_API, submitRun } from '../leaderboard';
 
-export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'prestige' | 'guide';
+export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'challenge' | 'prestige' | 'guide';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
 
 /** 一局中的一个阶段（读规则/Setup/游玩/结算） */
@@ -269,6 +273,8 @@ export const useGameStore = defineStore('game', {
         const names = fresh.map(a => `「${a.name}」`).join('');
         this.toast(`🏆 达成成就 ${names} 等 ${fresh.length} 项，全局经验 +${fresh.length}%`);
       }
+      const done = checkChallenge(this.s);
+      for (const e of done) this.toast(`🎯 挑战「${e.def.name}」达成！挑战币 +${e.reward}`);
     },
 
     logPlay(text: string, cls = '') {
@@ -284,6 +290,10 @@ export const useGameStore = defineStore('game', {
      */
     requestPlay(id: string) {
       if (this.session) return;
+      if (challengeMods(this.s).noPlay) {
+        this.toast('挑战限制：不可游玩桌游');
+        return;
+      }
       const avail = copiesOf(this.s, id);
       if (!avail.length) {
         this.toast('没有可游玩的实体（可能已全部上架某鱼）');
@@ -326,10 +336,15 @@ export const useGameStore = defineStore('game', {
       this.beginRound(id);
     },
 
-    /** 开始一轮：重新计算各段时长（牌套/收纳/熟练度减速即时生效） */
+    /** 开始一轮：重新计算各段时长（牌套/收纳/熟练度减速即时生效）；挑战「花佬」禁止游玩 */
     beginRound(id: string) {
       const ps = this.session;
       if (!ps) return;
+      if (challengeMods(this.s).noPlay) {
+        this.toast('挑战限制：不可游玩桌游');
+        this.clearSession();
+        return;
+      }
       const g = gameById(id);
       if (ps.restartTimer !== null) {
         clearTimeout(ps.restartTimer);
@@ -640,7 +655,7 @@ export const useGameStore = defineStore('game', {
         this.saveGame();
         return;
       }
-      const price = pool === 'perm' ? GACHA_PRICE : ROTATION_PRICE;
+      const price = gachaMoneyPrice(this.s, pool); // 含挑战价格倍率（柠檬佬）
       if (pay === 'money' && this.s.money < price * 10) return this.toast('钱不够十连');
       if (pay === 'ticket' && this.s.tickets < 10) return this.toast('普通券不够 10 张');
       if (pay === 'hiTicket' && this.s.hiTickets < 10) return this.toast('高级券不够 10 张');
@@ -852,6 +867,29 @@ export const useGameStore = defineStore('game', {
       const r = listWornCopies(this.s);
       this.toast(r.count > 0 ? `已上架 ${r.count} 件磨光实体（行情价 100%）` : '没有可上架的磨光实体（或槽位已满）');
       if (r.count > 0) this.saveGame();
+    },
+
+    // ---------- 挑战场景 ----------
+
+    /** 激活挑战：校验已解锁 + 未领过奖励 + 当前无激活（薄封装 → core → toast + 落档） */
+    startChallenge(id: string) {
+      const r = coreStartChallenge(this.s, id);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 放弃当前挑战：进度清零（已完成的不受影响，已领的起步资金不退回） */
+    abandonChallenge() {
+      const r = coreAbandonChallenge(this.s);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 挑战商店购买：校验 after 前置 / 满级 / 币足够 */
+    buyChallengeShop(id: string) {
+      const r = coreBuyChallengeShop(this.s, id);
+      this.toast(r.ok ? `${r.message}（剩余挑战币 ${this.s.prestige.coins}）` : r.reason);
+      if (r.ok) this.saveGame();
     },
 
     // ---------- 存档管理：导出 / 导入 / 重新开始 ----------

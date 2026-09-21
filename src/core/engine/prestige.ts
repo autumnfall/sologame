@@ -12,8 +12,8 @@ export interface PrestigeResult {
 }
 
 /**
- * 退坑转生：清仓本周目的一切（金钱/收藏/实体/属性/槽位/保底/职业），
- * 保留阅历、天赋、生涯统计、成就（含已解锁的里程碑功能）与功能开关、玩家名/本地排行榜；
+ * 退坑转生：清仓本周目的一切（金钱/收藏/实体/属性/槽位/保底/职业/进行中的挑战），
+ * 保留阅历、天赋、挑战币、挑战商店、已完成挑战、生涯统计、成就（含已解锁的里程碑功能）与功能开关、玩家名/本地排行榜；
  * 获得阅历 = insightGain。返回全新开局状态（started=false，由 UI 重新走三选一与上架流程）。
  */
 export function doPrestige(state: GameState): PrestigeResult {
@@ -21,7 +21,7 @@ export function doPrestige(state: GameState): PrestigeResult {
     return { ok: false, reason: `需要精通至少 ${prestigeUnlockCount(state)} 款桌游才能退坑` };
   }
   const gain = insightGain(state);
-  const { insight, perks, runs } = state.prestige;
+  const { insight, perks, runs, coins, shop, challengeDone } = state.prestige;
   const stats = state.stats;
   const achievements = state.achievements;
   const settings = state.settings;
@@ -30,7 +30,10 @@ export function doPrestige(state: GameState): PrestigeResult {
   const clientId = state.clientId;
   const fresh = defaultState();
   Object.assign(state, fresh, {
-    prestige: { insight: insight + gain, perks: { ...perks }, runs: runs + 1, lastGain: gain },
+    prestige: {
+      insight: insight + gain, perks: { ...perks }, runs: runs + 1, lastGain: gain,
+      coins, shop: { ...shop }, challengeDone: [...challengeDone],
+    },
     stats,
     achievements,
     settings,

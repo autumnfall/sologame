@@ -6,6 +6,7 @@ import { tierOwned, tierUnlocked } from '../mechanics/collection';
 import { storageCost, canStore } from '../mechanics/play';
 import { sellFeeRate, sellSlotsMax, taobaoPrice } from '../mechanics/economy';
 import { perkLevel, perkLv } from '../mechanics/prestige';
+import { distinctCapBlock } from '../mechanics/challenge';
 import { acquireGame } from './acquire';
 import type { AcquireResult } from './acquire';
 import { buyXianyu } from './xianyu';
@@ -59,6 +60,8 @@ export function buyTaobao(state: GameState, id: string): ActionResult {
   const left = state.taobaoStock[id] ?? TAOBAO_STOCK[g.rarity];
   if (left <= 0) return fail('已售罄');
   if (!tierUnlocked(state, g.rarity)) return fail('该级别尚未解锁');
+  const block = distinctCapBlock(state, id); // 挑战「款数上限」：到限拒购新款（先扣款前拦截）
+  if (block) return fail(block);
   state.money -= price;
   state.taobaoStock[id] = left - 1;
   state.stats.tbBought++;
