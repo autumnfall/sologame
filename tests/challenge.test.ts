@@ -1,74 +1,86 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   CHALLENGES, DURABILITY, GACHA_PRICE, GAMES, REGULAR_GAMES, SAVE_VERSION, XY_REFRESH_MS,
-  abandonChallenge, accumulateOffline, buyChallengeShop, buyTaobao, buyXianyu,
-  challengeAvailable, challengeShopLv, checkChallenge, defaultState, distinctCopyKinds,
+  accumulateOffline, buyChallengeShop, buyTaobao, buyXianyu,
+  challengeShopLv, checkChallenge, defaultState, distinctCopyKinds,
   doPrestige, expMult, gachaDraw, gachaMoneyPrice, goalProgress, kindCount, listCopy,
-  parseSave, refreshXianyu, sellChance, sellChanceFinal, serialize, settleRound,
-  startChallenge, takeJob, tickSecond, tickXianyu,
+  parseSave, refreshXianyu, selectPendingChallenge, sellChance, sellChanceFinal, serialize,
+  settleRound, takeJob, tickSecond, tickXianyu,
 } from '../src/core';
 import type { GameState } from '../src/core';
 import { lcg, own } from './helpers';
 
-/** 构造一个已完成指定挑战、可激活 id 的状态 */
-function stateWithChallenge(done: string[], active?: string): GameState {
+/** 凑齐转生门槛（首周目精通 4 款 N；runs>0 时按 prestigeUnlockCount 递增，调用方传足款数） */
+function meetUnlockRequirement(s: GameState, n = 4) {
+  for (const g of REGULAR_GAMES.filter(x => x.rarity === 'N').slice(0, n)) {
+    own(s, g.id, { prof: 20 }); // N 精通门槛 20 局
+  }
+}
+
+/** 新流程开启带挑战的周目：登记已完成挑战 → 选择 pending → 转生（pending 消费为 active） */
+function beginRunWithChallenge(done: string[], pending: string | null): GameState {
   const s = defaultState();
   s.prestige.challengeDone = [...done];
-  if (active) {
-    const r = startChallenge(s, active);
-    if (!r.ok) throw new Error(`激活失败: ${r.reason}`);
+  meetUnlockRequirement(s);
+  if (pending) {
+    const r = selectPendingChallenge(s, pending);
+    if (!r.ok) throw new Error(`选择挑战失败: ${r.reason}`);
   }
+  expect(doPrestige(s).ok).toBe(true);
   return s;
 }
 
 const FIVE_N = ['guoyuan', 'zongming', 'kafei', 'zhitu', 'kaska'];
 
-describe('挑战：激活与放弃', () => {
-  it('第一层开局即可激活；同时只能激活一个；完成后不可再激活（一次性）', () => {
+describe('挑战：转生时选择、新周目生效', () => {
+  it('selectPending 校验：已解锁且未完成的挑战才能选；已完成拒绝；null = 无挑战', () => {
     const s = defaultState();
-    expect(challengeAvailable(s, 'no-salary')).toBe(true);
-    expect(startChallenge(s, 'no-salary').ok).toBe(true);
-    expect(s.challenge.active).toBe('no-salary');
-    expect(startChallenge(s, 'marathon').ok).toBe(false); // 已有激活
-    expect(abandonChallenge(s).ok).toBe(true);
-    expect(s.challenge.active).toBeNull();
-    expect(startChallenge(s, 'marathon').ok).toBe(true);
-    // 领过奖励后拒绝再激活
+    expect(selectPendingChallenge(s, 'big-earner').ok).toBe(false); // 前置未满足
+    expect(s.prestige.pendingChallenge).toBeNull();
+    expect(selectPendingChallenge(s, 'no-salary').ok).toBe(true);
+    expect(s.prestige.pendingChallenge).toBe('no-salary');
+    expect(s.challenge.active).toBeNull(); // 正常游玩期不生效
+    expect(selectPendingChallenge(s, null).ok).toBe(true); // 改选无挑战
+    expect(s.prestige.pendingChallenge).toBeNull();
     s.prestige.challengeDone.push('no-salary');
-    expect(startChallenge(s, 'no-salary').ok).toBe(false);
+    expect(selectPendingChallenge(s, 'no-salary').ok).toBe(false); // 已完成（一次性）
   });
 
-  it('前置：big-earner 需 flea-market 与 merchant 都完成；startChallenge 同步校验', () => {
+  it('doPrestige 消费 pending → active（progress 归零、pending 清空），只消费一次', () => {
     const s = defaultState();
-    expect(challengeAvailable(s, 'big-earner')).toBe(false);
-    expect(startChallenge(s, 'big-earner').ok).toBe(false);
-    s.prestige.challengeDone.push('flea-market');
-    expect(challengeAvailable(s, 'big-earner')).toBe(false);
-    s.prestige.challengeDone.push('merchant');
-    expect(challengeAvailable(s, 'big-earner')).toBe(true);
-    expect(startChallenge(s, 'big-earner').ok).toBe(true);
+    meetUnlockRequirement(s);
+    expect(selectPendingChallenge(s, 'marathon').ok).toBe(true);
+    const r = doPrestige(s);
+    expect(r.ok).toBe(true);
+    expect(s.challenge).toEqual({ active: 'marathon', progress: 0 });
+    expect(s.prestige.pendingChallenge).toBeNull(); // 已消费
+    // 再次转生（无 pending）→ 无激活挑战（runs=1 门槛 6 款）
+    meetUnlockRequirement(s, 6);
+    const r2 = doPrestige(s);
+    expect(r2.ok).toBe(true);
+    expect(s.challenge.active).toBeNull();
   });
 
-  it('花佬 startMoneyBonus：激活立得 ¥1000，放弃不退回、可重新激活', () => {
-    const s = stateWithChallenge(['hardcore']);
-    s.money = 200;
-    expect(startChallenge(s, 'collector').ok).toBe(true);
-    expect(s.money).toBe(1200);
-    expect(abandonChallenge(s).ok).toBe(true);
-    expect(s.money).toBe(1200); // 不退回
-    expect(startChallenge(s, 'collector').ok).toBe(true); // 未完成可重新激活
+  it('无 pending 转生 → 新周目无激活挑战', () => {
+    const s = beginRunWithChallenge([], null);
+    expect(s.challenge.active).toBeNull();
+    expect(s.prestige.pendingChallenge).toBeNull();
+  });
+
+  it('花佬 startMoneyBonus 在转生生效时发放（替代原激活时发放）', () => {
+    const s = beginRunWithChallenge(['hardcore'], 'collector');
+    expect(s.challenge.active).toBe('collector');
+    expect(s.money).toBe(200 + 1000); // 新周目默认资金 + 起步资金
   });
 });
 
 describe('挑战：条件修饰', () => {
   it('无薪挑战：在线 tick 不发薪（周期照走、周期数照计）', () => {
-    const s = stateWithChallenge([], 'no-salary');
+    const s = beginRunWithChallenge([], 'no-salary');
     takeJob(s, 'teacher'); // 160 秒/周期，¥100
     for (let i = 0; i < 160; i++) {
       const r = tickSecond(s, () => 0.5);
-      if (r.payout) {
-        expect(r.payAmount).toBe(0);
-      }
+      if (r.payout) expect(r.payAmount).toBe(0);
     }
     expect(s.money).toBe(200);
     expect(s.jobProgress).toBe(0);
@@ -76,7 +88,7 @@ describe('挑战：条件修饰', () => {
   });
 
   it('无薪挑战：离线结算同样不发薪（周期照走）', () => {
-    const s = stateWithChallenge([], 'no-salary');
+    const s = beginRunWithChallenge([], 'no-salary');
     takeJob(s, 'teacher');
     accumulateOffline(s, 30 * 60 * 1000); // 1800 秒 → 11 周期余 40
     expect(s.offlineBank.workMoney).toBe(0);
@@ -86,7 +98,7 @@ describe('挑战：条件修饰', () => {
   });
 
   it('捡漏之王：刷新间隔 ×0.5、到货件数 ×2（(3+1)×2=8 件，其中 1 件一口价）', () => {
-    const s = stateWithChallenge(['no-salary'], 'flea-market');
+    const s = beginRunWithChallenge(['no-salary'], 'flea-market');
     const now = 1_000_000;
     const r = refreshXianyu(s, false, lcg(42), now);
     expect(r.ok).toBe(true);
@@ -100,7 +112,7 @@ describe('挑战：条件修饰', () => {
   });
 
   it('壮壮：到货件数 ×0.5（round(4×0.5)=2 件，其中 1 件一口价）', () => {
-    const s = stateWithChallenge(['no-salary'], 'merchant');
+    const s = beginRunWithChallenge(['no-salary'], 'merchant');
     const r = refreshXianyu(s, false, lcg(42), 0);
     expect(r.ok).toBe(true);
     expect(s.xianyuBuys).toHaveLength(2);
@@ -108,7 +120,7 @@ describe('挑战：条件修饰', () => {
   });
 
   it('硬核玩家：经验 ×0.6（settleRound 断言）', () => {
-    const s = stateWithChallenge(['marathon'], 'hardcore');
+    const s = beginRunWithChallenge(['marathon'], 'hardcore');
     const copy = own(s, 'guoyuan'); // 单属性 演算 13
     const r = settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
     // 疲劳 0→2（÷1.3）× 图鉴 1.015 × 挑战 0.6
@@ -120,14 +132,14 @@ describe('挑战：条件修饰', () => {
   });
 
   it('肝帝：疲劳增长 ×1.5（+2 → +3）', () => {
-    const s = stateWithChallenge([], 'marathon');
+    const s = beginRunWithChallenge([], 'marathon');
     const copy = own(s, 'guoyuan');
     settleRound(s, 'guoyuan', copy.uid, 1, () => 0.99);
     expect(s.collections['guoyuan'].fatigue).toBeCloseTo(3, 10);
   });
 
   it('柠檬佬：某赏价格 ×1.5（常驻池 + 桌游池），钱不够拒绝不扣费', () => {
-    const s = stateWithChallenge(['hardcore'], 'whale');
+    const s = beginRunWithChallenge(['hardcore'], 'whale');
     expect(gachaMoneyPrice(s, 'perm')).toBe(Math.max(1, Math.round(GACHA_PRICE * 1.5)));
     s.money = gachaMoneyPrice(s, 'perm') - 1;
     const r = gachaDraw(s, 'perm', 'money', () => 0.2);
@@ -146,7 +158,7 @@ describe('挑战：条件修饰', () => {
 
   it('叉叉：成交率 ×1.2（与好口碑乘区并列）', () => {
     const plain = defaultState();
-    const s = stateWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
     const base = sellChance(2.0, DURABILITY.N, 'N');
     expect(sellChanceFinal(plain, 2.0, DURABILITY.N, 'N')).toBeCloseTo(base, 10);
     expect(sellChanceFinal(s, 2.0, DURABILITY.N, 'N')).toBeCloseTo(base * 1.2, 10);
@@ -155,7 +167,7 @@ describe('挑战：条件修饰', () => {
 
 describe('挑战：目标与达成', () => {
   it('xyEarn 目标：成交通道累计净额，达成发币 + challengeDone + active 清空', () => {
-    const s = stateWithChallenge([], 'no-salary');
+    const s = beginRunWithChallenge([], 'no-salary');
     const c = own(s, 'guoyuan');
     listCopy(s, c.uid, 0.5);
     s.xySellNext = 1;
@@ -173,20 +185,21 @@ describe('挑战：目标与达成', () => {
     expect(s.prestige.challengeDone).toEqual(['no-salary']);
     expect(s.challenge.active).toBeNull();
     expect(s.challenge.progress).toBe(0);
-    // 一次性：再激活被拒
-    expect(startChallenge(s, 'no-salary').ok).toBe(false);
+    // 完成后修饰释放：同周目内可正常游玩（不再受限）
+    // 一次性：再选同挑战被拒
+    expect(selectPendingChallenge(s, 'no-salary').ok).toBe(false);
   });
 
   it('花佬：禁止游玩——离线自动游玩跳过（连刷 0 局）', () => {
-    const s = stateWithChallenge(['hardcore'], 'collector');
+    const s = beginRunWithChallenge(['hardcore'], 'collector');
     own(s, 'guoyuan');
     accumulateOffline(s, 10 * 60 * 1000, lcg(3));
     expect(s.offlineBank.playRounds).toBe(0);
     expect(s.collections['guoyuan'].prof).toBe(0);
   });
 
-  it('花佬：架上 30 款不同实体时 distinctCopies 达成', () => {
-    const s = stateWithChallenge(['hardcore'], 'collector');
+  it('花佬：架上 30 款不同实体时 distinctCopies 达成（完成后 noPlay 修饰释放）', () => {
+    const s = beginRunWithChallenge(['hardcore'], 'collector');
     const ids = REGULAR_GAMES.slice(0, 30).map(g => g.id);
     for (const id of ids) own(s, id);
     expect(goalProgress(s)).toBe(30);
@@ -194,6 +207,10 @@ describe('挑战：目标与达成', () => {
     expect(events).toHaveLength(1);
     expect(s.prestige.coins).toBe(4);
     expect(s.prestige.challengeDone).toContain('collector');
+    expect(s.challenge.active).toBeNull();
+    // 完成后修饰释放：noPlay 不再拦截（可正常刷精通再转生，无死局）
+    const copy = s.copies.find(cp => cp.gameId === ids[0])!;
+    expect(() => settleRound(s, copy.gameId, copy.uid, 1, () => 0.99)).not.toThrow();
   });
 
   it('花佬：在线 beginRound 入口被拒（store 层拦截）', async () => {
@@ -206,7 +223,7 @@ describe('挑战：目标与达成', () => {
     });
     setActivePinia(createPinia());
     const store = useGameStore();
-    store.s = stateWithChallenge(['hardcore'], 'collector');
+    store.s = beginRunWithChallenge(['hardcore'], 'collector');
     own(store.s, 'guoyuan');
     store.requestPlay('guoyuan');
     expect(store.session).toBeNull(); // 被拒：不可游玩
@@ -220,7 +237,7 @@ describe('挑战：目标与达成', () => {
   });
 
   it('叉叉：款数上限拦截新款购入（某宝/某鱼/某赏），已有款加购放行且不扣款', () => {
-    const s = stateWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
     for (const id of FIVE_N) own(s, id); // 架上 5 款
     s.money = 1e9;
     // 某宝：新款被拒，钱与库存不动
@@ -238,7 +255,7 @@ describe('挑战：目标与达成', () => {
     expect(s.money).toBe(1e9);
     expect(s.xianyuBuys).toHaveLength(1);
     // 某赏：抽出新款被拒（不扣费、不计抽数、不动保底）
-    const s2 = stateWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    const s2 = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
     for (const id of FIVE_N) own(s2, id);
     s2.rotTheme = '演算';
     s2.money = 1e9;
@@ -251,7 +268,7 @@ describe('挑战：目标与达成', () => {
   });
 
   it('叉叉：卖掉腾位后图鉴保留（distinctCollections 不回落），可再买新款', () => {
-    const s = stateWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
     for (const id of FIVE_N) own(s, id);
     s.money = 1e9;
     const c = s.copies.find(cp => cp.gameId === 'guoyuan')!;
@@ -294,7 +311,7 @@ describe('挑战商店', () => {
       const maxDur = DURABILITY[g.rarity];
       expect(it.durability).toBeGreaterThanOrEqual(Math.round(maxDur * 0.75)); // 成色下限上移
     }
-    // 对照：无火眼金睛时成色下限 30%
+    // 对照：无火眼金睛时存在低于该下限的货源
     const s2 = defaultState();
     refreshXianyu(s2, false, lcg(11), 0);
     const low = s2.xianyuBuys.find(it => {
@@ -306,46 +323,52 @@ describe('挑战商店', () => {
 });
 
 describe('挑战与转生', () => {
-  it('转生保留挑战币/商店/已完成挑战，重置进行中的挑战', () => {
-    const s = stateWithChallenge(['flea-market', 'merchant'], 'big-earner');
+  it('转生保留挑战币/商店/已完成挑战；消费 pending', () => {
+    const s = defaultState();
+    s.prestige.challengeDone = ['flea-market', 'merchant'];
     s.prestige.coins = 7;
     s.prestige.shop['exp-boost'] = 2;
-    // 满足转生条件（8 款 N 精通）
-    for (const g of REGULAR_GAMES.filter(x => x.rarity === 'N').slice(0, 8)) {
-      own(s, g.id, { prof: 20 });
-    }
+    meetUnlockRequirement(s);
+    expect(selectPendingChallenge(s, 'big-earner').ok).toBe(true);
     expect(doPrestige(s).ok).toBe(true);
+    expect(s.challenge.active).toBe('big-earner');
+    expect(s.prestige.pendingChallenge).toBeNull();
     expect(s.prestige.coins).toBe(7);
     expect(s.prestige.shop).toEqual({ 'exp-boost': 2 });
     expect(s.prestige.challengeDone).toEqual(['flea-market', 'merchant']);
-    expect(s.challenge).toEqual({ active: null, progress: 0 });
+  });
+
+  it('转生重置进行中的挑战（active 不跨周目）', () => {
+    const s = beginRunWithChallenge([], 'no-salary');
+    expect(s.challenge.active).toBe('no-salary');
+    meetUnlockRequirement(s, 6); // runs=1 门槛 6 款
+    expect(doPrestige(s).ok).toBe(true);
+    expect(s.challenge.active).toBeNull(); // 未完成挑战不带到下周目
   });
 });
 
-describe('挑战：存档迁移（v12 → v13）', () => {
-  it('v12 旧档 normalize 后新字段补默认值', () => {
+describe('挑战：存档迁移（v13 → v14）', () => {
+  it('v13 旧档 normalize 后 pendingChallenge 补默认值', () => {
     const s = defaultState();
     const old = JSON.parse(serialize(s)) as Record<string, unknown>;
-    old.saveVersion = 12;
+    old.saveVersion = 13;
     delete old.challenge;
-    old.prestige = { insight: 3, perks: {}, runs: 1, lastGain: 3 };
+    old.prestige = { insight: 3, perks: {}, runs: 1, lastGain: 3, coins: 0, shop: {}, challengeDone: [] };
     old.stats = {
       plays: 1, pulls: 0, workCycles: 0, soldCount: 0, tbBought: 0, xyBought: 0,
-      pityHits: 0, highPriceSold: 0, bargainBuys: 0, comeback: false, respecCount: 0,
+      pityHits: 0, highPriceSold: 0, bargainBuys: 0, xyEarned: 0, comeback: false, respecCount: 0,
     };
     const m = parseSave(JSON.stringify(old));
     expect(m).not.toBeNull();
     expect(m!.saveVersion).toBe(SAVE_VERSION);
     expect(m!.challenge).toEqual({ active: null, progress: 0 });
-    expect(m!.prestige.coins).toBe(0);
-    expect(m!.prestige.shop).toEqual({});
-    expect(m!.prestige.challengeDone).toEqual([]);
-    expect(m!.stats.xyEarned).toBe(0);
+    expect(m!.prestige.pendingChallenge).toBeNull();
   });
 
-  it('v13 档保留挑战进度与商店；未知挑战/商店 id 剔除', () => {
+  it('v14 档保留 pending/active；未知挑战 id 剔除', () => {
     const s = defaultState();
     s.challenge = { active: 'marathon', progress: 55 };
+    s.prestige.pendingChallenge = 'flea-market'; // 前置 no-salary 已完成
     s.prestige.coins = 5;
     s.prestige.shop = { 'exp-boost': 2 };
     s.prestige.challengeDone = ['no-salary'];
@@ -353,11 +376,13 @@ describe('挑战：存档迁移（v12 → v13）', () => {
     const dirty = JSON.parse(serialize(s)) as Record<string, unknown>;
     (dirty.challenge as Record<string, unknown>).active = 'ghost';
     const pres = dirty.prestige as Record<string, unknown>;
+    pres.pendingChallenge = 'ghost';
     pres.challengeDone = ['no-salary', 'ghost'];
     pres.shop = { 'exp-boost': 1, ghost: 2 };
     const m = parseSave(JSON.stringify(dirty));
     expect(m).not.toBeNull();
-    expect(m!.challenge).toEqual({ active: null, progress: 0 }); // 未知 id 视为无激活
+    expect(m!.challenge).toEqual({ active: null, progress: 0 }); // 未知 active 清空
+    expect(m!.prestige.pendingChallenge).toBeNull(); // 未知 pending 清空
     expect(m!.prestige.challengeDone).toEqual(['no-salary']);
     expect(m!.prestige.shop).toEqual({ 'exp-boost': 1 });
     expect(m!.prestige.coins).toBe(5);
@@ -366,6 +391,7 @@ describe('挑战：存档迁移（v12 → v13）', () => {
     const good = JSON.parse(serialize(s)) as Record<string, unknown>;
     const m2 = parseSave(JSON.stringify(good));
     expect(m2!.challenge).toEqual({ active: 'marathon', progress: 55 });
+    expect(m2!.prestige.pendingChallenge).toBe('flea-market');
     expect(CHALLENGES.length).toBe(8);
   });
 });

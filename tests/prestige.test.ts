@@ -185,7 +185,7 @@ describe('转生：存档迁移', () => {
     expect(s).not.toBeNull();
     expect(s!.saveVersion).toBe(SAVE_VERSION);
     expect(s!.prestige).toEqual({
-      insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [],
+      insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [], pendingChallenge: null,
     });
     expect(s!.money).toBe(5);
   });

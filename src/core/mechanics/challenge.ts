@@ -1,4 +1,4 @@
-import { CHALLENGES, CHALLENGE_SHOP, challengeDefById, challengeShopDefById } from '../data/challenges';
+import { CHALLENGES, CHALLENGE_SHOP, challengeShopDefById } from '../data/challenges';
 import type { ChallengeDef, ChallengeMods, ChallengeShopDef, ChallengeShopKey } from '../data/challenges';
 import type { GameState } from '../state';
 import { isMastered, kindCount } from './collection';
@@ -84,7 +84,7 @@ export interface ChallengeDoneEvent {
 
 /**
  * 扫描挑战：更新进度；达成且未领过奖励则入账（challengeDone + coins）、结束挑战并返回事件供 toast。
- * 每秒 tick 调用一次即可；全部为轻量推导。
+ * 每秒 tick 调用一次即可；全部为轻量推导。完成后修饰即释放，玩家可正常游玩至自行转生。
  */
 export function checkChallenge(state: GameState): ChallengeDoneEvent[] {
   const events: ChallengeDoneEvent[] = [];
@@ -104,13 +104,17 @@ export function checkChallenge(state: GameState): ChallengeDoneEvent[] {
 }
 
 /**
- * 激活挑战：需已解锁、未领过奖励、当前无激活中的挑战；
- * 激活时若带 startMoneyBonus 则立得资金（放弃不退回，防止刷钱）。
+ * 选择（或取消）下周目的挑战：只能在转生确认弹窗中操作，写入 prestige.pendingChallenge，
+ * 开新周目时由 doPrestige 消费转为 challenge.active 并发放 startMoneyBonus。
+ * 校验：已解锁（requires 全部完成）且未领过奖励；null = 选择「无挑战」。
  */
-export function startChallenge(state: GameState, id: string): ChallengeActionResult {
+export function selectPendingChallenge(state: GameState, id: string | null): ChallengeActionResult {
+  if (id === null) {
+    state.prestige.pendingChallenge = null;
+    return ok('已选择：无挑战');
+  }
   const def = CHALLENGES.find(c => c.id === id);
   if (!def) return fail('未知挑战');
-  if (state.challenge.active) return fail('已有挑战进行中，先完成或放弃当前挑战');
   if (state.prestige.challengeDone.includes(id)) return fail('该挑战已完成，奖励一次性发放');
   if (!challengeAvailable(state, id)) {
     const names = (def.requires ?? [])
@@ -118,23 +122,8 @@ export function startChallenge(state: GameState, id: string): ChallengeActionRes
       .map(r => CHALLENGES.find(c => c.id === r)?.name ?? r);
     return fail(`需先完成挑战：${names.join('、')}`);
   }
-  state.challenge.active = id;
-  state.challenge.progress = 0;
-  let bonus = 0;
-  if (def.mods.startMoneyBonus) {
-    bonus = def.mods.startMoneyBonus;
-    state.money += bonus;
-  }
-  return ok(`已激活挑战「${def.name}」${bonus ? `，获得起步资金 ¥${bonus}` : ''}！目标：${def.desc}`);
-}
-
-/** 放弃当前挑战：进度清零（已完成领过奖励的不受影响；已领的 startMoneyBonus 不退回） */
-export function abandonChallenge(state: GameState): ChallengeActionResult {
-  if (!state.challenge.active) return fail('当前没有进行中的挑战');
-  const def = challengeDefById(state.challenge.active);
-  state.challenge.active = null;
-  state.challenge.progress = 0;
-  return ok(`已放弃挑战「${def.name}」，可稍后重新激活`);
+  state.prestige.pendingChallenge = id;
+  return ok(`已选择下周目挑战「${def.name}」`);
 }
 
 /** 购买挑战商店物品（挑战币支付；after 前置需 ≥1 级） */

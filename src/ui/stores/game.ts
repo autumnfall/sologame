@@ -11,8 +11,7 @@ import {
   checkAchievements,
   checkChallenge,
   challengeMods,
-  startChallenge as coreStartChallenge,
-  abandonChallenge as coreAbandonChallenge,
+  selectPendingChallenge as coreSelectPendingChallenge,
   buyChallengeShop as coreBuyChallengeShop,
   autoSwitchTarget,
   isFeatureUnlocked,
@@ -871,16 +870,9 @@ export const useGameStore = defineStore('game', {
 
     // ---------- 挑战场景 ----------
 
-    /** 激活挑战：校验已解锁 + 未领过奖励 + 当前无激活（薄封装 → core → toast + 落档） */
-    startChallenge(id: string) {
-      const r = coreStartChallenge(this.s, id);
-      this.toast(r.ok ? r.message : r.reason);
-      if (r.ok) this.saveGame();
-    },
-
-    /** 放弃当前挑战：进度清零（已完成的不受影响，已领的起步资金不退回） */
-    abandonChallenge() {
-      const r = coreAbandonChallenge(this.s);
+    /** 选择（或取消）下周目挑战：只能在转生确认弹窗中操作，写入 prestige.pendingChallenge（薄封装） */
+    selectPendingChallenge(id: string | null) {
+      const r = coreSelectPendingChallenge(this.s, id);
       this.toast(r.ok ? r.message : r.reason);
       if (r.ok) this.saveGame();
     },

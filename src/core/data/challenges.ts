@@ -31,7 +31,7 @@ export interface ChallengeMods {
   noPlay?: boolean;
   /** 收藏架最多可同时持有多少款不同桌游的实体；到上限后拒绝获得「新款」（已有款加购副本不受影响） */
   maxDistinctCopies?: number;
-  /** 激活挑战时立得资金（放弃不退回） */
+  /** 新周目开局时立得资金（转生生效时发放） */
   startMoneyBonus?: number;
   /** 某鱼成交率倍率 */
   sellChanceMult?: number;

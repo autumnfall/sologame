@@ -14,8 +14,9 @@ import type { Rarity } from './types';
  * v11 = 排行榜（playerName/runStartedAt/localBoard/clientId）；均为新增可选字段，归一化补默认。
  * v12 = 快速上架比例（settings.quickListPct，50~200，默认 100）；新增可选字段，归一化补默认。
  * v13 = 挑战场景（GameState.challenge + prestige.coins/shop/challengeDone + stats.xyEarned）；均为新增可选字段，归一化补默认。
+ * v14 = 挑战激活改到转生流程（prestige.pendingChallenge）；新增可选字段，归一化补默认。
  */
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */

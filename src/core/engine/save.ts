@@ -89,6 +89,9 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   // v12 → v13（挑战场景）：新增 challenge/prestige.coins/shop/challengeDone/stats.xyEarned，
   // 均为新增可选字段，归一化时补默认值并剔除未知 id，无需改写数据
   12: raw => ({ ...raw }),
+  // v13 → v14（挑战激活改到转生流程）：新增 prestige.pendingChallenge，
+  // 新增可选字段，归一化时补默认值，无需改写数据
+  13: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -275,6 +278,9 @@ function normalize(data: Record<string, unknown>): GameState {
   const challengeDone = Array.isArray(presRaw.challengeDone)
     ? presRaw.challengeDone.filter((id): id is string => typeof id === 'string' && knownChallenges.has(id))
     : [];
+  // 待生效挑战：只接受已登记且未领过奖励的 id
+  const pendingRaw = typeof presRaw.pendingChallenge === 'string' ? presRaw.pendingChallenge : null;
+  const pendingChallenge = pendingRaw && knownChallenges.has(pendingRaw) && !challengeDone.includes(pendingRaw) ? pendingRaw : null;
   // 进行中的挑战：只接受已登记挑战 id；若已领过奖励（脏数据）则视为无激活
   const chRaw = isRecord(data.challenge) ? data.challenge : {};
   const activeRaw = typeof chRaw.active === 'string' ? chRaw.active : null;
@@ -291,6 +297,7 @@ function normalize(data: Record<string, unknown>): GameState {
       coins: num(presRaw.coins, 0),
       shop,
       challengeDone,
+      pendingChallenge,
     },
     money: num(data.money, s.money),
     sleeves: num(data.sleeves, s.sleeves),

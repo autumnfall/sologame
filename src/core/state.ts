@@ -84,6 +84,8 @@ export interface PrestigeState {
   shop: Record<string, number>;
   /** 已完成（领过币）的挑战 id，一次性奖励的依据 */
   challengeDone: string[];
+  /** 下次开周目时生效的挑战（转生确认弹窗中选择；开新周目时被消费转为 challenge.active） */
+  pendingChallenge: string | null;
 }
 
 /** 一个已完成周目的成绩记录（本地榜与在线榜共用结构） */
@@ -205,7 +207,7 @@ export function emptyOfflineBank(): OfflineBank {
 }
 
 export function defaultPrestige(): PrestigeState {
-  return { insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [] };
+  return { insight: 0, perks: {}, runs: 0, lastGain: 0, coins: 0, shop: {}, challengeDone: [], pendingChallenge: null };
 }
 
 export function defaultState(): GameState {

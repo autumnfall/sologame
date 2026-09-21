@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { PERKS, PERK_BRANCH_NAME, insightSpent, perkCost, perkPrereqMet } from '../../core';
+import { computed } from 'vue';
+import {
+  CHALLENGES,
+  PERKS,
+  PERK_BRANCH_NAME,
+  challengeAvailable,
+  insightSpent,
+  perkCost,
+  perkPrereqMet,
+} from '../../core';
 import type { PerkBranch } from '../../core';
 import { useGameStore } from '../stores/game';
 
@@ -28,6 +37,16 @@ function lockText(id: string): string {
 }
 
 const perksByBranch = (b: PerkBranch) => PERKS.filter(p => p.branch === b);
+
+// ---------- 下周目挑战（单选，写入 prestige.pendingChallenge，开新周目时生效） ----------
+
+const selectableChallenges = computed(() =>
+  CHALLENGES.filter(c => challengeAvailable(store.s, c.id) && !store.s.prestige.challengeDone.includes(c.id)),
+);
+
+function pickChallenge(id: string | null) {
+  store.selectPendingChallenge(id);
+}
 </script>
 
 <template>
@@ -63,13 +82,45 @@ const perksByBranch = (b: PerkBranch) => PERKS.filter(p => p.branch === b);
           </button>
         </div>
       </div>
+      <div style="margin-bottom:12px">
+        <b style="font-size:13px">🎯 下周目挑战 <small class="mut">单选，可选「无挑战」；选定后新周目开局即生效，持续整周目不可放弃</small></b>
+        <div style="border-top:1px solid var(--line);padding:6px 0">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:3px 0">
+            <input
+              type="radio"
+              name="pending-challenge"
+              :checked="store.s.prestige.pendingChallenge === null"
+              @change="pickChallenge(null)"
+            />
+            <span style="font-size:13px">无挑战 <small class="mut">正常游玩</small></span>
+          </label>
+          <label
+            v-for="c in selectableChallenges"
+            :key="c.id"
+            style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;padding:3px 0"
+          >
+            <input
+              type="radio"
+              name="pending-challenge"
+              style="margin-top:3px"
+              :checked="store.s.prestige.pendingChallenge === c.id"
+              @change="pickChallenge(c.id)"
+            />
+            <span style="font-size:13px">
+              {{ c.name }} <span class="price">🪙 {{ c.reward }}</span>
+              <small class="mut" style="display:block">{{ c.desc }}</small>
+            </span>
+          </label>
+          <small v-if="!selectableChallenges.length" class="mut">暂无可选挑战（未完成前置或已全部完成）。</small>
+        </div>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button :disabled="insightSpent(store.s) === 0" @click="store.respec()">↺ 洗点（全额退还）</button>
         <button class="primary" style="flex:1;min-width:220px" @click="store.startNewRun()">
           🌅 开启新周目（三选一）
         </button>
       </div>
-      <small class="mut" style="display:block;margin-top:6px">天赋与洗点仅在此界面可调整，开启新周目后本周目内锁定。</small>
+      <small class="mut" style="display:block;margin-top:6px">天赋与洗点仅在此界面可调整，开启新周目后本周目内锁定；挑战选择同样在开启新周目时锁定。</small>
     </div>
   </div>
 </template>

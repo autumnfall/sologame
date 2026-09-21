@@ -9,7 +9,6 @@ import {
   challengeShopDefById,
   challengeShopLevel,
   challengeShopPrereqMet,
-  goalProgress,
 } from '../../core';
 import type { ChallengeDef, ChallengeShopLine, GoalType } from '../../core';
 import { useGameStore } from '../stores/game';
@@ -51,13 +50,12 @@ function modsText(def: ChallengeDef): string[] {
   if (m.gachaPriceMult) out.push(`某赏价格 ×${m.gachaPriceMult}`);
   if (m.noPlay) out.push('🚫 禁止游玩桌游（补偿起步资金）');
   if (m.maxDistinctCopies) out.push(`收藏架最多 ${m.maxDistinctCopies} 款不同桌游（卖旧买新）`);
-  if (m.startMoneyBonus) out.push(`激活时立得资金 +¥${m.startMoneyBonus}`);
+  if (m.startMoneyBonus) out.push(`开局立得资金 +¥${m.startMoneyBonus}`);
   if (m.sellChanceMult) out.push(`某鱼成交率 ×${m.sellChanceMult}`);
   return out;
 }
 
 const doneSet = computed(() => new Set(store.s.prestige.challengeDone));
-const hasActive = computed(() => store.s.challenge.active !== null);
 
 function isDone(id: string): boolean {
   return doneSet.value.has(id);
@@ -116,13 +114,14 @@ const activeGoalText = computed(() => {
         </span>
       </div>
       <div class="mut" style="margin-top:6px;font-size:12px">
-        同时只能激活一个挑战：条件修饰立即生效（在线与离线一致），达成目标获得挑战币（每挑战一次性，跨周目保留）。
-        激活后可随时放弃；已完成挑战不可再激活。挑战币在下方商店兑换全局加成（收藏线即时生效，设计线供后续版本）。
+        挑战在<b>转生时选择</b>、新周目开局即生效，条件修饰持续整周目（在线与离线一致），达成目标获得挑战币（每挑战一次性，跨周目保留）。
+        本周目只能陪跑一个挑战，不可放弃；已完成挑战不可再选。挑战币在下方商店兑换全局加成（收藏线即时生效，设计线供后续版本）。
+        挑战完成后修饰即释放，可正常游玩刷精通至自行转生。
       </div>
     </div>
 
     <div v-for="n in LAYERS" :key="n" class="panel" style="margin-bottom:12px">
-      <h3 style="margin:0 0 8px">第 {{ n }} 层 <small class="mut">{{ n === 1 ? '开局即可激活' : '需完成前置挑战' }}</small></h3>
+      <h3 style="margin:0 0 8px">第 {{ n }} 层 <small class="mut">{{ n === 1 ? '开局即可选择' : '需完成前置挑战' }}</small></h3>
       <div class="grid">
         <div
           v-for="c in challengesByLayer(n)"
@@ -141,7 +140,7 @@ const activeGoalText = computed(() => {
             <div>🎖 目标：{{ GOAL_TEXT[c.goal.type](c.goal.target) }}</div>
           </div>
 
-          <!-- 进行中：进度条 + 放弃 -->
+          <!-- 进行中：进度条（陪跑到完成，不可放弃） -->
           <template v-if="store.s.challenge.active === c.id">
             <div style="margin-top:8px;font-size:12px">
               进度：<b>{{ Math.min(store.s.challenge.progress, c.goal.target) }}</b> / {{ c.goal.target }}
@@ -150,9 +149,8 @@ const activeGoalText = computed(() => {
             <div class="bar" style="margin-top:4px;height:8px">
               <i :style="{ width: progressPct(c) + '%' }"></i>
             </div>
-            <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-              <span class="ok" style="font-size:12px">挑战进行中</span>
-              <button style="padding:3px 10px;font-size:12px" @click="store.abandonChallenge()">放弃</button>
+            <div style="margin-top:6px">
+              <span class="ok" style="font-size:12px">挑战进行中 · 陪跑到完成（转生时可另选新的挑战）</span>
             </div>
           </template>
 
@@ -166,17 +164,9 @@ const activeGoalText = computed(() => {
             <span style="font-size:12px">{{ requiresText(c) }}</span>
           </div>
 
-          <!-- 可激活 -->
-          <div v-else style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-            <span class="mut" style="font-size:11px">当前进度预览：{{ goalProgress({ ...store.s, challenge: { active: c.id, progress: 0 } }) }}</span>
-            <button
-              class="primary"
-              :disabled="hasActive"
-              :title="hasActive ? '已有挑战进行中' : ''"
-              @click="store.startChallenge(c.id)"
-            >
-              激活
-            </button>
+          <!-- 已解锁未完成：仅展示，转生时选择 -->
+          <div v-else style="margin-top:6px" class="mut">
+            <span style="font-size:12px">📋 已解锁 · 转生时可选择（本周目不可开启）</span>
           </div>
         </div>
       </div>
