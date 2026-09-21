@@ -870,9 +870,9 @@ export const useGameStore = defineStore('game', {
 
     // ---------- 挑战场景 ----------
 
-    /** 选择（或取消）下周目挑战：只能在转生确认弹窗中操作，写入 prestige.pendingChallenge（薄封装） */
+    /** 选择（或取消）挑战：转生确认弹窗中操作；周目未开启窗口期（pendingStarter）立即对本周目生效 */
     selectPendingChallenge(id: string | null) {
-      const r = coreSelectPendingChallenge(this.s, id);
+      const r = coreSelectPendingChallenge(this.s, id, this.pendingStarter);
       this.toast(r.ok ? r.message : r.reason);
       if (r.ok) this.saveGame();
     },

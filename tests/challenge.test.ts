@@ -4,7 +4,7 @@ import {
   accumulateOffline, buyChallengeShop, buyTaobao, buyXianyu,
   challengeShopLv, checkChallenge, defaultState, distinctCopyKinds,
   doPrestige, expMult, gachaDraw, gachaMoneyPrice, goalProgress, kindCount, listCopy,
-  parseSave, refreshXianyu, selectPendingChallenge, sellChance, sellChanceFinal, serialize,
+  parseSave, pickStarter, refreshXianyu, selectPendingChallenge, sellChance, sellChanceFinal, serialize,
   settleRound, takeJob, tickSecond, tickXianyu,
 } from '../src/core';
 import type { GameState } from '../src/core';
@@ -44,6 +44,80 @@ describe('挑战：转生时选择、新周目生效', () => {
     expect(s.prestige.pendingChallenge).toBeNull();
     s.prestige.challengeDone.push('no-salary');
     expect(selectPendingChallenge(s, 'no-salary').ok).toBe(false); // 已完成（一次性）
+  });
+
+  it('selectPending 连续改选后者覆盖前者；未知 id 拒绝', () => {
+    const s = defaultState();
+    expect(selectPendingChallenge(s, 'marathon').ok).toBe(true);
+    expect(selectPendingChallenge(s, 'no-salary').ok).toBe(true); // 改选
+    expect(s.prestige.pendingChallenge).toBe('no-salary');
+    expect(selectPendingChallenge(s, 'ghost').ok).toBe(false); // 未知挑战
+    expect(s.prestige.pendingChallenge).toBe('no-salary'); // 拒绝时不覆盖
+  });
+
+  it('immediate：周目未开启窗口期直接生效（active 立置、pending 清空），下次转生不二次生效', () => {
+    // 模拟弹窗窗口期：doPrestige 已跑（money 已重置为开局资金、started=false）
+    const s = defaultState();
+    s.money = 200;
+    expect(s.challenge.active).toBeNull();
+    const r = selectPendingChallenge(s, 'no-salary', true);
+    expect(r.ok).toBe(true);
+    expect(s.challenge.active).toBe('no-salary');
+    expect(s.challenge.progress).toBe(0);
+    expect(s.prestige.pendingChallenge).toBeNull(); // 立即生效不留 pending
+    // 下一次转生：pending 已 null → 新周目无激活挑战（不二次生效）
+    meetUnlockRequirement(s);
+    expect(doPrestige(s).ok).toBe(true);
+    expect(s.challenge.active).toBeNull();
+    expect(s.prestige.pendingChallenge).toBeNull();
+  });
+
+  it('immediate：startMoneyBonus 入账（花佬 +¥1000）', () => {
+    const s = defaultState();
+    s.prestige.challengeDone.push('hardcore');
+    s.money = 200;
+    expect(selectPendingChallenge(s, 'collector', true).ok).toBe(true);
+    expect(s.challenge.active).toBe('collector');
+    expect(s.money).toBe(1200);
+  });
+
+  it('immediate 改选：旧挑战 bonus 精确回滚后应用新挑战（含替换 doPrestige 消费的）', () => {
+    // 花佬（+1000）→ 改选无薪挑战（无 bonus）：money 回到基准
+    const s = defaultState();
+    s.prestige.challengeDone.push('hardcore');
+    s.money = 200;
+    expect(selectPendingChallenge(s, 'collector', true).ok).toBe(true);
+    expect(s.money).toBe(1200);
+    expect(selectPendingChallenge(s, 'no-salary', true).ok).toBe(true);
+    expect(s.challenge.active).toBe('no-salary');
+    expect(s.money).toBe(200); // 回滚 1000，无新 bonus
+    // 窗口内替换 doPrestige 消费来的挑战：同样回滚其 bonus
+    const s2 = beginRunWithChallenge(['hardcore'], 'collector'); // doPrestige 已发 +1000 → 1200
+    expect(s2.challenge.active).toBe('collector');
+    expect(selectPendingChallenge(s2, 'no-salary', true).ok).toBe(true);
+    expect(s2.challenge.active).toBe('no-salary');
+    expect(s2.money).toBe(200);
+  });
+
+  it('immediate 选「无挑战」：撤销本周目已生效挑战并回滚 bonus', () => {
+    const s = defaultState();
+    s.prestige.challengeDone.push('hardcore');
+    s.money = 200;
+    expect(selectPendingChallenge(s, 'collector', true).ok).toBe(true);
+    expect(s.money).toBe(1200);
+    expect(selectPendingChallenge(s, null, true).ok).toBe(true);
+    expect(s.challenge.active).toBeNull();
+    expect(s.money).toBe(200);
+  });
+
+  it('immediate 校验：已完成/未解锁拒绝且不污染 active', () => {
+    const s = defaultState();
+    s.prestige.challengeDone.push('no-salary');
+    expect(selectPendingChallenge(s, 'no-salary', true).ok).toBe(false); // 已完成
+    expect(selectPendingChallenge(s, 'big-earner', true).ok).toBe(false); // 未解锁
+    expect(s.challenge.active).toBeNull();
+    expect(s.prestige.pendingChallenge).toBeNull();
+    expect(s.money).toBe(200);
   });
 
   it('doPrestige 消费 pending → active（progress 归零、pending 清空），只消费一次', () => {
@@ -156,6 +230,26 @@ describe('挑战：条件修饰', () => {
     expect(gachaMoneyPrice(s2, 'perm')).toBe(GACHA_PRICE);
   });
 
+  it('柠檬佬：券支付不受价格倍率影响（只乘金钱价）', () => {
+    // 常驻池 + 普通券：按 1 张券扣除，金钱分毫不动
+    const s = beginRunWithChallenge(['hardcore'], 'whale');
+    s.tickets = 2;
+    s.money = 500;
+    const r = gachaDraw(s, 'perm', 'ticket', () => 0.2); // 4 包牌套
+    expect('error' in r).toBe(false);
+    expect(s.tickets).toBe(1);
+    expect(s.money).toBe(500); // 券支付不走 gachaMoneyPrice
+    // 桌游池 + 高级券：同样只扣券
+    const s2 = beginRunWithChallenge(['hardcore'], 'whale');
+    s2.rotTheme = '演算';
+    s2.hiTickets = 1;
+    s2.money = 500;
+    const r2 = gachaDraw(s2, 'rot', 'hiTicket', () => 0.7);
+    expect('error' in r2).toBe(false);
+    expect(s2.hiTickets).toBe(0);
+    expect(s2.money).toBe(500);
+  });
+
   it('叉叉：成交率 ×1.2（与好口碑乘区并列）', () => {
     const plain = defaultState();
     const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
@@ -190,12 +284,18 @@ describe('挑战：目标与达成', () => {
     expect(selectPendingChallenge(s, 'no-salary').ok).toBe(false);
   });
 
-  it('花佬：禁止游玩——离线自动游玩跳过（连刷 0 局）', () => {
+  it('花佬：禁止游玩——离线自动游玩跳过（连刷 0 局），但离线工资照发', () => {
     const s = beginRunWithChallenge(['hardcore'], 'collector');
     own(s, 'guoyuan');
     accumulateOffline(s, 10 * 60 * 1000, lcg(3));
     expect(s.offlineBank.playRounds).toBe(0);
     expect(s.collections['guoyuan'].prof).toBe(0);
+    // noPlay 只禁游玩，不禁工作：离线工资不受 collector 影响
+    const s2 = beginRunWithChallenge(['hardcore'], 'collector');
+    takeJob(s2, 'teacher'); // 160 秒/周期
+    accumulateOffline(s2, 30 * 60 * 1000); // 1800 秒 → 11 周期
+    expect(s2.offlineBank.workMoney).toBeGreaterThan(0);
+    expect(s2.offlineBank.workCycles).toBe(11);
   });
 
   it('花佬：架上 30 款不同实体时 distinctCopies 达成（完成后 noPlay 修饰释放）', () => {
@@ -267,6 +367,40 @@ describe('挑战：目标与达成', () => {
     expect(s2.pityRot).toBe(0);
   });
 
+  it('叉叉：一口价盲买买到新款同样被拒（某鱼渠道含盲买）', () => {
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    for (const id of FIVE_N) own(s, id); // 架上 5 款到限
+    s.money = 1e9;
+    s.xianyuBuys = [{ gameId: 'shikong', price: 10, durability: 5, sleeved: false, stored: false, blind: true }];
+    const r = buyXianyu(s, 0);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toContain('挑战限制');
+    expect(s.copies.filter(c => c.gameId === 'shikong')).toHaveLength(0);
+    expect(s.xianyuBuys).toHaveLength(1); // 货源未消耗
+  });
+
+  it('叉叉：精通池不获得实体，不受款数上限影响', () => {
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    for (const id of FIVE_N) own(s, id); // 架上 5 款到限
+    s.sleeves = 1000;
+    const kinds = distinctCopyKinds(s);
+    const r = gachaDraw(s, 'master', 'sleeves', () => 0.1); // N 档 → 熟练值
+    expect('error' in r).toBe(false);
+    if ('error' in r || r.kind !== 'prof') throw new Error('unexpected');
+    expect(distinctCopyKinds(s)).toBe(kinds); // 无新实体
+    expect(s.copies).toHaveLength(5);
+  });
+
+  it('叉叉：开局三选一与老友馈赠在款数上限下正常（开局数量天然低于上限）', () => {
+    // 真实流程：doPrestige 已激活 big-earner，随后才走 pickStarter
+    const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
+    s.prestige.perks['gift'] = 3; // 老友馈赠 ×3
+    const r = pickStarter(s, 'guoyuan', lcg(7));
+    expect(r.ok).toBe(true);
+    expect(s.copies.length).toBe(4); // 1 自选 + 3 馈赠，未触及 5 款上限
+    expect(distinctCopyKinds(s)).toBe(4);
+  });
+
   it('叉叉：卖掉腾位后图鉴保留（distinctCollections 不回落），可再买新款', () => {
     const s = beginRunWithChallenge(['flea-market', 'merchant'], 'big-earner');
     for (const id of FIVE_N) own(s, id);
@@ -280,6 +414,51 @@ describe('挑战：目标与达成', () => {
     expect(goalProgress(s)).toBe(5);
     expect(buyTaobao(s, 'shikong').ok).toBe(true); // 腾位后可买新款
     expect(distinctCopyKinds(s)).toBe(5);
+  });
+
+  it('全 8 个挑战目标类型 → 达成发币（奖励合计 22，币供给配平依据）', () => {
+    const REQUIRES: Record<string, string[]> = {
+      'flea-market': ['no-salary'], merchant: ['no-salary'], hardcore: ['marathon'],
+      'big-earner': ['flea-market', 'merchant'], collector: ['hardcore'], whale: ['hardcore'],
+    };
+    let total = 0;
+    for (const def of CHALLENGES) {
+      const s = beginRunWithChallenge(REQUIRES[def.id] ?? [], def.id);
+      switch (def.goal.type) {
+        case 'xyEarn': s.stats.xyEarned = def.goal.target; break;
+        case 'bargainBuys': s.stats.bargainBuys = def.goal.target; break;
+        case 'masteryCount':
+          for (const g of REGULAR_GAMES.filter(x => x.rarity === 'N').slice(0, def.goal.target)) {
+            own(s, g.id, { prof: 20 });
+          }
+          break;
+        case 'plays': s.stats.plays = def.goal.target; break;
+        case 'highPriceSold': s.stats.highPriceSold = def.goal.target; break;
+        case 'pulls': s.stats.pulls = def.goal.target; break;
+        case 'distinctCopies':
+          for (const g of REGULAR_GAMES.slice(0, def.goal.target)) own(s, g.id);
+          break;
+        case 'distinctCollections':
+          for (const g of REGULAR_GAMES.slice(0, def.goal.target)) own(s, g.id);
+          break;
+      }
+      const events = checkChallenge(s);
+      expect(events, def.id).toHaveLength(1);
+      expect(events[0].def.id, def.id).toBe(def.id);
+      expect(events[0].reward, def.id).toBe(def.reward);
+      expect(s.prestige.coins, def.id).toBe(def.reward);
+      expect(s.challenge.active, def.id).toBeNull();
+      total += def.reward;
+    }
+    expect(total).toBe(22);
+  });
+
+  it('challenge.progress 与 goalProgress 一致（部分进度原样写回，供页面展示）', () => {
+    const s = beginRunWithChallenge([], 'no-salary');
+    s.stats.xyEarned = 1000; // 未达标
+    expect(checkChallenge(s)).toHaveLength(0);
+    expect(s.challenge.progress).toBe(1000);
+    expect(goalProgress(s)).toBe(1000);
   });
 });
 
@@ -379,13 +558,14 @@ describe('挑战：存档迁移（v13 → v14）', () => {
     pres.pendingChallenge = 'ghost';
     pres.challengeDone = ['no-salary', 'ghost'];
     pres.shop = { 'exp-boost': 1, ghost: 2 };
+    pres.coins = -5; // 负值脏数据归零
     const m = parseSave(JSON.stringify(dirty));
     expect(m).not.toBeNull();
     expect(m!.challenge).toEqual({ active: null, progress: 0 }); // 未知 active 清空
     expect(m!.prestige.pendingChallenge).toBeNull(); // 未知 pending 清空
     expect(m!.prestige.challengeDone).toEqual(['no-salary']);
     expect(m!.prestige.shop).toEqual({ 'exp-boost': 1 });
-    expect(m!.prestige.coins).toBe(5);
+    expect(m!.prestige.coins).toBe(0); // 负值归零
     expect(m!.stats.xyEarned).toBe(42);
     // 合法挑战进度原样保留
     const good = JSON.parse(serialize(s)) as Record<string, unknown>;

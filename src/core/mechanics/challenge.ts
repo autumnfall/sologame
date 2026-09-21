@@ -104,14 +104,28 @@ export function checkChallenge(state: GameState): ChallengeDoneEvent[] {
 }
 
 /**
- * 选择（或取消）下周目的挑战：只能在转生确认弹窗中操作，写入 prestige.pendingChallenge，
- * 开新周目时由 doPrestige 消费转为 challenge.active 并发放 startMoneyBonus。
- * 校验：已解锁（requires 全部完成）且未领过奖励；null = 选择「无挑战」。
+ * 选择（或取消）挑战。两种模式：
+ * - 默认（pending 路径）：写入 prestige.pendingChallenge，下次转生（doPrestige）时消费生效；
+ *   只能在转生确认弹窗中操作。
+ * - immediate（周目未开启窗口期，doPrestige 已跑、开局三选一未选）：直接作用于即将开启的本周目：
+ *   active = id、progress 归零、pending 清空（防止下次 doPrestige 二次生效）、发放 startMoneyBonus。
+ *   改选/取消时回滚旧挑战的 startMoneyBonus（active 非空且未在 challengeDone 中即视为替换，money 下限 0）。
+ * 校验（两种模式相同）：已解锁（requires 全部完成）且未领过奖励；null = 「无挑战」。
  */
-export function selectPendingChallenge(state: GameState, id: string | null): ChallengeActionResult {
+export function selectPendingChallenge(state: GameState, id: string | null, immediate = false): ChallengeActionResult {
+  /** 回滚当前 active 挑战的 startMoneyBonus（窗口内玩家无法花钱，精确回滚即可） */
+  const rollbackActive = (): void => {
+    const cur = state.challenge.active;
+    if (!cur || state.prestige.challengeDone.includes(cur)) return;
+    const old = CHALLENGES.find(c => c.id === cur);
+    if (old?.mods.startMoneyBonus) state.money = Math.max(0, state.money - old.mods.startMoneyBonus);
+    state.challenge.active = null;
+    state.challenge.progress = 0;
+  };
   if (id === null) {
+    if (immediate) rollbackActive();
     state.prestige.pendingChallenge = null;
-    return ok('已选择：无挑战');
+    return ok(immediate ? '已选择：本周目无挑战' : '已选择：无挑战');
   }
   const def = CHALLENGES.find(c => c.id === id);
   if (!def) return fail('未知挑战');
@@ -121,6 +135,14 @@ export function selectPendingChallenge(state: GameState, id: string | null): Cha
       .filter(r => !state.prestige.challengeDone.includes(r))
       .map(r => CHALLENGES.find(c => c.id === r)?.name ?? r);
     return fail(`需先完成挑战：${names.join('、')}`);
+  }
+  if (immediate) {
+    rollbackActive(); // 改选：回滚旧挑战（含 doPrestige 消费的）bonus
+    state.challenge.active = id;
+    state.challenge.progress = 0;
+    state.prestige.pendingChallenge = null; // 立即生效后不留下次转生二次消费
+    if (def.mods.startMoneyBonus) state.money += def.mods.startMoneyBonus;
+    return ok(`本周目挑战「${def.name}」已生效`);
   }
   state.prestige.pendingChallenge = id;
   return ok(`已选择下周目挑战「${def.name}」`);
