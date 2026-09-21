@@ -7,6 +7,7 @@ export * from './data/prices';
 export * from './data/balance';
 export * from './data/prestige';
 export * from './data/challenges';
+export * from './data/changelog';
 export * from './data/achievements';
 export * from './state';
 export * from './mechanics/attrs';

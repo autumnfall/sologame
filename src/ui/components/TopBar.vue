@@ -13,6 +13,7 @@ const TABS = [
   { key: 'challenge', label: '🎯 挑战' },
   { key: 'prestige', label: '🌅 转生' },
   { key: 'guide', label: '📖 教程' },
+  { key: 'changelog', label: '📝 更新' },
 ] as const;
 
 /** 属性徽章：等级 0 时只显示图标与名称（无等级数字、无 0/60 进度），有经验后再展开 */

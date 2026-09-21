@@ -67,7 +67,7 @@ import {
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 import { LEADERBOARD_API, submitRun } from '../leaderboard';
 
-export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'challenge' | 'prestige' | 'guide';
+export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'challenge' | 'prestige' | 'guide' | 'changelog';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
 
 /** 一局中的一个阶段（读规则/Setup/游玩/结算） */

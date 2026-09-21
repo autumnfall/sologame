@@ -13,6 +13,7 @@ import ShelfPage from './pages/ShelfPage.vue';
 import ChallengePage from './pages/ChallengePage.vue';
 import PrestigePage from './pages/PrestigePage.vue';
 import GuidePage from './pages/GuidePage.vue';
+import ChangelogPage from './pages/ChangelogPage.vue';
 
 const store = useGameStore();
 
@@ -86,7 +87,8 @@ onUnmounted(() => {
     <ShelfPage v-else-if="store.tab === 'shelf'" />
     <ChallengePage v-else-if="store.tab === 'challenge'" />
     <PrestigePage v-else-if="store.tab === 'prestige'" />
-    <GuidePage v-else />
+    <GuidePage v-else-if="store.tab === 'guide'" />
+    <ChangelogPage v-else />
   </div>
   <StarterModal />
   <OfflineModal />
