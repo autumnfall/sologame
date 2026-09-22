@@ -5,3 +5,4 @@ dist/
 *.local
 .dev-server.pid
 .dev-server.log
+kimi-debug-*.zip
