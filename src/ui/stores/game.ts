@@ -13,6 +13,10 @@ import {
   challengeMods,
   selectPendingChallenge as coreSelectPendingChallenge,
   buyChallengeShop as coreBuyChallengeShop,
+  foundPrototype as coreFoundPrototype,
+  iterateProto as coreIterateProto,
+  launchCrowd as coreLaunchCrowd,
+  deliverDesign as coreDeliverDesign,
   autoSwitchTarget,
   isFeatureUnlocked,
   isMastered,
@@ -67,7 +71,7 @@ import {
 import type { Attr, GameState, GachaPay, GachaPool, Rarity } from '../../core';
 import { LEADERBOARD_API, submitRun } from '../leaderboard';
 
-export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'challenge' | 'prestige' | 'guide' | 'changelog';
+export type TabKey = 'play' | 'work' | 'shop' | 'shelf' | 'challenge' | 'design' | 'prestige' | 'guide' | 'changelog';
 export type ShopTabKey = 'taobao' | 'xianyu' | 'gacha';
 
 /** 一局中的一个阶段（读规则/Setup/游玩/结算） */
@@ -262,6 +266,11 @@ export const useGameStore = defineStore('game', {
       if (r.payout) this.toast(`💼 工作周期结算 +¥${fmt(r.payAmount)}`);
       if (r.ticketDrop) this.toast('🎫 工作中捡到一张某赏抽赏券！');
       if (r.streamEvent) this.toast('📺 直播事件：' + r.streamEvent);
+      for (const e of r.crowd) {
+        this.toast(e.ok
+          ? `🎉 众筹成功《${e.name}》：支持 ${e.supporters} 人，待交付（垫资 ¥${fmt(e.cost)} → 货款 ¥${fmt(e.income)}）`
+          : `😢 众筹《${e.name}》未达标（${e.supporters} 人），原型已退回`);
+      }
       const xy = tickXianyu(this.s);
       if (xy.refreshed) this.toast('🔄 某鱼自动到货一批新货源');
       for (const sold of xy.sold) this.toast(`《${sold.name}》已售出，到账 ¥${sold.gain}`);
@@ -881,6 +890,36 @@ export const useGameStore = defineStore('game', {
     buyChallengeShop(id: string) {
       const r = coreBuyChallengeShop(this.s, id);
       this.toast(r.ok ? `${r.message}（剩余挑战币 ${this.s.prestige.coins}）` : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    // ---------- 桌游设计师 ----------
+
+    /** 立项：名称（2~10 字）+ 类型 + 体量，-10 灵感（薄封装 → core → toast + 落档） */
+    foundPrototype(name: string, themeId: string, scale: string) {
+      const r = coreFoundPrototype(this.s, name, themeId, scale);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 迭代原型维度：第 n 次花 5n 灵感（薄封装） */
+    iterateProto(uid: number, dimKey: string) {
+      const r = coreIterateProto(this.s, uid, dimKey);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 发起众筹：锁定 Q/售价，原型转入进行中（薄封装） */
+    launchCrowd(uid: number, goal: number, days: number, ratio: number) {
+      const r = coreLaunchCrowd(this.s, uid, goal, days, ratio);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 交付已众筹成功的设计：垫资成本 → 收货款（薄封装） */
+    deliverDesign(uid: number) {
+      const r = coreDeliverDesign(this.s, uid);
+      this.toast(r.ok ? r.message : r.reason);
       if (r.ok) this.saveGame();
     },
 

@@ -11,6 +11,7 @@ import { currentJob, expMult, fatigueIncMult, jobCyclePay, jobCyclePayExpected, 
 import { fatigueMod, playDuration, ruleDuration, setupDuration } from '../mechanics/play';
 import { perkLv } from '../mechanics/prestige';
 import { challengeMods } from '../mechanics/challenge';
+import { gainInspiration, tickCrowd } from './design';
 
 export interface TickResult {
   /** 本 tick 完成的工作周期数（0 或 1） */
@@ -19,6 +20,8 @@ export interface TickResult {
   payAmount: number;
   ticketDrop: boolean;
   streamEvent: string | null;
+  /** 本 tick 到期的众筹结算事件 */
+  crowd: import('./design').CrowdSettleEvent[];
 }
 
 /**
@@ -27,7 +30,9 @@ export interface TickResult {
  * 换工作/辞职会清零进度（actions.ts）。工作中仍按秒判定掉券；主播在周期结算时概率触发直播事件。
  */
 export function tickSecond(state: GameState, rng: () => number = Math.random): TickResult {
-  const result: TickResult = { payout: 0, payAmount: 0, ticketDrop: false, streamEvent: null };
+  const result: TickResult = { payout: 0, payAmount: 0, ticketDrop: false, streamEvent: null, crowd: [] };
+  // 众筹逐秒需求模拟（与职业无关）
+  result.crowd = tickCrowd(state, rng);
   const ticketDrop = rng() < 0.004 * ticketRateMult(state);
   if (ticketDrop) state.tickets++;
   result.ticketDrop = ticketDrop;
@@ -81,7 +86,8 @@ export function accumulateOffline(
     state.offlineBank.workCycles += cycles;
     state.stats.workCycles += cycles;
   }
-  // ② 自动游玩（挑战「花佬」禁止游玩：离线自动游玩一并跳过）
+  // ② 自动游玩（挑战「花佬」禁止游玩：离线自动游玩一并跳过；众筹逐秒推进不受 noPlay 影响）
+  tickCrowd(state, rng, Math.floor(addT / 1000));
   if (challengeMods(state).noPlay === true) return;
   let secs = addT / 1000;
   let guard = 0; // 防御上限：单轮最短约 10s，1 小时最多 ~360 局
@@ -100,6 +106,7 @@ export function accumulateOffline(
     const listed = new Set(state.listings.map(l => l.copyUid));
     const cands: { gameId: string; uid: number; score: number }[] = [];
     for (const c of state.copies) {
+      if (c.designed) continue; // 自创设计不可游玩
       if (listed.has(c.uid)) continue;
       const col = state.collections[c.gameId];
       if (!col?.firstOpened) continue;
@@ -168,6 +175,8 @@ export interface SettleResult {
   /** 本局是否触发了 0 耐久收益惩罚 */
   worn: boolean;
   round: number;
+  /** 本局入账灵感（桌游设计师，未解锁为 0） */
+  inspiration: number;
 }
 
 /**
@@ -214,10 +223,12 @@ export function settleRound(
   });
   const ticketDrop = rng() < 0.06 * ticketRateMult(state);
   if (ticketDrop) state.tickets += 1;
+  const inspiration = gainInspiration(state, g);
   return {
     gains, ticketDrop,
     fatigue: c.fatigue, tired: c.fatigue >= 7,
     wear, durability: copy.durability, worn, round,
+    inspiration,
   };
 }
 

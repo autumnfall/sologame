@@ -7,3 +7,4 @@ export * from './gacha';
 export * from './prestige';
 export * from './records';
 export * from './tick';
+export * from './design';

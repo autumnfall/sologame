@@ -1,6 +1,6 @@
 // ================= 挑战场景调参区 =================
 // 挑战 = 条件修饰 + 目标；完成后一次性发放挑战币（prestige.challengeDone 记录，跨周目保留）。
-// 设计师向商店加成（灵感/评分/版税）在 Phase 2 才消费，Phase 1 只定义数据与购买。
+// 设计师向商店加成（灵感/评分/版税）由桌游设计师玩法消费（见 data/designs.ts、mechanics/design.ts）。
 
 /** 挑战目标类型：goalProgress 按 type 从 stats / 收藏推导当前进度 */
 export type GoalType =
@@ -99,13 +99,13 @@ export const CHALLENGES: readonly ChallengeDef[] = [
   },
 ];
 
-/** 挑战商店效果键：机制层按 key 读取乘区（设计线三件 Phase 2 才消费） */
+/** 挑战商店效果键：机制层按 key 读取乘区（设计线三件由桌游设计师玩法消费） */
 export type ChallengeShopKey =
   | 'expBoost'   // 全局经验 +5%/级（收藏线）
   | 'xyEye'      // 某鱼好货（高成色/带牌套）概率 +8%/级（收藏线）
-  | 'inspUp'     // 灵感获取 +15%/级（设计线，Phase 2 消费）
-  | 'scoreUp'    // 设计评分 +8%/级（设计线，Phase 2 消费）
-  | 'royaltyUp'; // 版税率 +12%/级（设计线，Phase 2 消费）
+  | 'inspUp'     // 灵感获取 +15%/级（设计线，设计师玩法消费）
+  | 'scoreUp'    // 设计评分 +8%/级（设计线，设计师玩法消费）
+  | 'royaltyUp'; // 版税率 +12%/级（设计线，设计师玩法消费）
 
 export type ChallengeShopLine = 'collect' | 'design';
 
@@ -133,9 +133,9 @@ export interface ChallengeShopDef {
 export const CHALLENGE_SHOP: readonly ChallengeShopDef[] = [
   { id: 'exp-boost', key: 'expBoost', line: 'collect', name: '博览群玩', desc: '每级：全局经验 +5%（与图鉴/谋略等乘区并列相乘）', max: 5, base: 1, step: 0 },
   { id: 'xy-eye', key: 'xyEye', line: 'collect', name: '火眼金睛', desc: '每级：某鱼好货概率 +8%（带牌套概率提升、成色下限上移）', max: 3, base: 1, step: 0, after: 'exp-boost' },
-  { id: 'insp-up', key: 'inspUp', line: 'design', name: '灵感如泉', desc: '每级：灵感获取 +15%（桌游设计师玩法，后续版本生效）', max: 5, base: 1, step: 0 },
-  { id: 'score-up', key: 'scoreUp', line: 'design', name: '匠心独运', desc: '每级：设计评分 +8%（桌游设计师玩法，后续版本生效）', max: 4, base: 1, step: 0, after: 'insp-up' },
-  { id: 'royalty-up', key: 'royaltyUp', line: 'design', name: '畅销作家', desc: '每级：版税率 +12%（桌游设计师玩法，后续版本生效）', max: 3, base: 1, step: 0, after: 'score-up' },
+  { id: 'insp-up', key: 'inspUp', line: 'design', name: '灵感如泉', desc: '每级：桌游设计师的灵感获取 +15%（游玩获得灵感）', max: 5, base: 1, step: 0 },
+  { id: 'score-up', key: 'scoreUp', line: 'design', name: '匠心独运', desc: '每级：桌游设计师的出版评分 +8%', max: 4, base: 1, step: 0, after: 'insp-up' },
+  { id: 'royalty-up', key: 'royaltyUp', line: 'design', name: '畅销作家', desc: '每级：众筹购买概率 +6%', max: 3, base: 1, step: 0, after: 'score-up' },
 ];
 
 const CHALLENGE_MAP = new Map(CHALLENGES.map(c => [c.id, c]));

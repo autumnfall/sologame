@@ -7,9 +7,10 @@ import type { GameState, MarketItem } from '../state';
 import { copyByUid } from '../state';
 import { isMastered } from '../mechanics/collection';
 import { canStore } from '../mechanics/play';
-import { sellFeeRate, xyPriceMult } from '../mechanics/economy';
+import { copyValueOf, copyRarity, sellFeeRate, xyPriceMult } from '../mechanics/economy';
 import { perkLv } from '../mechanics/prestige';
 import { challengeMods, challengeShopLv, distinctCapBlock } from '../mechanics/challenge';
+import { designByGameId } from '../mechanics/design';
 import { acquireGame } from './acquire';
 
 export interface RefreshResult {
@@ -156,9 +157,9 @@ export function tickXianyu(
         state.listings.splice(i, 1); // 实体丢失（不应发生），清理
         continue;
       }
-      const g = gameById(copy.gameId);
-      const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
-      const chance = sellChanceFinal(state, l.price / value, copy.durability, g.rarity);
+      const name = copy.designed ? (designByGameId(state, copy.gameId)?.name ?? '自创桌游') : gameById(copy.gameId).name;
+      const value = copyValueOf(state, copy); // 自创设计按众筹售价取价
+      const chance = sellChanceFinal(state, l.price / value, copy.durability, copyRarity(copy));
       if (rng() < chance) {
         const gain = Math.round(l.price * (1 - sellFeeRate(state)));
         state.money += gain;
@@ -168,9 +169,9 @@ export function tickXianyu(
         state.stats.xyEarned += gain; // 某鱼卖出净额累计（挑战「无薪挑战」目标）
         if (l.price >= value * 2) state.stats.highPriceSold++; // 200% 定价成交
         // 唯一副本卖光 → 打回头客标记
-        const col = state.collections[g.id];
-        if (col && !state.copies.some(c => c.gameId === g.id)) col.resold = true;
-        result.sold.push({ gameId: g.id, name: g.name, price: l.price, gain });
+        const col = state.collections[copy.gameId];
+        if (col && !state.copies.some(c => c.gameId === copy.gameId)) col.resold = true;
+        result.sold.push({ gameId: copy.gameId, name, price: l.price, gain });
       }
     }
   }

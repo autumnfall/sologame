@@ -62,6 +62,10 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'prestige-3', name: '三朝元老', desc: '完成 3 次退坑转生', check: s => s.prestige.runs >= 3 },
   { id: 'first-perk', name: '天赋初见', desc: '第一次投资天赋', check: s => Object.keys(s.prestige.perks).length > 0 },
   { id: 'first-respec', name: '洗心革面', desc: '第一次洗点重分天赋', check: s => s.stats.respecCount >= 1 },
+  // ---------- 设计师线 ----------
+  { id: 'first-proto', name: '灵光一现', desc: '第一次立项设计桌游', check: s => s.designer.prototypes.length + s.designer.campaigns.length + s.designer.funded.length + s.designer.failed.length >= 1 },
+  { id: 'first-funded', name: '一呼百应', desc: '第一次众筹成功', check: s => s.designer.successCount >= 1 },
+  { id: 'crowd-800', name: '万众瞩目', desc: '单次众筹支持人数 ≥800', check: s => s.designer.funded.some(f => f.supporters >= 800) },
 ];
 
 const ACH_MAP = new Map(ACHIEVEMENTS.map(a => [a.id, a]));

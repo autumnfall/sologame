@@ -1,12 +1,14 @@
-import { TAOBAO_STOCK, SELL_SLOT_COSTS, MARKET_SLOT_COSTS, MARKET_SLOTS_MAX, SELL_PRICE_MIN, SELL_PRICE_MAX, STORE_WEAR_ONCE, copyValue } from '../data/balance';
+import { TAOBAO_STOCK, SELL_SLOT_COSTS, MARKET_SLOT_COSTS, MARKET_SLOTS_MAX, SELL_PRICE_MIN, SELL_PRICE_MAX, STORE_WEAR_ONCE } from '../data/balance';
 import { gameById, gamesByRarity, nextTier, REGULAR_GAMES } from '../data/games';
 import type { GameState } from '../state';
 import { copyByUid } from '../state';
 import { tierOwned, tierUnlocked } from '../mechanics/collection';
 import { storageCost, canStore } from '../mechanics/play';
-import { sellFeeRate, sellSlotsMax, taobaoPrice } from '../mechanics/economy';
+import { copyValueOf, sellFeeRate, sellSlotsMax, taobaoPrice } from '../mechanics/economy';
 import { perkLevel, perkLv } from '../mechanics/prestige';
 import { distinctCapBlock } from '../mechanics/challenge';
+import { designByGameId } from '../mechanics/design';
+import { scaleById } from '../data/designs';
 import { acquireGame } from './acquire';
 import type { AcquireResult } from './acquire';
 import { buyXianyu } from './xianyu';
@@ -76,10 +78,21 @@ export function buyTaobao(state: GameState, id: string): ActionResult {
 
 export { buyXianyu };
 
-/** 套牌套（实体级）：按实际卡牌数消耗牌套张数（无卡牌游戏不可套） */
+/** 套牌套（实体级）：按实际卡牌数消耗牌套张数（无卡牌游戏不可套）；自创桌游按体量的牌套需求 */
 export function applySleeve(state: GameState, uid: number): ActionResult {
   const copy = copyByUid(state, uid);
   if (!copy) return fail('实体不存在');
+  if (copy.designed) {
+    const d = designByGameId(state, copy.gameId);
+    if (!d) return fail('设计不存在');
+    const cost = scaleById(d.scale).sleeveCost;
+    if (copy.sleeved) return fail('已套牌套');
+    if (state.listings.some(l => l.copyUid === uid)) return fail('上架中的实体不可操作');
+    if (state.sleeves < cost) return fail(`牌套不够，需要 ${cost} 张`);
+    state.sleeves -= cost;
+    copy.sleeved = true;
+    return ok(`《${d.name}》已套牌套（消耗 ${cost} 张）`);
+  }
   const g = gameById(copy.gameId);
   if (!g.cards || g.cards <= 0) return fail('这款桌游没有卡牌，无需牌套');
   if (copy.sleeved) return fail('已套牌套');
@@ -94,6 +107,7 @@ export function applySleeve(state: GameState, uid: number): ActionResult {
 export function applyStorage(state: GameState, uid: number): ActionResult {
   const copy = copyByUid(state, uid);
   if (!copy) return fail('实体不存在');
+  if (copy.designed) return fail('自创桌游不可收纳');
   const g = gameById(copy.gameId);
   if (copy.stored) return fail('已收纳');
   if (state.listings.some(l => l.copyUid === uid)) return fail('上架中的实体不可操作');
@@ -107,11 +121,12 @@ export function applyStorage(state: GameState, uid: number): ActionResult {
   return ok(`《${g.name}》收纳完成，Setup ×0.5、磨损 ×0.75（整理一次性 -${once} 耐久）`);
 }
 
-/** 一键套牌套：给所有未套且牌足够的实体套牌套（成就里程碑解锁） */
+/** 一键套牌套：给所有未套且牌足够的实体套牌套（成就里程碑解锁；自创设计跳过） */
 export function sleeveAll(state: GameState): { count: number; used: number } {
   let count = 0;
   let used = 0;
   for (const c of state.copies) {
+    if (c.designed) continue;
     if (c.sleeved) continue;
     const g = gameById(c.gameId);
     if (!g.cards || g.cards <= 0) continue;
@@ -125,10 +140,11 @@ export function sleeveAll(state: GameState): { count: number; used: number } {
   return { count, used };
 }
 
-/** 一键上架磨光件：所有耐久 0 的未上架未锁定实体按行情价（100%）上架，占满槽位为止 */
+/** 一键上架磨光件：所有耐久 0 的未上架未锁定实体按行情价（100%）上架，占满槽位为止（自创设计不可玩故不会磨光，天然跳过） */
 export function listWornCopies(state: GameState): { count: number } {
   let count = 0;
   for (const c of state.copies) {
+    if (c.designed) continue;
     if (c.durability > 0 || c.locked) continue;
     if (state.listings.length >= state.sellSlots) break;
     if (state.listings.some(l => l.copyUid === c.uid)) continue;
@@ -137,10 +153,11 @@ export function listWornCopies(state: GameState): { count: number } {
   return { count };
 }
 
-/** 上岗/辞职：换工作会放弃当前周期进度 */
+/** 上岗/辞职：换工作会放弃当前周期进度；担任「桌游设计师」解锁设计玩法（周目内永久） */
 export function takeJob(state: GameState, jobId: string): ActionResult {
   state.job = jobId;
   state.jobProgress = 0;
+  if (jobId === 'master') state.designer.unlocked = true;
   return ok('已上岗，新周期从头开始');
 }
 
@@ -156,24 +173,24 @@ export function toggleLock(state: GameState, uid: number): ActionResult {
   if (!copy) return fail('实体不存在');
   if (state.listings.some(l => l.copyUid === uid)) return fail('上架中的实体不可操作');
   copy.locked = !copy.locked;
-  const g = gameById(copy.gameId);
-  return ok(copy.locked ? `《${g.name}》已锁定：不可出售、不会被一键上架` : `《${g.name}》已解锁`);
+  const name = copy.designed ? (designByGameId(state, copy.gameId)?.name ?? '自创桌游') : gameById(copy.gameId).name;
+  return ok(copy.locked ? `《${name}》已锁定：不可出售、不会被一键上架` : `《${name}》已解锁`);
 }
 
-/** 某鱼出售：上架实体（定价 = 总价值 × 倍率，50%~200%），占用出售槽位 */
+/** 某鱼出售：上架实体（定价 = 总价值 × 倍率，50%~200%），占用出售槽位；自创设计按出版定价取价 */
 export function listCopy(state: GameState, uid: number, priceMult: number): ActionResult {
   const copy = copyByUid(state, uid);
   if (!copy) return fail('实体不存在');
   if (copy.locked) return fail('该实体已锁定，不可出售（可在收藏架解锁）');
   if (state.listings.some(l => l.copyUid === uid)) return fail('已在上架中');
   if (state.listings.length >= state.sellSlots) return fail('出售槽位已满，可花钱扩充');
-  const g = gameById(copy.gameId);
   if (priceMult < SELL_PRICE_MIN || priceMult > SELL_PRICE_MAX) return fail('定价需在 50%~200% 之间');
-  const value = copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
+  const value = copyValueOf(state, copy);
   const price = Math.max(10, Math.round(value * priceMult));
   state.listings.push({ copyUid: uid, price });
   const fee = Math.round(sellFeeRate(state) * 1000) / 10;
-  return ok(`《${g.name}》已上架 ¥${price}（成交价收取 ${fee}% 手续费）`);
+  const name = copy.designed ? (designByGameId(state, copy.gameId)?.name ?? '自创桌游') : gameById(copy.gameId).name;
+  return ok(`《${name}》已上架 ¥${price}（成交价收取 ${fee}% 手续费）`);
 }
 
 /** 某鱼出售：随时下架，实体退回 */

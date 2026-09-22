@@ -5,10 +5,12 @@ import { gamesByRarity } from '../data/games';
 import { gameById } from '../data/games';
 import type { AffixType } from '../data/types';
 import type { GameState } from '../state';
+import { isDesignedId } from '../state';
 
-/** 已收藏的桌游种数（firstOpened，含隐藏款；实体卖光后收藏进度仍保留） */
+/** 已收藏的桌游种数（firstOpened，含隐藏款；实体卖光后收藏进度仍保留；不含自创设计） */
 export function kindCount(state: GameState): number {
-  return Object.values(state.collections).filter(c => c.firstOpened).length;
+  return Object.entries(state.collections)
+    .filter(([id, c]) => !isDesignedId(id) && c.firstOpened).length;
 }
 
 /**
@@ -20,10 +22,10 @@ export function globalBonus(state: GameState): number {
   return raw <= GLOBAL_SOFTCAP ? raw : GLOBAL_SOFTCAP + (raw - GLOBAL_SOFTCAP) * 0.1;
 }
 
-/** 是否拥有指定类型的隐藏款词条（词条随收藏永久生效，与实体去留无关） */
+/** 是否拥有指定类型的隐藏款词条（词条随收藏永久生效，与实体去留无关；自创设计无词条） */
 export function hasAffix(state: GameState, type: AffixType): boolean {
   return Object.keys(state.collections).some(
-    id => state.collections[id].firstOpened && gameById(id).affix?.type === type,
+    id => !isDesignedId(id) && state.collections[id].firstOpened && gameById(id).affix?.type === type,
   );
 }
 

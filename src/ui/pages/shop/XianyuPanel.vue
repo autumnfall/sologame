@@ -8,9 +8,12 @@ import {
   SELL_SLOT_COSTS,
   conditionText,
   copyByUid,
-  copyValue,
+  copyRarity,
+  copyValueOf,
+  designByGameId,
   gameById,
   gainText,
+  isDesignedId,
   isFeatureUnlocked,
   marketItemValue,
   sellChanceFinal,
@@ -53,6 +56,10 @@ function circled(i: number): string {
 }
 
 function copyLabel(c: Copy): string {
+  if (c.designed) {
+    const d = designByGameId(store.s, c.gameId);
+    return `《${d?.name ?? '自创桌游'}》 自创 · ${conditionText(c.durability, 'SSR')}`;
+  }
   const g = gameById(c.gameId);
   const idx = store.s.copies.filter(x => x.gameId === c.gameId).findIndex(x => x.uid === c.uid);
   return `《${g.name}》 实体${circled(idx)} · ${conditionText(c.durability, g.rarity)} · 耐久 ${durText(c.durability)}`;
@@ -71,21 +78,26 @@ const sellGroups = computed(() => {
       gameId,
       copies: [...copies].sort((a, b) => a.durability - b.durability),
     }))
-    .sort((a, b) => gameById(a.gameId).name.localeCompare(gameById(b.gameId).name, 'zh'));
+    .sort((a, b) => groupName(a.gameId).localeCompare(groupName(b.gameId), 'zh'));
 });
+
+function groupName(gameId: string): string {
+  return isDesignedId(gameId) ? (designByGameId(store.s, gameId)?.name ?? '自创桌游') : gameById(gameId).name;
+}
 
 function durText(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function listedPrice(c: Copy, mult: number): number {
-  const g = gameById(c.gameId);
-  return Math.max(10, Math.round(copyValue(g.marketPrice, g.cards, c.durability, g.rarity, c.sleeved, c.stored) * mult));
+  return Math.max(10, Math.round(copyValueOf(store.s, c) * mult)); // 自创设计按出版定价取价
 }
 
 const sellPrice = computed(() => (sellCopy.value ? listedPrice(sellCopy.value, priceMult.value) : 0));
 const sellOdds = computed(() =>
-  sellCopy.value ? sellChanceFinal(store.s, priceMult.value, sellCopy.value.durability, gameById(sellCopy.value.gameId).rarity) : 0,
+  sellCopy.value
+    ? sellChanceFinal(store.s, priceMult.value, sellCopy.value.durability, copyRarity(sellCopy.value))
+    : 0,
 );
 
 const sellCost = computed(() =>
@@ -106,13 +118,12 @@ const listingRows = computed(() =>
   store.s.listings.map(l => {
     const c = copyByUid(store.s, l.copyUid);
     if (!c) return { uid: l.copyUid, label: '（实体丢失）', price: l.price, odds: 0 };
-    const g = gameById(c.gameId);
-    const value = copyValue(g.marketPrice, g.cards, c.durability, g.rarity, c.sleeved, c.stored);
+    const value = copyValueOf(store.s, c);
     return {
       uid: l.copyUid,
       label: copyLabel(c),
       price: l.price,
-      odds: sellChanceFinal(store.s, l.price / value, c.durability, g.rarity),
+      odds: sellChanceFinal(store.s, l.price / value, c.durability, copyRarity(c)),
     };
   }),
 );
@@ -168,7 +179,7 @@ const listingRows = computed(() =>
           选择实体：
           <select v-model.number="sellUid" style="margin-left:4px;max-width:280px">
             <option :value="null" disabled>— 选择要上架的实体 —</option>
-            <optgroup v-for="grp in sellGroups" :key="grp.gameId" :label="`《${gameById(grp.gameId).name}》`">
+            <optgroup v-for="grp in sellGroups" :key="grp.gameId" :label="`《${groupName(grp.gameId)}》`">
               <option v-for="c in grp.copies" :key="c.uid" :value="c.uid">
                 {{ (c.durability <= 0 ? '🔧 ' : '') + copyLabel(c) }}
               </option>

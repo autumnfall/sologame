@@ -1,14 +1,17 @@
 import type { Attr } from '../data/constants';
-import { SELL_FEE } from '../data/balance';
+import { SELL_FEE, DURABILITY, copyValue } from '../data/balance';
 import { jobById } from '../data/jobs';
 import { taobaoBase } from '../data/prices';
+import { gameById } from '../data/games';
 import type { Game, Job } from '../data/types';
-import type { GameState } from '../state';
+import type { Rarity } from '../data/types';
+import type { Copy, GameState } from '../state';
 import { attrLevel } from './attrs';
 import { computeSetBonus, globalBonus, hasAffix } from './collection';
 import { achievementExpMult } from './achievements';
 import { perkLv } from './prestige';
 import { challengeMods, challengeShopLv } from './challenge';
+import { designByGameId } from './design';
 
 // ---------- 六维属性效果（全部为乘区，便于控制平衡） ----------
 // 谋略：游玩经验 +2.5%/级  演算：游玩时间 -2%/级（下限 ×0.80）
@@ -58,6 +61,26 @@ export function taobaoPrice(state: GameState, g: Game): number {
 /** 出售槽位上限：基础 5；商路亨通（商业线封顶）解锁到 8 */
 export function sellSlotsMax(state: GameState): number {
   return perkLv(state, 'sellHaste') > 0 ? 8 : 5;
+}
+
+/**
+ * 实体总价值（出售定价基础）：自创设计按众筹售价取价（成色线性折扣，成色按 SSR 档计），
+ * 其余走常规 copyValue。某鱼挂售/展示共用。
+ */
+export function copyValueOf(state: GameState, copy: Copy): number {
+  if (copy.designed) {
+    const d = designByGameId(state, copy.gameId);
+    if (!d) return 0;
+    const ratio = Math.max(0, Math.min(1, copy.durability / DURABILITY.SSR));
+    return Math.round(d.price * (0.5 + 0.5 * ratio));
+  }
+  const g = gameById(copy.gameId);
+  return copyValue(g.marketPrice, g.cards, copy.durability, g.rarity, copy.sleeved, copy.stored);
+}
+
+/** 出售成色稀有度：自创设计按 SSR 档参与成交率公式 */
+export function copyRarity(copy: Copy): Rarity {
+  return copy.designed ? 'SSR' : gameById(copy.gameId).rarity;
 }
 
 /** 时机条金色区宽度（基础 14%，洞察每级 +2%，上限 40%） */

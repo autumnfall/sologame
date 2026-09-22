@@ -1,6 +1,7 @@
 import { ACHIEVEMENTS, FEATURE_UNLOCKS } from '../data/achievements';
 import type { AchievementDef, FeatureKey } from '../data/achievements';
 import { isMastered } from './collection';
+import { isDesignedId } from '../state';
 import type { GameState } from '../state';
 
 /** 已达成成就数 */
@@ -46,7 +47,7 @@ export function autoSwitchTarget(
   rng: () => number = Math.random,
 ): string | null {
   const cand = Object.keys(state.collections).filter(id => {
-    if (id === excludeId) return false;
+    if (id === excludeId || isDesignedId(id)) return false; // 自创设计不可游玩
     const c = state.collections[id];
     if (!c.firstOpened) return false;
     if (state.copies.filter(x => x.gameId === id && !state.listings.some(l => l.copyUid === x.uid)).length === 0) return false;

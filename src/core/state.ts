@@ -25,6 +25,83 @@ export interface Copy {
   stored: boolean;
   /** 收藏架锁定：锁定的实体不可出售（含一键上架磨光件） */
   locked?: boolean;
+  /** 桌游设计师产出的自创实体（id 空间 design-N，不进 GAMES 表/图鉴/转生权重） */
+  designed?: true;
+}
+
+/** 设计原型：立项产物；iter = 6 维度各自的迭代次数（0~5），发起众筹后锁定 */
+export interface Prototype {
+  /** 自增 uid（沿用为众筹/成功款 uid） */
+  uid: number;
+  /** 玩家自取名称（2~10 字） */
+  name: string;
+  themeId: string;
+  scale: string;
+  /** 6 维度迭代次数（key = DESIGN_DIMS key） */
+  iter: Record<string, number>;
+}
+
+/** 进行中的众筹项目（Q/稀有度/成本价/售价在发起时锁定） */
+export interface DesignCampaign {
+  uid: number;
+  name: string;
+  themeId: string;
+  scale: string;
+  /** 质量分（锁定值） */
+  score: number;
+  rarity: import('./data/types').Rarity;
+  costPrice: number;
+  /** 实际售价 = round(costPrice × 定价倍率) */
+  price: number;
+  /** 目标支持人数 */
+  goal: number;
+  /** 期限（天，1 天 = 24 秒） */
+  days: number;
+  elapsedSec: number;
+  supporters: number;
+  /** 发起时的迭代状态（失败退回原型用） */
+  iter: Record<string, number>;
+}
+
+/** 已众筹成功（待交付两阶段结算：先垫资成本，交付后收货款） */
+export interface FundedDesign {
+  uid: number;
+  name: string;
+  score: number;
+  rarity: import('./data/types').Rarity;
+  price: number;
+  supporters: number;
+  /** 垫资成本 = 支持人数 × 成本价 */
+  cost: number;
+  /** 货款收入 = 支持人数 × 售价（净收益 = income − cost，可为负） */
+  income: number;
+  /** 是否已交付（交付时 money −= cost 再 += income） */
+  delivered: boolean;
+}
+
+/** 已失败的众筹（原型退回，可重新发起） */
+export interface FailedCampaign {
+  uid: number;
+  name: string;
+  goal: number;
+  days: number;
+  supporters: number;
+}
+
+/** 桌游设计师状态（周目级：转生重置，不进转生白名单） */
+export interface DesignerState {
+  /** 担任「桌游设计师」职业后解锁（周目内永久） */
+  unlocked: boolean;
+  /** 灵感（cap 999） */
+  inspiration: number;
+  prototypes: Prototype[];
+  campaigns: DesignCampaign[];
+  funded: FundedDesign[];
+  failed: FailedCampaign[];
+  /** 下一个设计 uid（自增） */
+  nextUid: number;
+  /** 累计众筹成功款数（≥10 预留出版玩法） */
+  successCount: number;
 }
 
 /** 离线期间单款桌游的自动游玩统计 */
@@ -36,8 +113,7 @@ export interface OfflinePlayStat {
   wear: number;
 }
 
-/**
- * 离线总结（收益已自动入账，这里只存展示数据）：
+/** 离线总结（收益已自动入账，这里只存展示数据）：
  * 超过 1 分钟的离线会在回来时弹出总结弹窗，随后清空。
  */
 export interface OfflineBank {
@@ -157,6 +233,8 @@ export interface GameState {
   started: boolean;
   /** 挑战场景（周目级）：当前激活的挑战 id 与目标进度 */
   challenge: { active: string | null; progress: number };
+  /** 桌游设计师（周目级，转生重置） */
+  designer: DesignerState;
   /** 离线总结（收益已自动入账；>1 分钟离线回来时弹窗展示，关闭后清空） */
   offlineBank: OfflineBank;
   lastSeen: number;
@@ -237,6 +315,9 @@ export function defaultState(): GameState {
     jobProgress: 0,
     started: false,
     challenge: { active: null, progress: 0 },
+    designer: {
+      unlocked: false, inspiration: 0, prototypes: [], campaigns: [], funded: [], failed: [], nextUid: 1, successCount: 0,
+    },
     offlineBank: emptyOfflineBank(),
     lastSeen: Date.now(),
     stats: {
@@ -266,4 +347,9 @@ export function copyByUid(state: GameState, uid: number): Copy | undefined {
 export function copiesOf(state: GameState, gameId: string): Copy[] {
   const listed = new Set(state.listings.map(l => l.copyUid));
   return state.copies.filter(c => c.gameId === gameId && !listed.has(c.uid));
+}
+
+/** 是否自创设计实体（id 空间 design-N，不进 GAMES 表） */
+export function isDesignedId(gameId: string): boolean {
+  return gameId.startsWith('design-');
 }

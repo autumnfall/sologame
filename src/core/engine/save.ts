@@ -2,11 +2,13 @@ import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
+import { DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, SCALES, THEMES, rarityOf } from '../data/designs';
 import { gameById } from '../data/games';
-import { defaultState, genClientId } from '../state';
+import { defaultState, genClientId, isDesignedId } from '../state';
 import { rankCmp } from './records';
-import type { CollectionEntry, Copy, GameState, Listing, MarketItem, OfflineBank, RunRecord } from '../state';
 import type { Attr } from '../data/constants';
+import type { Rarity } from '../data/types';
+import type { CollectionEntry, Copy, DesignerState, DesignCampaign, FailedCampaign, FundedDesign, GameState, Listing, MarketItem, OfflineBank, Prototype, RunRecord } from '../state';
 
 /** 存储适配器：默认 localStorage，测试中可注入内存实现 */
 export interface StorageLike {
@@ -92,6 +94,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   // v13 → v14（挑战激活改到转生流程）：新增 prestige.pendingChallenge，
   // 新增可选字段，归一化时补默认值，无需改写数据
   13: raw => ({ ...raw }),
+  // v14 → v15（桌游设计师）：新增 designer 状态/Copy.designed；均为新增可选字段，归一化补默认，无需改写数据
+  14: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -222,13 +226,19 @@ function normalize(data: Record<string, unknown>): GameState {
   if (Array.isArray(data.copies)) {
     for (const c of data.copies) {
       if (!isRecord(c) || typeof c.gameId !== 'string') continue;
+      const designed = c.designed === true && isDesignedId(c.gameId);
+      if (c.designed === true && !designed) continue; // 脏 designed 标记（id 不在 design-N 空间）剔除
+      if (designed && !collections[c.gameId]) continue; // 自创实体必须有对应图鉴条目
       copies.push({
         uid: num(c.uid, 0),
         gameId: c.gameId,
-        durability: typeof c.durability === 'number' ? Math.max(0, c.durability) : DURABILITY[gameById(c.gameId).rarity],
-        sleeved: c.sleeved === true,
-        stored: c.stored === true,
+        durability: typeof c.durability === 'number'
+          ? Math.max(0, c.durability)
+          : designed ? DESIGN_DURABILITY : DURABILITY[gameById(c.gameId).rarity],
+        sleeved: !designed && c.sleeved === true,
+        stored: !designed && c.stored === true,
         ...(c.locked === true ? { locked: true } : {}),
+        ...(designed ? { designed: true } : {}),
       });
     }
   }
@@ -285,6 +295,103 @@ function normalize(data: Record<string, unknown>): GameState {
   const chRaw = isRecord(data.challenge) ? data.challenge : {};
   const activeRaw = typeof chRaw.active === 'string' ? chRaw.active : null;
   const active = activeRaw && knownChallenges.has(activeRaw) && !challengeDone.includes(activeRaw) ? activeRaw : null;
+  // 桌游设计师（v4 众筹）：兼容 v1 旧字段——旧 prototype（invested/insp、无 name/scale/iter）
+  // 迁移为 iter 全 0、体量 standard、名称回落「主题·uid号」；旧 published 数组并入 funded（稀有度按 score 重算）
+  const desRaw = isRecord(data.designer) ? data.designer : {};
+  const knownThemes = new Set(THEMES.map(t => t.id));
+  const knownScales = new Set(SCALES.map(s => s.id));
+  const normIter = (raw: unknown): Record<string, number> => {
+    const iter: Record<string, number> = {};
+    for (const d of DESIGN_DIMS) iter[d.key] = 0;
+    if (isRecord(raw)) {
+      for (const d of DESIGN_DIMS) iter[d.key] = Math.min(ITER_MAX, Math.max(0, Math.floor(num(raw[d.key], 0))));
+    }
+    return iter;
+  };
+  const prototypes: Prototype[] = Array.isArray(desRaw.prototypes)
+    ? desRaw.prototypes.filter(isRecord).map(p => {
+        const themeId = String(p.themeId ?? '');
+        const uid = num(p.uid, 0);
+        const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 10) : `${themeId}·${uid}号`;
+        return {
+          uid, name, themeId,
+          scale: knownScales.has(String(p.scale)) ? String(p.scale) : 'standard',
+          iter: normIter(p.iter),
+        };
+      }).filter(p => knownThemes.has(p.themeId))
+    : [];
+  const normRarity = (raw: unknown, score: number): Rarity =>
+    typeof raw === 'string' && ['N', 'R', 'SR', 'SSR'].includes(raw) ? raw as Rarity : rarityOf(score);
+  const funded: FundedDesign[] = [];
+  /** 旧条目缺 cost/delivered 的兜底：成本价无记录时按标准档重算（300×(0.8+Q/100)），旧数据视为已结算 */
+  const normFunded = (p: Record<string, unknown>, score: number, supporters: number, income: number): FundedDesign => {
+    const costPrice = num(p.costPrice, Math.round(300 * (0.8 + score / 100)));
+    const hasCost = typeof p.cost === 'number' && Number.isFinite(p.cost);
+    return {
+      uid: num(p.uid, 0),
+      name: typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 10) : `设计·${num(p.uid, 0)}号`,
+      score, rarity: normRarity(p.rarity, score),
+      price: num(p.price, 0), supporters,
+      cost: hasCost ? num(p.cost, 0) : supporters * costPrice,
+      income,
+      delivered: typeof p.delivered === 'boolean' ? p.delivered : true,
+    };
+  };
+  // v1 旧字段 published → 并入 funded（支持者/收入信息已不存在，记 0；视为已结算）
+  if (Array.isArray(desRaw.published)) {
+    for (const p of desRaw.published.filter(isRecord)) {
+      const score = Math.min(100, Math.max(1, Math.round(num(p.score, 1))));
+      funded.push(normFunded(p, score, 0, 0));
+    }
+  }
+  if (Array.isArray(desRaw.funded)) {
+    for (const p of desRaw.funded.filter(isRecord)) {
+      const score = Math.min(100, Math.max(1, Math.round(num(p.score, 1))));
+      funded.push(normFunded(p, score, Math.floor(num(p.supporters, 0)), num(p.income, 0)));
+    }
+  }
+  const campaigns: DesignCampaign[] = Array.isArray(desRaw.campaigns)
+    ? desRaw.campaigns.filter(isRecord).map(c => {
+        const score = Math.min(100, Math.max(1, Math.round(num(c.score, 1))));
+        return {
+          uid: num(c.uid, 0),
+          name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 10) : `设计·${num(c.uid, 0)}号`,
+          themeId: knownThemes.has(String(c.themeId)) ? String(c.themeId) : THEMES[0].id,
+          scale: knownScales.has(String(c.scale)) ? String(c.scale) : 'standard',
+          score, rarity: normRarity(c.rarity, score),
+          costPrice: num(c.costPrice, 0), price: num(c.price, 0),
+          goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
+          days: Math.min(120, Math.max(1, Math.floor(num(c.days, 30)))),
+          elapsedSec: num(c.elapsedSec, 0), supporters: Math.floor(num(c.supporters, 0)),
+          iter: normIter(c.iter),
+        };
+      })
+    : [];
+  const failed: FailedCampaign[] = Array.isArray(desRaw.failed)
+    ? desRaw.failed.filter(isRecord).map(c => ({
+        uid: num(c.uid, 0),
+        name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 10) : `设计·${num(c.uid, 0)}号`,
+        goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
+        days: Math.min(120, Math.max(1, Math.floor(num(c.days, 30)))),
+        supporters: Math.floor(num(c.supporters, 0)),
+      }))
+    : [];
+  const maxUid = Math.max(
+    1,
+    ...prototypes.map(p => p.uid + 1),
+    ...campaigns.map(c => c.uid + 1),
+    ...funded.map(p => p.uid + 1),
+  );
+  const designer: DesignerState = {
+    unlocked: desRaw.unlocked === true,
+    inspiration: num(desRaw.inspiration, 0),
+    prototypes,
+    campaigns,
+    funded,
+    failed,
+    nextUid: Math.max(num(desRaw.nextUid, 1), maxUid),
+    successCount: Math.max(num(desRaw.successCount, 0), funded.length),
+  };
   return {
     ...s,
     ...data,
@@ -322,6 +429,7 @@ function normalize(data: Record<string, unknown>): GameState {
     jobProgress: num(data.jobProgress, 0),
     started: data.started === true,
     challenge: { active, progress: active ? num(chRaw.progress, 0) : 0 },
+    designer,
     offlineBank: {
       t: num(bank.t, 0),
       workMoney: num(bank.workMoney, 0),

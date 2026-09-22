@@ -11,6 +11,7 @@ const TABS = [
   { key: 'shop', label: '🛒 商店' },
   { key: 'shelf', label: '📚 收藏架' },
   { key: 'challenge', label: '🎯 挑战' },
+  { key: 'design', label: '🎨 设计' },
   { key: 'prestige', label: '🌅 转生' },
   { key: 'guide', label: '📖 教程' },
   { key: 'changelog', label: '📝 更新' },
@@ -50,6 +51,7 @@ const attrChips = computed(() =>
     <div id="tabs">
       <button
         v-for="t in TABS"
+        v-show="t.key !== 'design' || store.s.designer.unlocked"
         :key="t.key"
         :class="{ active: store.tab === t.key }"
         @click="store.tab = t.key"

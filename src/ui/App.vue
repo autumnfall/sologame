@@ -11,6 +11,7 @@ import WorkPage from './pages/WorkPage.vue';
 import ShopPage from './pages/ShopPage.vue';
 import ShelfPage from './pages/ShelfPage.vue';
 import ChallengePage from './pages/ChallengePage.vue';
+import DesignPage from './pages/DesignPage.vue';
 import PrestigePage from './pages/PrestigePage.vue';
 import GuidePage from './pages/GuidePage.vue';
 import ChangelogPage from './pages/ChangelogPage.vue';
@@ -86,8 +87,9 @@ onUnmounted(() => {
     <ShopPage v-else-if="store.tab === 'shop'" />
     <ShelfPage v-else-if="store.tab === 'shelf'" />
     <ChallengePage v-else-if="store.tab === 'challenge'" />
+    <DesignPage v-else-if="store.tab === 'design' && store.s.designer.unlocked" />
     <PrestigePage v-else-if="store.tab === 'prestige'" />
-    <GuidePage v-else-if="store.tab === 'guide'" />
+    <GuidePage v-else-if="store.tab === 'guide' || store.tab === 'design'" />
     <ChangelogPage v-else />
   </div>
   <StarterModal />
