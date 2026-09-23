@@ -1,6 +1,6 @@
 // ================= 挑战场景调参区 =================
 // 挑战 = 条件修饰 + 目标；完成后一次性发放挑战币（prestige.challengeDone 记录，跨周目保留）。
-// 设计师向商店加成（灵感/评分/版税）由桌游设计师玩法消费（见 data/designs.ts、mechanics/design.ts）。
+// 设计师向商店加成（灵感/Q/众筹人气）由桌游设计师玩法消费（见 data/designs.ts、mechanics/design.ts）。
 
 /** 挑战目标类型：goalProgress 按 type 从 stats / 收藏推导当前进度 */
 export type GoalType =
@@ -105,7 +105,7 @@ export type ChallengeShopKey =
   | 'xyEye'      // 某鱼好货（高成色/带牌套）概率 +8%/级（收藏线）
   | 'inspUp'     // 灵感获取 +15%/级（设计线，设计师玩法消费）
   | 'scoreUp'    // 设计评分 +8%/级（设计线，设计师玩法消费）
-  | 'royaltyUp'; // 版税率 +12%/级（设计线，设计师玩法消费）
+  | 'royaltyUp'; // 众筹购买概率 +6%/级（设计线，设计师玩法消费）
 
 export type ChallengeShopLine = 'collect' | 'design';
 

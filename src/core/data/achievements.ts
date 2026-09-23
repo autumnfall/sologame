@@ -66,6 +66,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'first-proto', name: '灵光一现', desc: '第一次立项设计桌游', check: s => s.designer.prototypes.length + s.designer.campaigns.length + s.designer.funded.length + s.designer.failed.length >= 1 },
   { id: 'first-funded', name: '一呼百应', desc: '第一次众筹成功', check: s => s.designer.successCount >= 1 },
   { id: 'crowd-800', name: '万众瞩目', desc: '单次众筹支持人数 ≥800', check: s => s.designer.funded.some(f => f.supporters >= 800) },
+  { id: 'hot-500', name: '未发售先火', desc: '预热看好人数 ≥500', check: s => s.designer.campaigns.some(c => c.watchers >= 500) },
 ];
 
 const ACH_MAP = new Map(ACHIEVEMENTS.map(a => [a.id, a]));

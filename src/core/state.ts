@@ -29,7 +29,7 @@ export interface Copy {
   designed?: true;
 }
 
-/** 设计原型：立项产物；iter = 6 维度各自的迭代次数（0~5），发起众筹后锁定 */
+/** 设计原型：立项产物；iter = 6 维度迭代次数；经营 activity 积累曝光与看好种子 */
 export interface Prototype {
   /** 自增 uid（沿用为众筹/成功款 uid） */
   uid: number;
@@ -39,9 +39,39 @@ export interface Prototype {
   scale: string;
   /** 6 维度迭代次数（key = DESIGN_DIMS key） */
   iter: Record<string, number>;
+  /** 曝光度（软上限 200，超出部分收益减半；发起时带入众筹） */
+  exposure: number;
+  /** 组织试玩攒下的看好种子（发起预热时转为初始看好） */
+  seeds: number;
+  /** 各 activity 已办次数（成本递增曲线基数） */
+  activities: Record<string, number>;
+  /** 每日次数的日戳（floor(now_ms/1000/DAY_SECONDS)）与当日计数（试玩/宣传每日各 3 次） */
+  activityDay: number;
+  activityCount: Record<string, number>;
 }
 
-/** 进行中的众筹项目（Q/稀有度/成本价/售价在发起时锁定） */
+/** 待决事件：生成后独立 5 天（120 秒）倒计时，超时按默认选项结算 */
+export interface PendingEvent {
+  eventId: string;
+  /** 剩余秒数 */
+  remainingSec: number;
+}
+
+/** 事件历史条目（触发/抉择/结果全记录） */
+export interface EventHistoryEntry {
+  /** 发生时的项目天数 */
+  day: number;
+  eventId: string;
+  /** 所选选项下标 */
+  optionIdx: number;
+  /** 是否默认兜底结算（超时/终局前 5 天自动） */
+  byDefault: boolean;
+  /** 结果描述（如 支持+8% / 流量+50% 命中） */
+  result: string;
+  kind: 'event' | 'milestone';
+}
+
+/** 进行中的众筹项目（状态机：preheat → live；Q/稀有度/成本价/售价/平台在发起时锁定） */
 export interface DesignCampaign {
   uid: number;
   name: string;
@@ -55,15 +85,39 @@ export interface DesignCampaign {
   price: number;
   /** 目标支持人数 */
   goal: number;
-  /** 期限（天，1 天 = 24 秒） */
+  /** 总期限 T（天，1 天 = 24 秒；预热 P 天含在总时长内） */
   days: number;
+  /** 预热天数 P（live 前） */
+  preheatDays: number;
+  platformId: string;
+  status: 'preheat' | 'live';
+  /** 看好人数（预热逐日积累；开众筹瞬间 × 转化率转初始支持） */
+  watchers: number;
+  /** 预热期曝光（追加宣传积累；逐日折算看好） */
+  exposure: number;
+  /** 预热期已结算看好的天数 */
+  watchersDays: number;
+  /** 众筹开启时锁定的看好转化率 */
+  convertRate: number;
   elapsedSec: number;
   supporters: number;
+  /** 事件流量乘区（+25%~+50% 事件作用于剩余天数每秒流量） */
+  flowMult: number;
+  /** 事件判定计时（满 120 秒掷一次 60%） */
+  eventTimer: number;
+  /** 本项目已出过的事件（轮空前不重复） */
+  usedEvents: string[];
+  pendingEvents: PendingEvent[];
+  eventHistory: EventHistoryEntry[];
+  /** 已触发的里程碑（150/200） */
+  milestonesHit: number[];
+  /** 预热期追加宣传次数（成本递增基数） */
+  boostCount: number;
   /** 发起时的迭代状态（失败退回原型用） */
   iter: Record<string, number>;
 }
 
-/** 已众筹成功（待交付两阶段结算：先垫资成本，交付后收货款） */
+/** 已众筹成功（两阶段结算 + 平台抽成：到期到账 firstPayment，交付垫资成本并收回 remainPayment） */
 export interface FundedDesign {
   uid: number;
   name: string;
@@ -73,9 +127,15 @@ export interface FundedDesign {
   supporters: number;
   /** 垫资成本 = 支持人数 × 成本价 */
   cost: number;
-  /** 货款收入 = 支持人数 × 售价（净收益 = income − cost，可为负） */
+  /** 货款总额 = 支持人数 × 售价 */
   income: number;
-  /** 是否已交付（交付时 money −= cost 再 += income） */
+  /** 平台抽成 = round(income × 抽成率) */
+  commission: number;
+  /** 到期立即到账 = round((income − commission) × 50%) */
+  firstPayment: number;
+  /** 交付时收回 = income − commission − firstPayment */
+  remainPayment: number;
+  /** 是否已交付（交付时 money −= cost 再 += remainPayment） */
   delivered: boolean;
 }
 

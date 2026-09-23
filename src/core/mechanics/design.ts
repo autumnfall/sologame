@@ -1,7 +1,10 @@
 import {
-  INSPIRE_BY_RARITY, INSPIRE_HIDDEN_MULT, Q_BASE, RARITY_DEMAND_BONUS,
-  dimByKey, rarityOf, scaleById, themeById, themeDimKey,
+  BOOST_EXPOSURE_RANGE, EVENT_POOL, EXPOSURE_SOFTCAP, INSPIRE_BY_RARITY,
+  INSPIRE_HIDDEN_MULT, PLAYTEST_ATTR_BONUS, Q_BASE, RARITY_DEMAND_BONUS,
+  dimByKey, eventById, platformById, priceAffinity, qualityMult,
+  rarityOf, scaleById, themeById, themeDimKey,
 } from '../data/designs';
+import type { EventOptionDef } from '../data/designs';
 import type { Game } from '../data/types';
 import type { DesignCampaign, GameState, Prototype } from '../state';
 import { attrLevel } from './attrs';
@@ -113,3 +116,66 @@ export function designByGameId(
 }
 
 export { rarityOf, scaleById, themeById, themeDimKey };
+
+// ---------- v5 公式：曝光 · 预热 · 转化率 · 事件 ----------
+
+/** 曝光软上限累加：超出 200 的部分收益减半 */
+export function addExposure(cur: number, gain: number): number {
+  const raw = cur + gain;
+  return raw <= EXPOSURE_SOFTCAP ? raw : EXPOSURE_SOFTCAP + (raw - EXPOSURE_SOFTCAP) / 2;
+}
+
+/** 组织试玩产出倍率：沉浸/应变每级 +4% */
+export function playtestMult(state: GameState): number {
+  return 1 + PLAYTEST_ATTR_BONUS * (attrLevel(state, '沉浸') + attrLevel(state, '应变'));
+}
+
+/** 每日新增看好 = round((曝光/10 + 平台基础曝光) × 定价亲和 × 质量系数) */
+export function watcherDailyGain(exposure: number, platformId: string, ratio: number, q: number): number {
+  return Math.round((exposure / 10 + platformById(platformId).baseExposure) * priceAffinity(ratio) * qualityMult(q));
+}
+
+/** 单次追加宣传的曝光产出（rng ∈ [0,1)） */
+export function boostExposureGain(rng: () => number): number {
+  return BOOST_EXPOSURE_RANGE[0] + Math.floor(rng() * (BOOST_EXPOSURE_RANGE[1] - BOOST_EXPOSURE_RANGE[0] + 1));
+}
+
+export { priceAffinity, qualityMult };
+
+/** 事件选项可用性（UI 置灰与引擎校验共用）；deal = 当前成交额 supporters×price */
+export function eventOptionCheck(
+  state: GameState,
+  c: { supporters: number; price: number },
+  opt: EventOptionDef,
+): { ok: boolean; reason: string } {
+  if (opt.requireAttr) {
+    const { attr, lv } = opt.requireAttr;
+    if (attrLevel(state, attr) < lv) return { ok: false, reason: `${attr}需 ${lv} 级` };
+  }
+  if (opt.requireAttrAlt) {
+    const { attrs, lv } = opt.requireAttrAlt;
+    if (attrs.every(a => attrLevel(state, a) < lv)) return { ok: false, reason: `${attrs.join(' 或 ')}需 ${lv} 级` };
+  }
+  if (opt.moneyPct) {
+    const cost = Math.round(c.supporters * c.price * opt.moneyPct);
+    if (state.money < cost) return { ok: false, reason: `需 ¥${cost}` };
+  }
+  if (opt.inspiration && state.designer.inspiration < opt.inspiration) {
+    return { ok: false, reason: `需灵感 ${opt.inspiration}` };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** 从事件池抽一个不重复的事件（usedEvents 轮空前不重复；池空则重置） */
+export function drawEvent(used: string[], rng: () => number): string {
+  let pool = EVENT_POOL_IDS.filter(id => !used.includes(id));
+  if (!pool.length) {
+    used.length = 0; // 轮空一轮，重置
+    pool = [...EVENT_POOL_IDS];
+  }
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+const EVENT_POOL_IDS: string[] = EVENT_POOL.map(e => e.id);
+
+export { eventById };

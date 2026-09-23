@@ -15,9 +15,10 @@ import type { Rarity } from './types';
  * v12 = 快速上架比例（settings.quickListPct，50~200，默认 100）；新增可选字段，归一化补默认。
  * v13 = 挑战场景（GameState.challenge + prestige.coins/shop/challengeDone + stats.xyEarned）；均为新增可选字段，归一化补默认。
  * v14 = 挑战激活改到转生流程（prestige.pendingChallenge）；新增可选字段，归一化补默认。
- * v15 = 桌游设计师（designer 状态 + Copy.designed + offlineBank.royalties）；均为新增可选字段，归一化补默认。
+ * v15 = 桌游设计师（designer 状态 + Copy.designed）；均为新增可选字段，归一化补默认。
+ * v16 = 设计师 v5（曝光/预热/平台/事件/两阶段抽成结算）；normalize 兼容旧 campaign/funded 形态。
  */
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 export const SAVE_KEY = 'bgcollector_save';
 
 /** 离线收益累积上限：1 小时 */

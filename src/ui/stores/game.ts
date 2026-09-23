@@ -15,7 +15,10 @@ import {
   buyChallengeShop as coreBuyChallengeShop,
   foundPrototype as coreFoundPrototype,
   iterateProto as coreIterateProto,
-  launchCrowd as coreLaunchCrowd,
+  startPreheat as coreStartPreheat,
+  runActivity as coreRunActivity,
+  boostCampaign as coreBoostCampaign,
+  resolveEvent as coreResolveEvent,
   deliverDesign as coreDeliverDesign,
   autoSwitchTarget,
   isFeatureUnlocked,
@@ -268,7 +271,7 @@ export const useGameStore = defineStore('game', {
       if (r.streamEvent) this.toast('📺 直播事件：' + r.streamEvent);
       for (const e of r.crowd) {
         this.toast(e.ok
-          ? `🎉 众筹成功《${e.name}》：支持 ${e.supporters} 人，待交付（垫资 ¥${fmt(e.cost)} → 货款 ¥${fmt(e.income)}）`
+          ? `🎉 众筹成功《${e.name}》：支持 ${e.supporters} 人，待交付（已到账 ¥${fmt(e.firstPayment)}，交付垫资 ¥${fmt(e.cost)} → 收尾款 ¥${fmt(e.remainPayment)}）`
           : `😢 众筹《${e.name}》未达标（${e.supporters} 人），原型已退回`);
       }
       const xy = tickXianyu(this.s);
@@ -909,9 +912,30 @@ export const useGameStore = defineStore('game', {
       if (r.ok) this.saveGame();
     },
 
-    /** 发起众筹：锁定 Q/售价，原型转入进行中（薄封装） */
-    launchCrowd(uid: number, goal: number, days: number, ratio: number) {
-      const r = coreLaunchCrowd(this.s, uid, goal, days, ratio);
+    /** 发起预热：选平台 + 目标 + 总期限 T + 预热 P + 定价，原型转入进行中（薄封装） */
+    startPreheat(uid: number, platformId: string, goal: number, days: number, preheatDays: number, ratio: number) {
+      const r = coreStartPreheat(this.s, uid, platformId, goal, days, preheatDays, ratio);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 设计期经营：试玩/宣传/日记（薄封装） */
+    runActivity(uid: number, key: 'playtest' | 'promo' | 'diary') {
+      const r = coreRunActivity(this.s, uid, key);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 预热期追加宣传（薄封装） */
+    boostCampaign(uid: number) {
+      const r = coreBoostCampaign(this.s, uid);
+      this.toast(r.ok ? r.message : r.reason);
+      if (r.ok) this.saveGame();
+    },
+
+    /** 抉择待决事件（薄封装） */
+    resolveEvent(campaignUid: number, pendingIdx: number, optionIdx: number) {
+      const r = coreResolveEvent(this.s, campaignUid, pendingIdx, optionIdx);
       this.toast(r.ok ? r.message : r.reason);
       if (r.ok) this.saveGame();
     },

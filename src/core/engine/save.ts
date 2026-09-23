@@ -2,13 +2,13 @@ import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
-import { DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, SCALES, THEMES, rarityOf } from '../data/designs';
+import { DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, PLATFORMS, SCALES, THEMES, rarityOf } from '../data/designs';
 import { gameById } from '../data/games';
 import { defaultState, genClientId, isDesignedId } from '../state';
 import { rankCmp } from './records';
 import type { Attr } from '../data/constants';
 import type { Rarity } from '../data/types';
-import type { CollectionEntry, Copy, DesignerState, DesignCampaign, FailedCampaign, FundedDesign, GameState, Listing, MarketItem, OfflineBank, Prototype, RunRecord } from '../state';
+import type { CollectionEntry, Copy, DesignerState, DesignCampaign, EventHistoryEntry, FailedCampaign, FundedDesign, GameState, Listing, MarketItem, OfflineBank, PendingEvent, Prototype, RunRecord } from '../state';
 
 /** 存储适配器：默认 localStorage，测试中可注入内存实现 */
 export interface StorageLike {
@@ -96,6 +96,9 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   13: raw => ({ ...raw }),
   // v14 → v15（桌游设计师）：新增 designer 状态/Copy.designed；均为新增可选字段，归一化补默认，无需改写数据
   14: raw => ({ ...raw }),
+  // v15 → v16（设计师 v5：曝光/预热/平台/事件/两阶段抽成结算）：均为新增可选字段，
+  // 旧 campaign/funded 在归一化时补默认值，无需改写数据
+  15: raw => ({ ...raw }),
 };
 
 function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
@@ -317,16 +320,25 @@ function normalize(data: Record<string, unknown>): GameState {
           uid, name, themeId,
           scale: knownScales.has(String(p.scale)) ? String(p.scale) : 'standard',
           iter: normIter(p.iter),
+          exposure: num(p.exposure, 0), // v16 起：设计期经营积累
+          seeds: Math.floor(num(p.seeds, 0)),
+          activities: { playtest: 0, promo: 0, diary: 0, ...(isRecord(p.activities) ? p.activities : {}) } as Record<string, number>,
+          activityDay: num(p.activityDay, -1),
+          activityCount: { playtest: 0, promo: 0, diary: 0, ...(isRecord(p.activityCount) ? p.activityCount : {}) } as Record<string, number>,
         };
       }).filter(p => knownThemes.has(p.themeId))
     : [];
   const normRarity = (raw: unknown, score: number): Rarity =>
     typeof raw === 'string' && ['N', 'R', 'SR', 'SSR'].includes(raw) ? raw as Rarity : rarityOf(score);
   const funded: FundedDesign[] = [];
-  /** 旧条目缺 cost/delivered 的兜底：成本价无记录时按标准档重算（300×(0.8+Q/100)），旧数据视为已结算 */
+  /** 旧条目缺 cost/delivered 的兜底：成本价无记录时按标准档重算（300×(0.8+Q/100)）；
+   * 缺 commission/firstPayment/remainPayment 的旧数据视为已全额结算（remainPayment=income、delivered=true，保持旧交付行为） */
   const normFunded = (p: Record<string, unknown>, score: number, supporters: number, income: number): FundedDesign => {
     const costPrice = num(p.costPrice, Math.round(300 * (0.8 + score / 100)));
     const hasCost = typeof p.cost === 'number' && Number.isFinite(p.cost);
+    const legacy = typeof p.commission !== 'number';
+    const commission = Math.floor(num(p.commission, 0));
+    const firstPayment = Math.floor(num(p.firstPayment, 0));
     return {
       uid: num(p.uid, 0),
       name: typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 10) : `设计·${num(p.uid, 0)}号`,
@@ -334,6 +346,8 @@ function normalize(data: Record<string, unknown>): GameState {
       price: num(p.price, 0), supporters,
       cost: hasCost ? num(p.cost, 0) : supporters * costPrice,
       income,
+      commission, firstPayment,
+      remainPayment: legacy ? income : Math.floor(num(p.remainPayment, income - commission - firstPayment)),
       delivered: typeof p.delivered === 'boolean' ? p.delivered : true,
     };
   };
@@ -350,9 +364,27 @@ function normalize(data: Record<string, unknown>): GameState {
       funded.push(normFunded(p, score, Math.floor(num(p.supporters, 0)), num(p.income, 0)));
     }
   }
+  const knownPlatforms = new Set(PLATFORMS.map(p => p.id));
+  const normPending = (raw: unknown): PendingEvent[] => Array.isArray(raw)
+    ? raw.filter(isRecord)
+        .map(e => ({ eventId: String(e.eventId ?? ''), remainingSec: num(e.remainingSec, 0) }))
+        .filter(e => e.eventId && e.remainingSec > 0)
+    : [];
+  const normHistory = (raw: unknown): EventHistoryEntry[] => Array.isArray(raw)
+    ? raw.filter(isRecord).map(h => ({
+        day: Math.floor(num(h.day, 0)),
+        eventId: String(h.eventId ?? ''),
+        optionIdx: Math.floor(num(h.optionIdx, -1)),
+        byDefault: h.byDefault === true,
+        result: typeof h.result === 'string' ? h.result.slice(0, 60) : '',
+        kind: h.kind === 'milestone' ? 'milestone' as const : 'event' as const,
+      })).filter(h => h.eventId)
+    : [];
   const campaigns: DesignCampaign[] = Array.isArray(desRaw.campaigns)
     ? desRaw.campaigns.filter(isRecord).map(c => {
         const score = Math.min(100, Math.max(1, Math.round(num(c.score, 1))));
+        const days = Math.min(120, Math.max(1, Math.floor(num(c.days, 30))));
+        const elapsedSec = num(c.elapsedSec, 0);
         return {
           uid: num(c.uid, 0),
           name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 10) : `设计·${num(c.uid, 0)}号`,
@@ -361,8 +393,23 @@ function normalize(data: Record<string, unknown>): GameState {
           score, rarity: normRarity(c.rarity, score),
           costPrice: num(c.costPrice, 0), price: num(c.price, 0),
           goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
-          days: Math.min(120, Math.max(1, Math.floor(num(c.days, 30)))),
-          elapsedSec: num(c.elapsedSec, 0), supporters: Math.floor(num(c.supporters, 0)),
+          days,
+          // v16 状态机：旧 campaign（无 status）视为已开众筹的 live，预热 0 天
+          preheatDays: Math.min(days - 15 > 0 ? days - 15 : 0, Math.max(0, Math.floor(num(c.preheatDays, 0)))),
+          platformId: knownPlatforms.has(String(c.platformId)) ? String(c.platformId) : 'moudian',
+          status: c.status === 'preheat' ? 'preheat' as const : 'live' as const,
+          watchers: Math.floor(num(c.watchers, 0)),
+          exposure: num(c.exposure, 0),
+          watchersDays: Math.max(0, Math.min(Math.floor(num(c.preheatDays, 0)), Math.floor(elapsedSec / 24))),
+          convertRate: num(c.convertRate, 0),
+          elapsedSec, supporters: Math.floor(num(c.supporters, 0)),
+          flowMult: Math.max(1, num(c.flowMult, 1)),
+          eventTimer: num(c.eventTimer, 0),
+          usedEvents: Array.isArray(c.usedEvents) ? c.usedEvents.filter((id): id is string => typeof id === 'string') : [],
+          pendingEvents: normPending(c.pendingEvents),
+          eventHistory: normHistory(c.eventHistory),
+          milestonesHit: Array.isArray(c.milestonesHit) ? c.milestonesHit.filter((m): m is number => typeof m === 'number') : [],
+          boostCount: Math.floor(num(c.boostCount, 0)),
           iter: normIter(c.iter),
         };
       })

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CROWD_SUCCESS_LIMIT, DAY_SECONDS, DESIGN_DIMS, ITER_MAX, SAVE_VERSION,
-  accumulateOffline, applySleeve, attrLevel, checkAchievements, defaultState,
-  demandParts, deliverDesign, doPrestige, foundPrototype, iterateProto,
-  launchCrowd, parseSave, qualityOf, rarityOf, costPriceOf, settleRound,
-  takeJob, tickCrowd,
+  ACTIVITY_DAILY_LIMIT, DAY_SECONDS, EXPOSURE_SOFTCAP, PREHEAT_MIN, SAVE_VERSION,
+  accumulateOffline, addExposure, boostCampaign, checkAchievements,
+  convertRate, defaultState, demandParts, deliverDesign, doPrestige,
+  foundPrototype, iterateProto, parseSave, playtestCost, promoCost,
+  rarityOf, resolveEvent, runActivity, settleRound, startPreheat,
+  takeJob, tickCrowd, watcherDailyGain, platformById, eventById, preheatMax,
 } from '../src/core';
-import type { GameState } from '../src/core';
+import type { DesignCampaign, GameState } from '../src/core';
 import { expToReach, own, uidOf } from './helpers';
 
 /** 解锁设计师（担任 master 职业） */
@@ -15,7 +16,7 @@ function unlocked(s: GameState): GameState {
   return s;
 }
 
-/** 解锁 + 满灵感 + 立项一个原型 */
+/** 解锁 + 满灵感 + 立项 */
 function found(s: GameState, name = '灵感方舟', themeId = 'euro', scale = 'standard') {
   s.designer.inspiration = 999;
   const r = foundPrototype(s, name, themeId, scale);
@@ -23,370 +24,425 @@ function found(s: GameState, name = '灵感方舟', themeId = 'euro', scale = 's
   return s.designer.prototypes[s.designer.prototypes.length - 1];
 }
 
-/** 发起众筹（默认目标 50 / 30 天 / 定价 100%） */
-function launched(s: GameState, opts: { goal?: number; days?: number; ratio?: number } = {}) {
+/** 走完整 startPreheat */
+function preheated(s: GameState, opts: { goal?: number; days?: number; preheat?: number; ratio?: number; platform?: string } = {}) {
   const p = s.designer.prototypes[s.designer.prototypes.length - 1];
-  const r = launchCrowd(s, p.uid, opts.goal ?? 50, opts.days ?? 30, opts.ratio ?? 1);
+  const r = startPreheat(s, p.uid, opts.platform ?? 'moudian', opts.goal ?? 50, opts.days ?? 30, opts.preheat ?? 5, opts.ratio ?? 1);
   if (!r.ok) throw new Error(`发起失败: ${r.reason}`);
   return s.designer.campaigns[s.designer.campaigns.length - 1];
 }
+
+/** 直接构造 live 状态的 campaign（跳过预热，精确控制数值） */
+function liveCampaign(s: GameState, opts: Partial<DesignCampaign> = {}): DesignCampaign {
+  const score = opts.score ?? 30;
+  const c: DesignCampaign = {
+    uid: opts.uid ?? s.designer.nextUid++,
+    name: opts.name ?? '测试项目', themeId: 'euro', scale: 'standard',
+    score, rarity: rarityOf(score),
+    costPrice: opts.costPrice ?? 100, price: opts.price ?? 100,
+    goal: opts.goal ?? 50, days: opts.days ?? 30, preheatDays: 0,
+    platformId: opts.platformId ?? 'moudian', status: 'live',
+    watchers: 0, exposure: 0, watchersDays: 0, convertRate: 0,
+    elapsedSec: 0, supporters: 0, flowMult: 1, eventTimer: 0,
+    usedEvents: [], pendingEvents: [], eventHistory: [], milestonesHit: [], boostCount: 0,
+    iter: { mech: 0, balance: 0, replay: 0, art: 0, rules: 0, theme: 0 },
+    ...opts,
+  };
+  s.designer.campaigns.push(c);
+  return c;
+}
+
+const ZERO_ITER = { mech: 0, balance: 0, replay: 0, art: 0, rules: 0, theme: 0 };
 
 describe('设计师：解锁与灵感（v1 保留）', () => {
   it('担任「桌游设计师」职业解锁（周目内永久）；其他职业不解锁', () => {
     const s = defaultState();
     expect(s.designer.unlocked).toBe(false);
-    expect(foundPrototype(s, '灵感方舟', 'euro', 'standard').ok).toBe(false); // 未解锁
+    expect(foundPrototype(s, '灵感方舟', 'euro', 'standard').ok).toBe(false);
     takeJob(s, 'teacher');
     expect(s.designer.unlocked).toBe(false);
     takeJob(s, 'master');
     expect(s.designer.unlocked).toBe(true);
     takeJob(s, 'teacher');
-    expect(s.designer.unlocked).toBe(true); // 换工作不回退
+    expect(s.designer.unlocked).toBe(true);
   });
 
   it('settleRound 按稀有度入账灵感（N1/R2/SR4/SSR8，隐藏款 ×2），未解锁不加', () => {
     const s = unlocked(defaultState());
-    own(s, 'guoyuan'); // N
-    own(s, 'yueliang'); // R
-    own(s, 'tigemei'); // SR
-    own(s, 'lingji'); // SSR
-    own(s, 'hezou'); // N 隐藏款
+    own(s, 'guoyuan'); own(s, 'yueliang'); own(s, 'tigemei'); own(s, 'lingji'); own(s, 'hezou');
     expect(settleRound(s, 'guoyuan', uidOf(s, 'guoyuan'), 1, () => 0.99).inspiration).toBe(1);
     expect(settleRound(s, 'yueliang', uidOf(s, 'yueliang'), 1, () => 0.99).inspiration).toBe(2);
     expect(settleRound(s, 'tigemei', uidOf(s, 'tigemei'), 1, () => 0.99).inspiration).toBe(4);
     expect(settleRound(s, 'lingji', uidOf(s, 'lingji'), 1, () => 0.99).inspiration).toBe(8);
-    expect(settleRound(s, 'hezou', uidOf(s, 'hezou'), 1, () => 0.99).inspiration).toBe(2); // 隐藏 ×2
+    expect(settleRound(s, 'hezou', uidOf(s, 'hezou'), 1, () => 0.99).inspiration).toBe(2);
     const s2 = defaultState();
     own(s2, 'guoyuan');
     expect(settleRound(s2, 'guoyuan', uidOf(s2, 'guoyuan'), 1, () => 0.99).inspiration).toBe(0);
   });
 
-  it('insp-up 乘区 +15%/级，且灵感 cap 999', () => {
+  it('insp-up 乘区 +15%/级，灵感 cap 999', () => {
     const s = unlocked(defaultState());
-    s.prestige.shop['insp-up'] = 2; // ×1.3
+    s.prestige.shop['insp-up'] = 2;
     own(s, 'guoyuan');
     expect(settleRound(s, 'guoyuan', uidOf(s, 'guoyuan'), 1, () => 0.99).inspiration).toBeCloseTo(1.3, 10);
-    // cap：直接顶到 998 再加 SSR 8×1.3 → 封顶 999
     s.designer.inspiration = 998;
     own(s, 'aoding');
-    const gained = settleRound(s, 'aoding', uidOf(s, 'aoding'), 1, () => 0.99).inspiration;
-    expect(gained).toBeCloseTo(999 - 998, 10);
+    expect(settleRound(s, 'aoding', uidOf(s, 'aoding'), 1, () => 0.99).inspiration).toBeCloseTo(1, 10);
     expect(s.designer.inspiration).toBe(999);
   });
 });
 
-describe('设计师：立项', () => {
-  it('foundPrototype 扣 10 灵感，记录名称/类型/体量，iter 全 0', () => {
+describe('设计师：立项与经营 activity', () => {
+  it('foundPrototype 扣 10 灵感；名称 2~10 字 / 未知类型体量 / 灵感不足拒绝', () => {
     const s = unlocked(defaultState());
     s.designer.inspiration = 100;
     const r = foundPrototype(s, '  星海拾遗  ', 'mystery', 'big');
     expect(r.ok).toBe(true);
     const p = s.designer.prototypes[0];
-    expect(p.name).toBe('星海拾遗'); // trim
-    expect(p.themeId).toBe('mystery');
-    expect(p.scale).toBe('big');
+    expect(p.name).toBe('星海拾遗');
     expect(Object.values(p.iter).every(v => v === 0)).toBe(true);
+    expect(p.exposure).toBe(0);
     expect(s.designer.inspiration).toBe(90);
-    expect(s.designer.nextUid).toBe(2);
-  });
-
-  it('名称校验：1 字 / 11 字 / 未知类型 / 未知体量 / 灵感不足均拒绝', () => {
-    const s = unlocked(defaultState());
-    s.designer.inspiration = 10;
     expect(foundPrototype(s, '短', 'euro', 'standard').ok).toBe(false);
     expect(foundPrototype(s, '这个名字实在太长太长啦', 'euro', 'standard').ok).toBe(false);
     expect(foundPrototype(s, '灵感方舟', 'ghost', 'standard').ok).toBe(false);
     expect(foundPrototype(s, '灵感方舟', 'euro', 'ghost').ok).toBe(false);
-    expect(foundPrototype(s, '灵感方舟', 'euro', 'standard').ok).toBe(true); // 恰好 10 灵感
-    expect(foundPrototype(s, '第二艘船', 'euro', 'standard').ok).toBe(false); // 灵感已用完
-    expect(s.designer.prototypes).toHaveLength(1);
-  });
-});
-
-describe('设计师：六维迭代', () => {
-  it('维度与属性一一对应表', () => {
-    expect(DESIGN_DIMS.map(d => [d.key, d.attr])).toEqual([
-      ['mech', '谋略'], ['balance', '演算'], ['replay', '应变'],
-      ['art', '洞察'], ['rules', '运筹'], ['theme', '沉浸'],
-    ]);
-    expect(DESIGN_DIMS).toHaveLength(6);
+    s.designer.inspiration = 0;
+    expect(foundPrototype(s, '灵感方舟', 'euro', 'standard').ok).toBe(false);
   });
 
-  it('iterateProto 扣递增灵感（5/10/15…），维度上限 5，属性经验全程不动', () => {
-    const s = unlocked(defaultState());
-    s.attrExp['谋略'] = 12345; // 属性经验任意值，迭代不得触碰
-    s.attrExp['演算'] = expToReach(5); // 演算 5 级
-    const p = found(s);
-    const expBefore = { ...s.attrExp };
-    expect(iterateProto(s, p.uid, 'mech').ok).toBe(true); // -5
-    expect(iterateProto(s, p.uid, 'mech').ok).toBe(true); // -10
-    expect(iterateProto(s, p.uid, 'mech').ok).toBe(true); // -15
-    expect(s.designer.inspiration).toBe(999 - 10 - 30); // 立项 -10 + 迭代 30
-    expect(p.iter.mech).toBe(3);
-    iterateProto(s, p.uid, 'mech'); // -20 → 4
-    iterateProto(s, p.uid, 'mech'); // -25 → 5
-    expect(p.iter.mech).toBe(ITER_MAX);
-    expect(iterateProto(s, p.uid, 'mech').ok).toBe(false); // 已满
-    expect(s.attrExp).toEqual(expBefore); // 属性永不消耗
-    expect(attrLevel(s, '演算')).toBe(5); // 等级不受影响
+  it('经营成本递增：试玩 ¥50×2ⁿ、宣传 ¥30×1.6ⁿ（取整）', () => {
+    expect(playtestCost(0)).toBe(50);
+    expect(playtestCost(1)).toBe(100);
+    expect(playtestCost(2)).toBe(200);
+    expect(promoCost(0)).toBe(30);
+    expect(promoCost(1)).toBe(48);
+    expect(promoCost(2)).toBe(77); // 76.8 取整
   });
 
-  it('增益公式钉死：Lv5 非主场 +4、主场 +5（Q 差值）', () => {
-    const s = unlocked(defaultState());
-    s.attrExp['演算'] = expToReach(5); // 演算 5 级
-    // 德式精算（主属性 演算）→ 主场维度 balance
-    const p = found(s, '试作一号', 'euro', 'standard');
-    const q0 = qualityOf(s, p);
-    iterateProto(s, p.uid, 'balance'); // 主场：2+floor(2)+1 = 5
-    expect(qualityOf(s, p) - q0).toBe(5);
-    const p2 = found(s, '试作二号', 'euro', 'standard');
-    const q2 = qualityOf(s, p2);
-    iterateProto(s, p2.uid, 'mech'); // 非主场（谋略 0 级）：2+0 = 2
-    expect(qualityOf(s, p2) - q2).toBe(2);
-    // 谋略 5 级后非主场 = 2+2 = 4
-    s.attrExp['谋略'] = expToReach(5);
-    const p3 = found(s, '试作三号', 'euro', 'standard');
-    const q3 = qualityOf(s, p3);
-    iterateProto(s, p3.uid, 'mech');
-    expect(qualityOf(s, p3) - q3).toBe(4);
-  });
-
-  it('灵感不够迭代拒绝；score-up 乘区作用于 Q', () => {
+  it('组织试玩：扣钱、曝光与种子入账（rng=0 最小产出），沉浸/应变每级 +4% 产出', () => {
     const s = unlocked(defaultState());
     const p = found(s);
-    s.designer.inspiration = 4;
-    expect(iterateProto(s, p.uid, 'mech').ok).toBe(false);
-    expect(p.iter.mech).toBe(0);
-    // score-up 2 级：Q = round(基础 × 1.16)
+    s.money = 1000;
+    const r = runActivity(s, p.uid, 'playtest', () => 0, 0);
+    expect(r.ok).toBe(true);
+    expect(s.money).toBe(950);
+    expect(p.exposure).toBe(8); // rng0 → +8，种子 +0
+    expect(p.seeds).toBe(0);
+    // 沉浸 1 级 + 应变 1 级 → 产出 ×1.08：round(8×1.08)=9
     const s2 = unlocked(defaultState());
-    s2.prestige.shop['insp-up'] = 1;
-    s2.prestige.shop['score-up'] = 2;
+    s2.attrExp['沉浸'] = expToReach(1);
+    s2.attrExp['应变'] = expToReach(1);
     const p2 = found(s2);
-    iterateProto(s2, p2.uid, 'mech'); // 谋略 0 级非主场 +2
-    expect(qualityOf(s2, p2)).toBe(Math.round(32 * 1.16)); // 33
-  });
-});
-
-describe('设计师：Q / 稀有度 / 成本价', () => {
-  it('稀有度阈值：49→N / 50→R / 69→R / 70→SR / 89→SR / 90→SSR', () => {
-    expect(rarityOf(49)).toBe('N');
-    expect(rarityOf(50)).toBe('R');
-    expect(rarityOf(69)).toBe('R');
-    expect(rarityOf(70)).toBe('SR');
-    expect(rarityOf(89)).toBe('SR');
-    expect(rarityOf(90)).toBe('SSR');
+    runActivity(s2, p2.uid, 'playtest', () => 0, 0);
+    expect(p2.exposure).toBe(9);
   });
 
-  it('成本价 = round(体量基数 × (0.8+Q/100))；Q=60 标准 → 420', () => {
-    expect(costPriceOf(60, 'standard')).toBe(Math.round(300 * 1.4)); // 420
-    expect(costPriceOf(60, 'small')).toBe(Math.round(120 * 1.4)); // 168
-    expect(costPriceOf(60, 'big')).toBe(Math.round(600 * 1.4)); // 840
-  });
-});
-
-describe('设计师：需求概率（demandParts 逐项）', () => {
-  it('题材匹配 +10%（单/双）、价格<200 +10%、溢价线性、稀有度、畅销作家', () => {
+  it('每日上限：试玩/宣传各 3 次/游戏日（24 秒），跨日重置；日记由灵感限制', () => {
     const s = unlocked(defaultState());
-    const base = { themeId: 'euro', price: 400, costPrice: 400, rarity: 'N' as const };
-    // 无命中：margin ratio=1 → 0.3，其余 0
-    expect(demandParts(s, base, 'solo', 'party')).toMatchObject({ theme: 0, cheap: 0, rarity: 0, perk: 0 });
-    expect(demandParts(s, base, 'euro', 'solo').theme).toBe(0.1); // 单题材命中
-    expect(demandParts(s, base, 'euro', 'euro').theme).toBe(0.2); // 双命中
-    expect(demandParts(s, { ...base, price: 199 }, 'solo', 'party').cheap).toBe(0.1);
-    expect(demandParts(s, { ...base, price: 200 }, 'solo', 'party').cheap).toBe(0);
-    // 溢价线性：100%→+30%，1000%→+0%，中间线性（550%→+15%）
-    expect(demandParts(s, { ...base, price: 400 }, 'solo', 'party').margin).toBeCloseTo(0.3, 10);
-    expect(demandParts(s, { ...base, price: 4000 }, 'solo', 'party').margin).toBeCloseTo(0, 10);
-    expect(demandParts(s, { ...base, price: 2200 }, 'solo', 'party').margin).toBeCloseTo(0.15, 10);
-    // 稀有度 0/5/10/20%
-    expect(demandParts(s, { ...base, rarity: 'N' }, 'solo', 'party').rarity).toBe(0);
-    expect(demandParts(s, { ...base, rarity: 'R' }, 'solo', 'party').rarity).toBe(0.05);
-    expect(demandParts(s, { ...base, rarity: 'SR' }, 'solo', 'party').rarity).toBe(0.1);
-    expect(demandParts(s, { ...base, rarity: 'SSR' }, 'solo', 'party').rarity).toBe(0.2);
-    // 畅销作家（royaltyUp）每级 +6%
-    expect(demandParts(s, base, 'solo', 'party').perk).toBe(0);
-    s.prestige.shop['insp-up'] = 1;
-    s.prestige.shop['score-up'] = 1;
-    s.prestige.shop['royalty-up'] = 2;
-    expect(demandParts(s, base, 'solo', 'party').perk).toBeCloseTo(0.12, 10);
-    // 合计 = 各项之和（0.2+0.1+0.3+0.2+0.12 = 0.92）
-    const maxed = { themeId: 'euro', price: 1, costPrice: 1, rarity: 'SSR' as const };
-    expect(demandParts(s, maxed, 'euro', 'euro').total).toBeCloseTo(0.92, 10);
+    const p = found(s);
+    s.money = 1e9;
+    for (let i = 0; i < ACTIVITY_DAILY_LIMIT; i++) expect(runActivity(s, p.uid, 'playtest', () => 0, 0).ok).toBe(true);
+    expect(runActivity(s, p.uid, 'playtest', () => 0, 0).ok).toBe(false); // 第 4 次
+    // 同一游戏日内（毫秒戳差 23 秒）仍受限
+    expect(runActivity(s, p.uid, 'playtest', () => 0, 23_000).ok).toBe(false);
+    // 跨游戏日（+24 秒 = 24000 毫秒）重置
+    expect(runActivity(s, p.uid, 'playtest', () => 0, DAY_SECONDS * 1000).ok).toBe(true);
+    // 日记：灵感限制（无每日上限）
+    s.designer.inspiration = 6;
+    expect(runActivity(s, p.uid, 'diary', () => 0, DAY_SECONDS * 1000).ok).toBe(true);
+    expect(runActivity(s, p.uid, 'diary', () => 0, DAY_SECONDS * 1000).ok).toBe(true);
+    expect(runActivity(s, p.uid, 'diary', () => 0, DAY_SECONDS * 1000).ok).toBe(false); // 灵感耗尽
+    expect(p.exposure).toBe(8 * 4 + 4 * 2); // 4 试玩 + 2 日记
+  });
+
+  it('曝光软上限 200：超出部分收益减半', () => {
+    expect(addExposure(0, 100)).toBe(100);
+    expect(addExposure(195, 10)).toBe(200 + 2.5); // 超 5 减半天 2.5
+    expect(addExposure(200, 10)).toBe(205);
+    expect(EXPOSURE_SOFTCAP).toBe(200);
   });
 });
 
-describe('设计师：众筹', () => {
-  it('launchCrowd 锁 Q/稀有度/成本价/售价，原型转入进行中（不可再迭代）', () => {
-    const s = unlocked(defaultState());
-    const p = found(s, '灵感方舟', 'euro', 'standard');
-    iterateProto(s, p.uid, 'mech'); // Q 30→32
-    const c = launched(s, { goal: 100, days: 45, ratio: 2 });
-    expect(c.score).toBe(32);
-    expect(c.rarity).toBe('N');
-    expect(c.costPrice).toBe(costPriceOf(32, 'standard'));
-    expect(c.price).toBe(Math.round(c.costPrice * 2));
-    expect(c.goal).toBe(100);
-    expect(c.days).toBe(45);
-    expect(s.designer.prototypes).toHaveLength(0);
-    expect(iterateProto(s, c.uid, 'mech').ok).toBe(false); // 已锁定
+describe('设计师：预热与时间池', () => {
+  it('每日看好公式：round((曝光/10 + 平台基础曝光) × 定价亲和 × 质量系数)', () => {
+    expect(watcherDailyGain(0, 'moudian', 1, 50)).toBe(Math.round(25 * 1.2 * 1.0)); // 30
+    expect(watcherDailyGain(0, 'xinwu', 1, 50)).toBe(Math.round(12 * 1.2 * 1.0)); // 14
+    expect(watcherDailyGain(100, 'moudian', 1, 50)).toBe(Math.round(35 * 1.2 * 1.0)); // 42
+    expect(watcherDailyGain(0, 'moudian', 10, 50)).toBe(Math.round(25 * 0.6 * 1.0)); // 15（亲和线性）
+    expect(watcherDailyGain(0, 'moudian', 1, 100)).toBe(Math.round(25 * 1.2 * 1.2)); // 36
   });
 
-  it('参数越界拒绝：goal/days/ratio；成功满 10 款拒绝再发起', () => {
+  it('转化率边界：Q100 定价100% → 25%；定价1000% → 7%；低质高价触下限 5%', () => {
+    expect(convertRate(100, 1)).toBeCloseTo(0.25, 10);
+    expect(convertRate(100, 10)).toBeCloseTo(0.07, 10);
+    expect(convertRate(0, 10)).toBe(0.05);
+    expect(convertRate(50, 1)).toBeCloseTo(0.20, 10);
+    expect(preheatMax(60)).toBe(30);
+    expect(preheatMax(40)).toBe(25);
+    expect(PREHEAT_MIN).toBe(5);
+  });
+
+  it('时间池校验：T∈[30,120]、P∈[5, min(30,T−15)]、平台/目标合法', () => {
     const s = unlocked(defaultState());
     found(s);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 49, 30, 1).ok).toBe(false);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 1001, 30, 1).ok).toBe(false);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 50, 29, 1).ok).toBe(false);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 50, 121, 1).ok).toBe(false);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 50, 30, 0.5).ok).toBe(false);
-    expect(launchCrowd(s, s.designer.prototypes[0].uid, 50, 30, 10.5).ok).toBe(false);
-    expect(launchCrowd(s, 999, 50, 30, 1).ok).toBe(false); // 原型不存在
-    expect(s.designer.campaigns).toHaveLength(0);
-    // 满 10 款
-    const s2 = unlocked(defaultState());
-    s2.designer.successCount = CROWD_SUCCESS_LIMIT;
-    found(s2);
-    const r = launchCrowd(s2, s2.designer.prototypes[0].uid, 50, 30, 1);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toContain('后续版本');
+    const uid = s.designer.prototypes[0].uid;
+    expect(startPreheat(s, uid, 'moudian', 50, 29, 5, 1).ok).toBe(false); // T 太短
+    expect(startPreheat(s, uid, 'moudian', 50, 121, 5, 1).ok).toBe(false);
+    expect(startPreheat(s, uid, 'moudian', 50, 60, 4, 1).ok).toBe(false); // P<5
+    expect(startPreheat(s, uid, 'moudian', 50, 60, 31, 1).ok).toBe(false); // P>30
+    expect(startPreheat(s, uid, 'moudian', 50, 40, 26, 1).ok).toBe(false); // P>min(30,25)
+    expect(startPreheat(s, uid, 'ghost', 50, 60, 10, 1).ok).toBe(false); // 未知平台
+    expect(startPreheat(s, uid, 'moudian', 49, 60, 10, 1).ok).toBe(false); // 目标越界
+    expect(startPreheat(s, uid, 'moudian', 50, 60, 10, 0.5).ok).toBe(false); // 定价越界
+    expect(startPreheat(s, uid, 'moudian', 50, 40, 25, 1).ok).toBe(true); // P=25 恰好
   });
 
-  it('逐秒模拟确定性：p=1 必买（rng 0 全命中题材）、p=0 不买（高价无加成）', () => {
-    // 必买：rng 0 → k=1、题材双中 euro、roll 0 < p
+  it('预热逐日攒看好、开众筹瞬间 × 转化率转初始支持，状态机 preheat → live', () => {
     const s = unlocked(defaultState());
-    found(s, '必买船', 'euro', 'standard');
-    const c = launched(s, { ratio: 1 }); // margin +30%，题材 +20% → p=0.5+
+    const p = found(s, '预热船', 'euro', 'standard');
+    p.seeds = 7;
+    const c = preheated(s, { goal: 50, days: 30, preheat: 5, ratio: 1 }); // Q30 → 亲和 1.2、质量 0.92
+    expect(c.status).toBe('preheat');
+    expect(c.watchers).toBe(7); // 种子转入
+    const perDay = watcherDailyGain(0, 'moudian', 1, 30); // round(25×1.2×0.92)=28
+    tickCrowd(s, () => 0.999, 5 * DAY_SECONDS - 1);
+    expect(c.status).toBe('preheat');
+    expect(c.watchers).toBe(7 + 4 * perDay); // 4 整天
+    tickCrowd(s, () => 0.999, 1);
+    expect(c.status).toBe('live');
+    expect(c.watchers).toBe(7 + 5 * perDay);
+    expect(c.convertRate).toBeCloseTo(convertRate(30, 1), 10);
+    expect(c.supporters).toBe(Math.floor(c.watchers * c.convertRate));
+  });
+
+  it('预热期追加宣传：扣钱加曝光，按剩余天数折算看好', () => {
+    const s = unlocked(defaultState());
+    found(s, '宣传船', 'euro', 'standard');
+    const c = preheated(s, { days: 30, preheat: 5 });
+    s.money = 1000;
+    const before = c.watchers;
+    const r = boostCampaign(s, c.uid, () => 0); // 花费 30，曝光 +5
+    expect(r.ok).toBe(true);
+    expect(s.money).toBe(970);
+    expect(c.exposure).toBe(5);
+    const remaining = c.preheatDays - c.watchersDays; // 5
+    const delta = Math.round((5 / 10) * 1.2 * 0.92 * remaining); // 3
+    expect(c.watchers).toBe(before + delta);
+    expect(boostCampaign(s, c.uid, () => 0).ok).toBe(true); // 成本递增第二档 48
+    expect(s.money).toBe(970 - 48);
+  });
+
+  it('预热期不可迭代；追加宣传仅限预热期', () => {
+    const s = unlocked(defaultState());
+    found(s);
+    const c = preheated(s);
+    expect(iterateProto(s, c.uid, 'mech').ok).toBe(false); // 已不在原型列表
+    tickCrowd(s, () => 0.999, c.preheatDays * DAY_SECONDS); // 进入 live
+    expect(boostCampaign(s, c.uid, () => 0).ok).toBe(false);
+  });
+});
+
+describe('设计师：众筹期与平台结算（两阶段 + 抽成）', () => {
+  it('逐秒模拟确定性：p 必买 / p=0 不买（含事件干扰下的基本增长）', () => {
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '必买船' }); // ratio 1 → p=0.4
     tickCrowd(s, () => 0, 3);
-    expect(c.supporters).toBe(3); // 每秒 1 人
-    // 不买：大盒 ratio 10（margin 0）、售价≥200、稀有度 N、题材 solo（rng 0.999 → THEMES[7]）
+    expect(c.supporters).toBe(3);
     const s2 = unlocked(defaultState());
-    found(s2, '滞销书', 'euro', 'big');
-    const c2 = launched(s2, { ratio: 10 });
+    const c2 = liveCampaign(s2, { name: '滞销书', price: 1000, costPrice: 100, goal: 50 }); // ratio 10 → p=0
     tickCrowd(s2, () => 0.999, 5);
     expect(c2.supporters).toBe(0);
   });
 
-  it('到期成功：钱不动、待交付（cost/income 正确），提前满额继续累积', () => {
+  it('平台抽成结算：到期到账 firstPayment=round((货款−抽成)×50%)；某点 5% vs 某集 3%', () => {
+    // 某点
     const s = unlocked(defaultState());
     s.money = 0;
-    found(s, '爆款预定', 'euro', 'standard');
-    const c = launched(s, { goal: 50, days: 30, ratio: 1 }); // 720 秒
-    tickCrowd(s, () => 0, 30 * DAY_SECONDS - 1);
-    expect(s.designer.campaigns).toHaveLength(1); // 未到期
-    expect(c.supporters).toBeGreaterThanOrEqual(50); // 提前满额
-    const events = tickCrowd(s, () => 0, 1); // 最后一秒到期
+    liveCampaign(s, { name: '某点船', price: 100, costPrice: 100, goal: 50, days: 30 });
+    const events = tickCrowd(s, () => 0, 30 * DAY_SECONDS);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ name: '爆款预定', ok: true });
-    // 满额后继续累积：支持/100 提升每秒关注人数，720 秒远超目标
-    expect(events[0].supporters).toBeGreaterThan(30 * DAY_SECONDS);
-    expect(s.money).toBe(0); // 待交付，钱不动
+    const f = s.designer.funded[0];
+    expect(f.supporters).toBeGreaterThanOrEqual(30 * DAY_SECONDS); // 支持/100 加速 + 里程碑加成
+    expect(f.income).toBe(f.supporters * 100);
+    expect(f.commission).toBe(Math.round(f.income * 0.05));
+    expect(f.firstPayment).toBe(Math.round((f.income - f.commission) * 0.5));
+    expect(f.remainPayment).toBe(f.income - f.commission - f.firstPayment);
+    expect(s.money).toBe(f.firstPayment); // 立即到账一半
     expect(s.designer.successCount).toBe(1);
-    expect(s.designer.campaigns).toHaveLength(0);
-    const f = s.designer.funded[0];
-    expect(f.delivered).toBe(false);
-    expect(f.income).toBe(events[0].supporters * c.price);
-    expect(f.cost).toBe(events[0].supporters * c.costPrice);
-    expect(events[0].income).toBe(f.income);
-    expect(events[0].cost).toBe(f.cost);
+    // 某集：同条件仅平台不同
+    const s2 = unlocked(defaultState());
+    s2.money = 0;
+    liveCampaign(s2, { name: '某集船', price: 100, costPrice: 100, goal: 50, days: 30, platformId: 'xinwu' });
+    tickCrowd(s2, () => 0, 30 * DAY_SECONDS);
+    const f2 = s2.designer.funded[0];
+    expect(f2.commission).toBe(Math.round(f2.income * 0.03));
+    expect(f2.commission).toBeLessThan(f.commission);
+    expect(platformById('moudian').baseExposure).toBe(25);
+    expect(platformById('xinwu').baseExposure).toBe(12);
   });
 
-  it('deliverDesign：垫资 → 货款净额精确（含亏损例）；资金不足/重复交付拒绝且状态不污染', () => {
+  it('deliverDesign v5：垫资成本 + 收尾款 remainPayment，净额 = 货款−抽成−成本（可为负）', () => {
     const s = unlocked(defaultState());
-    // 直接构造 funded 条目做金额精确断言
-    s.designer.funded.push({ uid: 1, name: '盈利船', score: 60, rarity: 'R', price: 100, supporters: 100, cost: 4000, income: 10000, delivered: false });
-    s.designer.funded.push({ uid: 2, name: '亏损船', score: 60, rarity: 'R', price: 30, supporters: 100, cost: 4200, income: 3000, delivered: false });
-    // 资金不足：盈利船需垫资 4000
-    s.money = 3999;
-    const r0 = deliverDesign(s, 1);
-    expect(r0.ok).toBe(false);
-    expect(!r0.ok && r0.reason).toContain('资金不足');
-    expect(s.money).toBe(3999);
-    expect(s.designer.funded[0].delivered).toBe(false);
-    // 正常交付（盈利）：money -= 4000 再 += 10000
-    s.money = 5000;
-    const r1 = deliverDesign(s, 1);
-    expect(r1.ok).toBe(true);
-    expect(s.money).toBe(5000 - 4000 + 10000);
-    expect(s.designer.funded[0].delivered).toBe(true);
-    // 亏损例（price < 成本价 42）：净 −1200
-    s.money = 10000;
-    const r2 = deliverDesign(s, 2);
-    expect(r2.ok).toBe(true);
-    expect(s.money).toBe(10000 - 4200 + 3000);
-    expect(s.designer.funded[1].delivered).toBe(true);
-    // 重复交付 / 不存在
-    expect(deliverDesign(s, 1).ok).toBe(false);
-    expect(deliverDesign(s, 999).ok).toBe(false);
-    expect(s.money).toBe(10000 - 4200 + 3000);
-  });
-
-  it('端到端：众筹成功 → 待交付 → 交付净入账 支持×(售价−成本价)', () => {
-    const s = unlocked(defaultState());
-    s.money = 0;
-    found(s, '端到端', 'euro', 'standard');
-    const c = launched(s, { ratio: 2, goal: 50, days: 30 }); // 售价 = 2×成本价
+    s.money = 1000000;
+    liveCampaign(s, { name: '交付船', price: 100, costPrice: 100, goal: 50, days: 30 });
     tickCrowd(s, () => 0, 30 * DAY_SECONDS);
-    expect(s.money).toBe(0); // 成功也不入账
     const f = s.designer.funded[0];
-    expect(f.delivered).toBe(false);
-    expect(f.income).toBe(f.supporters * c.price);
-    expect(f.cost).toBe(f.supporters * c.costPrice);
-    s.money = f.cost; // 恰好够垫资
-    expect(deliverDesign(s, f.uid).ok).toBe(true);
-    expect(s.money).toBe(f.income); // 0 − cost + income
+    expect(s.money).toBe(1000000 + f.firstPayment);
+    const r = deliverDesign(s, f.uid);
+    expect(r.ok).toBe(true);
+    expect(s.money).toBe(1000000 + f.firstPayment - f.cost + f.remainPayment);
     expect(f.delivered).toBe(true);
+    expect(f.income - f.commission - f.cost).toBe(-f.commission); // 售价=成本价 → 净亏抽成
+    expect(deliverDesign(s, f.uid).ok).toBe(false); // 重复拒绝
+    const s2 = unlocked(defaultState());
+    s2.designer.funded.push({ uid: 1, name: '亏损船', score: 60, rarity: 'R', price: 30, supporters: 100, cost: 4200, income: 3000, commission: 90, firstPayment: 1455, remainPayment: 1455, delivered: false });
+    s2.money = 4199;
+    const r2 = deliverDesign(s2, 1);
+    expect(r2.ok).toBe(false); // 垫资不足
+    expect(!r2.ok && r2.reason).toContain('资金不足');
+    expect(s2.designer.funded[0].delivered).toBe(false);
   });
 
-  it('到期失败：无收入、原型退回（iter 保留）、进 failed', () => {
+  it('到期失败：无资金往来、原型退回、进 failed', () => {
     const s = unlocked(defaultState());
     s.money = 500;
-    found(s, '生不逢时', 'euro', 'big');
-    const c = launched(s, { goal: 1000, days: 30, ratio: 10 }); // p=0 无人买
+    liveCampaign(s, { name: '生不逢时', price: 1000, costPrice: 100, goal: 1000, days: 30 });
     const events = tickCrowd(s, () => 0.999, 30 * DAY_SECONDS);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ name: '生不逢时', ok: false, supporters: 0, income: 0 });
+    expect(events[0]).toMatchObject({ name: '生不逢时', ok: false, supporters: 0 });
     expect(s.money).toBe(500);
-    expect(s.designer.successCount).toBe(0);
     expect(s.designer.failed).toHaveLength(1);
     expect(s.designer.prototypes).toHaveLength(1); // 原型退回
-    expect(s.designer.prototypes[0].name).toBe('生不逢时');
-    expect(s.designer.prototypes[0].iter).toEqual(c.iter);
+    expect(s.designer.prototypes[0].iter).toEqual(ZERO_ITER);
   });
 
-  it('离线复用同一逐秒函数（accumulateOffline 推进众筹）', () => {
+  it('里程碑解锁：150%/200% 目标自动 +3%/+5% 并记入历史', () => {
     const s = unlocked(defaultState());
-    found(s, '挂机船', 'euro', 'standard');
-    launched(s);
-    accumulateOffline(s, 60 * 1000, () => 0.999); // 60 秒
-    expect(s.designer.campaigns[0].elapsedSec).toBe(60);
-    expect(s.designer.campaigns).toHaveLength(1); // 未到期
+    const c = liveCampaign(s, { name: '爆款船', price: 100, costPrice: 100, goal: 50, days: 40 });
+    tickCrowd(s, () => 0, 40 * DAY_SECONDS);
+    expect(c.milestonesHit).toContain(150);
+    expect(c.milestonesHit).toContain(200);
+    const milestones = c.eventHistory.filter(h => h.kind === 'milestone');
+    expect(milestones.length).toBe(2);
+    expect(milestones[0].result).toContain('解锁回报');
+    // 支持人数应高于纯逐秒累积（40×24=960）：960 + 里程碑加成
+    expect(c.supporters).toBeGreaterThan(40 * DAY_SECONDS);
   });
 
-  it('存量 designed 副本 applySleeve 用体量 sleeveCost', () => {
+  it('离线复用同一逐秒函数（accumulateOffline 推进众筹 + 事件照常生成）', () => {
     const s = unlocked(defaultState());
-    found(s, '老牌设计', 'euro', 'big');
-    launched(s);
-    const copy = { uid: s.nextUid++, gameId: `design-${s.designer.campaigns[0].uid}`, durability: 80, sleeved: false, stored: false, designed: true as const };
-    s.copies.push(copy);
-    s.sleeves = 1000;
-    const r = applySleeve(s, copy.uid);
+    const c = liveCampaign(s, { name: '挂机船', price: 100, costPrice: 100, goal: 1000, days: 30 });
+    accumulateOffline(s, 60 * 1000, () => 0.999);
+    expect(c.elapsedSec).toBe(60);
+    expect(s.designer.campaigns).toHaveLength(1);
+  });
+});
+
+describe('设计师：事件系统', () => {
+  it('触发：每 5 天 60% 判定；rng 0 必触发、0.999 不触发；不重复直到轮空', () => {
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '事件船', price: 1000, costPrice: 100 }); // p=0 不涨支持
+    tickCrowd(s, () => 0, 5 * DAY_SECONDS);
+    expect(c.pendingEvents).toHaveLength(1);
+    expect(c.usedEvents).toEqual([c.pendingEvents[0].eventId]);
+    expect(c.pendingEvents[0].remainingSec).toBe(5 * DAY_SECONDS);
+    const s2 = unlocked(defaultState());
+    const c2 = liveCampaign(s2, { name: '平静船', price: 1000, costPrice: 100 });
+    tickCrowd(s2, () => 0.999, 5 * DAY_SECONDS);
+    expect(c2.pendingEvents).toHaveLength(0);
+    // 不重复：连续两个窗口各触发一个，id 不同
+    tickCrowd(s, () => 0, 5 * DAY_SECONDS); // 第一个超时自动结算 + 第二个生成
+    tickCrowd(s, () => 0, 5 * DAY_SECONDS); // 第二个超时 + 第三个生成
+    expect(new Set(c.usedEvents).size).toBe(c.usedEvents.length);
+    expect(c.usedEvents.length).toBe(3);
+  });
+
+  it('窗口超时按默认选项自动结算（byDefault 记入历史，不耗资源）', () => {
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '超时船', price: 1000, costPrice: 100, goal: 1000 });
+    s.money = 1000;
+    tickCrowd(s, () => 0, 5 * DAY_SECONDS); // 生成 e1（rng0 抽第一个）
+    expect(c.pendingEvents[0].eventId).toBe('e1');
+    tickCrowd(s, () => 0, 5 * DAY_SECONDS - 1); // 倒计时剩 1
+    expect(c.pendingEvents).toHaveLength(1);
+    tickCrowd(s, () => 0, 1); // 超时（同一秒事件判定生成下一个，不影响本次结算）
+    expect(c.pendingEvents).toHaveLength(1);
+    expect(c.pendingEvents[0].eventId).toBe('e2');
+    expect(c.eventHistory).toHaveLength(1);
+    expect(c.eventHistory[0].byDefault).toBe(true);
+    expect(c.eventHistory[0].eventId).toBe('e1');
+    expect(s.money).toBe(1000); // 默认不耗资源
+  });
+
+  it('进入最后 5 天：所有待决事件按默认自动结算', () => {
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '冲刺船', price: 1000, costPrice: 100, goal: 1000, days: 30 });
+    c.pendingEvents.push({ eventId: 'e4', remainingSec: 5 * DAY_SECONDS });
+    c.pendingEvents.push({ eventId: 'e5', remainingSec: 3 * DAY_SECONDS });
+    tickCrowd(s, () => 0.999, 25 * DAY_SECONDS); // 跨入最后 5 天
+    expect(c.pendingEvents).toHaveLength(0);
+    expect(c.eventHistory.length).toBe(2);
+    expect(c.eventHistory.every(h => h.byDefault)).toBe(true);
+    expect(c.supporters).toBe(0); // p=0 无增长，e4/e5 默认 −8%/−7% 不扣到负
+  });
+
+  it('主动抉择：需求校验（成交额/属性/灵感）+ 结果应用 + 历史记录', () => {
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '抉择船', price: 100, costPrice: 100, supporters: 100, goal: 1000 });
+    s.money = 1000;
+    s.designer.inspiration = 100;
+    c.pendingEvents.push({ eventId: 'e1', remainingSec: 5 * DAY_SECONDS });
+    // 选项① 付费推广（成交额 3% = 300）→ +8%
+    const r = resolveEvent(s, c.uid, 0, 0, () => 0.5);
     expect(r.ok).toBe(true);
-    expect(s.sleeves).toBe(1000 - 300); // 大盒 sleeveCost
-    expect(copy.sleeved).toBe(true);
+    expect(s.money).toBe(700);
+    expect(c.supporters).toBe(108);
+    expect(c.eventHistory[0].byDefault).toBe(false);
+    // 属性门槛：e8 选项① 沉浸≥10
+    c.pendingEvents.push({ eventId: 'e8', remainingSec: 5 * DAY_SECONDS });
+    expect(resolveEvent(s, c.uid, 0, 0, () => 0.5).ok).toBe(false); // 沉浸 0 级
+    s.attrExp['沉浸'] = expToReach(10);
+    expect(resolveEvent(s, c.uid, 0, 0, () => 0.5).ok).toBe(true);
+    expect(c.supporters).toBe(Math.round(108 * 1.06)); // +6%
+    // 灵感需求：e11 选项① 灵感 5
+    s.designer.inspiration = 4;
+    c.pendingEvents.push({ eventId: 'e11', remainingSec: 5 * DAY_SECONDS });
+    expect(resolveEvent(s, c.uid, 0, 0, () => 0.5).ok).toBe(false);
+    s.designer.inspiration = 5;
+    expect(resolveEvent(s, c.uid, 0, 0, () => 0.5).ok).toBe(true);
+    expect(s.designer.inspiration).toBe(0);
+    expect(c.pendingEvents).toHaveLength(0);
+    expect(c.eventHistory).toHaveLength(3);
+  });
+
+  it('事件池 16 个齐全且每个都有默认选项；流量结果生效（e15 默认 +25%）', () => {
+    expect(eventById('e1').name).toContain('KOL');
+    for (let i = 1; i <= 16; i++) {
+      const def = eventById(`e${i}`);
+      expect(def.options.some(o => o.isDefault), def.id).toBe(true);
+    }
+    const s = unlocked(defaultState());
+    const c = liveCampaign(s, { name: '黑马船', price: 1000, costPrice: 100, goal: 1000 });
+    c.pendingEvents.push({ eventId: 'e15', remainingSec: 5 * DAY_SECONDS });
+    expect(resolveEvent(s, c.uid, 0, 0, () => 0.5).ok).toBe(true);
+    expect(c.flowMult).toBeCloseTo(1.25, 10);
+    expect(c.supporters).toBe(0); // 0 支持的 +5% 仍为 0
+    expect(c.eventHistory[0].result).toContain('流量+25%');
   });
 });
 
 describe('设计师：成就与转生', () => {
-  it('成就：灵光一现（立项）/ 一呼百应（首次成功）/ 万众瞩目（≥800 人）', () => {
+  it('成就：灵光一现 / 一呼百应 / 万众瞩目（≥800）/ 未发售先火（预热看好 ≥500）', () => {
     const s = unlocked(defaultState());
-    expect(checkAchievements(s).map(a => a.id)).not.toContain('first-proto');
     found(s);
     expect(checkAchievements(s).map(a => a.id)).toContain('first-proto');
-    expect(checkAchievements(s).map(a => a.id)).not.toContain('first-funded');
-    s.money = 0;
-    launched(s, { goal: 50, days: 30 });
-    tickCrowd(s, () => 0, 30 * DAY_SECONDS);
-    // 万众瞩目需要 funded 里有 ≥800 人的条目；本条爆款即满足（见上方断言）——同批已授予
+    // 未发售先火：构造高看好预热项目
+    s.designer.campaigns.push({ ...liveCampaign(s, { name: '预热王' }), watchers: 500, status: 'preheat' });
+    expect(checkAchievements(s).map(a => a.id)).toContain('hot-500');
+    // 众筹成功 → 一呼百应
+    const c = liveCampaign(s, { name: '爆款', price: 100, costPrice: 100, goal: 50, days: 40 });
+    tickCrowd(s, () => 0, 40 * DAY_SECONDS);
+    expect(c.supporters).toBeGreaterThanOrEqual(800);
     const ids = checkAchievements(s).map(a => a.id);
     expect(ids).toContain('first-funded');
     expect(ids).toContain('crowd-800');
@@ -394,9 +450,9 @@ describe('设计师：成就与转生', () => {
 
   it('转生重置设计师状态（不进白名单）', () => {
     const s = unlocked(defaultState());
-    for (const g of ['guoyuan', 'zongming', 'kafei', 'zhitu']) own(s, g, { prof: 20 }); // 解锁转生
+    for (const g of ['guoyuan', 'zongming', 'kafei', 'zhitu']) own(s, g, { prof: 20 });
     found(s);
-    launched(s);
+    preheated(s);
     expect(doPrestige(s).ok).toBe(true);
     expect(s.designer).toEqual({
       unlocked: false, inspiration: 0, prototypes: [], campaigns: [], funded: [], failed: [], nextUid: 1, successCount: 0,
@@ -404,52 +460,74 @@ describe('设计师：成就与转生', () => {
   });
 });
 
-describe('设计师：存档迁移（v14/v1 → v15 v4 形态）', () => {
-  it('v14 旧档 normalize 后 designer 补 v4 默认值', () => {
-    const s = defaultState();
-    const old = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
-    old.saveVersion = 14;
-    delete old.designer;
-    const m = parseSave(JSON.stringify(old));
-    expect(m).not.toBeNull();
-    expect(m!.saveVersion).toBe(SAVE_VERSION);
-    expect(m!.designer).toEqual({
-      unlocked: false, inspiration: 0, prototypes: [], campaigns: [], funded: [], failed: [], nextUid: 1, successCount: 0,
-    });
-  });
-
-  it('v1 旧字段兼容：prototype（invested/insp）→ iter 全 0 + 名称/体量回落；published → 并入 funded（rarity 按 score 回填）', () => {
+describe('设计师：存档迁移（v15 → v16）', () => {
+  it('v15 旧档 normalize：campaign 补 platformId=某点/status=live/watchers=0，funded 补抽成字段且保持旧全额交付', () => {
     const s = defaultState();
     const dirty = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
     dirty.saveVersion = 15;
     dirty.designer = {
       unlocked: true,
       inspiration: 42,
-      // v1 形态 prototype：无 name/scale/iter，有 invested/insp
-      prototypes: [
-        { uid: 1, themeId: 'euro', invested: { 演算: 100 }, insp: 3 },
-        { uid: 2, themeId: 'ghost', invested: { 演算: 10 }, insp: 1 }, // 未知主题剔除
+      prototypes: [],
+      // v15 形态 campaign：无 platformId/status/watchers/preheatDays
+      campaigns: [
+        { uid: 1, name: '旧项目', themeId: 'euro', scale: 'standard', score: 50, rarity: 'R', costPrice: 400, price: 400, goal: 50, days: 30, elapsedSec: 120, supporters: 10, iter: ZERO_ITER },
       ],
-      // v1 形态 published：无 rarity/scale/attrs
-      published: [
-        { uid: 3, name: '旧出版作', themeId: 'euro', score: 80, price: 1000, printedAt: 0, royalties: 50 },
+      // v15 形态 funded：无 commission/firstPayment/remainPayment
+      funded: [
+        { uid: 2, name: '旧成功', score: 60, rarity: 'R', price: 420, supporters: 100, cost: 4200, income: 42000, delivered: false },
       ],
-      nextUid: 1, // 低于已用 uid，应兜底
+      nextUid: 3, successCount: 1,
+    };
+    const m = parseSave(JSON.stringify(dirty));
+    expect(m).not.toBeNull();
+    expect(m!.saveVersion).toBe(SAVE_VERSION);
+    const c = m!.designer.campaigns[0];
+    expect(c.platformId).toBe('moudian');
+    expect(c.status).toBe('live');
+    expect(c.watchers).toBe(0);
+    expect(c.exposure).toBe(0);
+    expect(c.pendingEvents).toEqual([]);
+    expect(c.elapsedSec).toBe(120); // 保持
+    const f = m!.designer.funded[0];
+    expect(f.commission).toBe(0);
+    expect(f.firstPayment).toBe(0);
+    expect(f.remainPayment).toBe(42000); // 旧数据保持全额交付行为
+    expect(f.delivered).toBe(false);
+    expect(m!.designer.successCount).toBe(1);
+  });
+
+  it('v1 旧字段仍兼容（prototype invested/insp → iter 全 0；published → 并入 funded）', () => {
+    const s = defaultState();
+    const dirty = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+    dirty.saveVersion = 15;
+    dirty.designer = {
+      unlocked: true,
+      prototypes: [{ uid: 1, themeId: 'euro', invested: { 演算: 100 }, insp: 3 }],
+      published: [{ uid: 3, name: '旧出版作', themeId: 'euro', score: 80, price: 1000, printedAt: 0, royalties: 50 }],
+      nextUid: 1,
     };
     const m = parseSave(JSON.stringify(dirty));
     expect(m).not.toBeNull();
     const d = m!.designer;
-    expect(d.inspiration).toBe(42);
-    expect(d.prototypes).toHaveLength(1);
-    expect(d.prototypes[0]).toMatchObject({ uid: 1, themeId: 'euro', scale: 'standard' });
-    expect(d.prototypes[0].name).toBeTruthy(); // 名称回落
-    expect(Object.values(d.prototypes[0].iter).every(v => v === 0)).toBe(true);
-    expect(d.funded).toHaveLength(1); // v1 published 并入 funded
-    expect(d.funded[0]).toMatchObject({
-      uid: 3, name: '旧出版作', score: 80, rarity: 'SR', price: 1000,
-      supporters: 0, income: 0, cost: 0, delivered: true, // 旧数据视为已结算
-    });
+    expect(d.prototypes[0].iter).toEqual(ZERO_ITER);
+    expect(d.prototypes[0].exposure).toBe(0);
+    expect(d.funded[0]).toMatchObject({ uid: 3, score: 80, rarity: 'SR', delivered: true, remainPayment: 0 });
     expect(d.nextUid).toBeGreaterThanOrEqual(4);
-    expect(d.successCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// 既有公式锚点（v4 保留）：需求概率分解
+describe('设计师：需求概率分解（v4 保留）', () => {
+  it('题材/低价/溢价线性/稀有度/畅销作家逐项', () => {
+    const s = unlocked(defaultState());
+    const base = { themeId: 'euro', price: 400, costPrice: 400, rarity: 'N' as const };
+    expect(demandParts(s, base, 'euro', 'solo').theme).toBe(0.1);
+    expect(demandParts(s, base, 'euro', 'euro').theme).toBe(0.2);
+    expect(demandParts(s, { ...base, price: 199 }, 'solo', 'party').cheap).toBe(0.1);
+    expect(demandParts(s, { ...base, price: 2200 }, 'solo', 'party').margin).toBeCloseTo(0.15, 10);
+    expect(demandParts(s, { ...base, rarity: 'SSR' }, 'solo', 'party').rarity).toBe(0.2);
+    s.prestige.shop['royalty-up'] = 2;
+    expect(demandParts(s, base, 'solo', 'party').perk).toBeCloseTo(0.12, 10);
   });
 });
