@@ -3,7 +3,7 @@ import {
   CROWD_GOAL_MIN, CROWD_SUCCESS_LIMIT,
   DAY_SECONDS, DESIGN_DIMS, DIARY_EXPOSURE, DIARY_INSPIRATION_COST, EVENT_CHANCE,
   EVENT_CHECK_SECONDS, EVENT_FINAL_DAYS, EVENT_WINDOW_SECONDS, FIRST_PAYMENT_RATIO,
-  FOUND_COST, INSPIRE_CAP, ITER_MAX, MILESTONES, PLAYTEST_EXPOSURE_RANGE,
+  FOUND_COST, ITER_MAX, MILESTONES, PLAYTEST_EXPOSURE_RANGE,
   PLAYTEST_SEED_RANGE, PREHEAT_MIN, PRICE_RATIO_MAX, PRICE_RATIO_MIN,
   PROMO_EXPOSURE_RANGE, THEMES, convertRate, eventById, iterCost, platformById,
   playtestCost, preheatMax, promoCost, rarityOf, scaleById, themeById,
@@ -13,8 +13,8 @@ import type { Game } from '../data/types';
 import type { DesignCampaign, GameState } from '../state';
 import {
   addExposure, boostExposureGain, costPriceOf, demandProb, drawEvent,
-  eventOptionCheck, inspireGain, playtestMult, priceAffinity, qualityMult,
-  qualityOf, watcherDailyGain,
+  eventOptionCheck, inspireCap, inspireGain, playtestMult, priceAffinity,
+  qualityMult, qualityOf, watcherDailyGain,
 } from '../mechanics/design';
 
 export type DesignResult =
@@ -53,7 +53,7 @@ export function gainInspiration(state: GameState, g: Game): number {
   if (!state.designer.unlocked) return 0;
   const amt = inspireGain(state, g);
   const before = state.designer.inspiration;
-  state.designer.inspiration = Math.min(INSPIRE_CAP, before + amt);
+  state.designer.inspiration = Math.min(inspireCap(state), before + amt);
   return state.designer.inspiration - before;
 }
 
@@ -203,7 +203,7 @@ export function startPreheat(
     uid: proto.uid, name: proto.name, themeId: proto.themeId, scale: proto.scale,
     score, rarity: rarityOf(score), costPrice, price,
     goal, days, preheatDays, platformId, status: 'preheat',
-    watchers: proto.seeds, exposure: proto.exposure, watchersDays: 0,
+    watchers: proto.seeds, exposure: proto.exposure, watchersDays: 0, demandDays: 0,
     convertRate: 0, elapsedSec: 0, supporters: 0, flowMult: 1, eventTimer: 0,
     usedEvents: [], pendingEvents: [], eventHistory: [], milestonesHit: [], boostCount: 0,
     iter: proto.iter,
@@ -301,11 +301,11 @@ export function resolveEvent(
   return ok(`${def.name}：${opt.label} → ${result}`);
 }
 
-/** 单秒需求模拟：基础关注 1~5 + floor(支持/100)（上限 10），每人按需求概率判定；事件流量乘区作用于人数 */
-function crowdSecond(state: GameState, c: DesignCampaign, rng: () => number): number {
+/** 单游戏日需求结算：基础关注 k = min(10, 1 + floor(rng×5) + floor(支持/100))，潜在购买 = k×10（× 流量乘区），每人按需求概率判定 */
+function crowdDay(state: GameState, c: DesignCampaign, rng: () => number): number {
   const base = 1 + Math.floor(rng() * 5) + Math.floor(c.supporters / 100);
   const k = Math.min(10, base);
-  const eff = Math.max(k, Math.round(k * c.flowMult));
+  const eff = Math.max(1, Math.round(k * 10 * c.flowMult));
   let gain = 0;
   for (let j = 0; j < eff; j++) {
     const f1 = THEMES[Math.floor(rng() * THEMES.length)].id;
@@ -366,8 +366,12 @@ export function tickCrowd(state: GameState, rng: () => number = Math.random, sec
       if (remainingDays <= EVENT_FINAL_DAYS) {
         while (c.pendingEvents.length) autoResolveEvent(c, c.pendingEvents.length - 1);
       }
-      // 逐秒需求
-      c.supporters += crowdSecond(state, c, rng);
+      // 按游戏日结算需求（v5.1：每日一次，k×10 人；天数累加器与预热 watchersDays 同模式）
+      const passedDays = Math.floor(c.elapsedSec / DAY_SECONDS) - c.preheatDays - c.demandDays;
+      for (let d = 0; d < passedDays; d++) {
+        c.supporters += crowdDay(state, c, rng);
+        c.demandDays++;
+      }
       // 里程碑解锁：150% / 200% 目标自动 +3% / +5% 支持
       for (const m of MILESTONES) {
         const mark = Math.round(m.pct * 100);

@@ -88,10 +88,13 @@ export function scaleById(id: string): DesignScale {
 
 // ---------- 数值定稿（docs/challenges-designer.md 同步） ----------
 
-/** 游玩灵感：按稀有度 N+1 / R+2 / SR+4 / SSR+8（隐藏款 ×2），乘 insp-up；cap 999 */
-export const INSPIRE_BY_RARITY: Record<Rarity, number> = { N: 1, R: 2, SR: 4, SSR: 8 };
-export const INSPIRE_HIDDEN_MULT = 2;
-export const INSPIRE_CAP = 999;
+/** 灵感获取只看游玩时长（游戏分钟）：base = max(1, round(playTime/30))，最终 min(5, round(base × insp-up)) */
+export const INSPIRE_MINUTES_DIV = 30;
+export const INSPIRE_MAX_PER_PLAY = 5;
+
+/** 灵感动态上限 = 基础 100 + 每款已精通桌游按稀有度追加（N1/R2/SR3/SR4，每款只算一次） */
+export const INSPIRE_BASE_CAP = 100;
+export const INSPIRE_CAP_BY_RARITY: Record<Rarity, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
 
 /** 立项花费灵感 */
 export const FOUND_COST = 10;

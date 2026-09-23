@@ -97,6 +97,8 @@ export interface DesignCampaign {
   exposure: number;
   /** 预热期已结算看好的天数 */
   watchersDays: number;
+  /** 众筹期已结算需求的天数（每日一次结算，k×10 人判定） */
+  demandDays: number;
   /** 众筹开启时锁定的看好转化率 */
   convertRate: number;
   elapsedSec: number;

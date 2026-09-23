@@ -4,6 +4,7 @@ import { PERKS } from '../data/prestige';
 import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
 import { DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, PLATFORMS, SCALES, THEMES, rarityOf } from '../data/designs';
 import { gameById } from '../data/games';
+import { inspireCap } from '../mechanics/design';
 import { defaultState, genClientId, isDesignedId } from '../state';
 import { rankCmp } from './records';
 import type { Attr } from '../data/constants';
@@ -385,6 +386,8 @@ function normalize(data: Record<string, unknown>): GameState {
         const score = Math.min(100, Math.max(1, Math.round(num(c.score, 1))));
         const days = Math.min(120, Math.max(1, Math.floor(num(c.days, 30))));
         const elapsedSec = num(c.elapsedSec, 0);
+        const preheatDays = Math.min(days - 15 > 0 ? days - 15 : 0, Math.max(0, Math.floor(num(c.preheatDays, 0))));
+        const status: 'preheat' | 'live' = c.status === 'preheat' ? 'preheat' : 'live';
         return {
           uid: num(c.uid, 0),
           name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 10) : `设计·${num(c.uid, 0)}号`,
@@ -395,9 +398,11 @@ function normalize(data: Record<string, unknown>): GameState {
           goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
           days,
           // v16 状态机：旧 campaign（无 status）视为已开众筹的 live，预热 0 天
-          preheatDays: Math.min(days - 15 > 0 ? days - 15 : 0, Math.max(0, Math.floor(num(c.preheatDays, 0)))),
+          preheatDays,
           platformId: knownPlatforms.has(String(c.platformId)) ? String(c.platformId) : 'moudian',
-          status: c.status === 'preheat' ? 'preheat' as const : 'live' as const,
+          status,
+          // 需求按游戏日结算（v5.1）：live 旧档按已走天数回填，避免下次 tick 批量补结算
+          demandDays: status === 'live' ? Math.max(0, Math.min(Math.floor(elapsedSec / 24), days) - preheatDays) : 0,
           watchers: Math.floor(num(c.watchers, 0)),
           exposure: num(c.exposure, 0),
           watchersDays: Math.max(0, Math.min(Math.floor(num(c.preheatDays, 0)), Math.floor(elapsedSec / 24))),
@@ -429,9 +434,11 @@ function normalize(data: Record<string, unknown>): GameState {
     ...campaigns.map(c => c.uid + 1),
     ...funded.map(p => p.uid + 1),
   );
+  // 灵感按动态上限截断（v5.1）：旧档高库存不保留，防止新上限被存量穿透
+  const capProbe = { collections, prestige: { perks } } as unknown as GameState;
   const designer: DesignerState = {
     unlocked: desRaw.unlocked === true,
-    inspiration: num(desRaw.inspiration, 0),
+    inspiration: Math.min(Math.max(0, num(desRaw.inspiration, 0)), inspireCap(capProbe)),
     prototypes,
     campaigns,
     funded,

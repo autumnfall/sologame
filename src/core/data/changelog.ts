@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: 'v0.3.1',
+    date: '2026-09-23',
+    sections: {
+      adjust: [
+        '平衡调整：众筹需求改为按游戏日结算（原逐秒，每日一次 k×10 人判定），整体节奏放缓约 60%',
+        '灵感系统重做：获取只看游玩时长（单局至多 5 点，稀有度与隐藏款不再影响）；上限改为动态——基础 100 + 每款已精通桌游按稀有度 +1~+4（N/R/SR/SSR），转生后重新积累；旧档超限库存载入时自动截断',
+      ],
+    },
+  },
+  {
     version: 'v0.3',
     date: '2026-09-23',
     sections: {

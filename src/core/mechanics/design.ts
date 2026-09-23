@@ -1,6 +1,9 @@
+import { GAMES } from '../data/games';
+import { isMastered } from './collection';
 import {
-  BOOST_EXPOSURE_RANGE, EVENT_POOL, EXPOSURE_SOFTCAP, INSPIRE_BY_RARITY,
-  INSPIRE_HIDDEN_MULT, PLAYTEST_ATTR_BONUS, Q_BASE, RARITY_DEMAND_BONUS,
+  BOOST_EXPOSURE_RANGE, EVENT_POOL, EXPOSURE_SOFTCAP, INSPIRE_BASE_CAP,
+  INSPIRE_CAP_BY_RARITY, INSPIRE_MAX_PER_PLAY, INSPIRE_MINUTES_DIV,
+  PLAYTEST_ATTR_BONUS, Q_BASE, RARITY_DEMAND_BONUS,
   dimByKey, eventById, platformById, priceAffinity, qualityMult,
   rarityOf, scaleById, themeById, themeDimKey,
 } from '../data/designs';
@@ -15,10 +18,19 @@ export function inspireMult(state: GameState): number {
   return 1 + 0.15 * challengeShopLv(state, 'inspUp');
 }
 
-/** 一局游玩可获得的灵感（按稀有度，隐藏款 ×2；入账处 cap 999） */
+/** 一局游玩可获得的灵感：只看游玩时长 base = max(1, round(playTime/30))，最终 min(5, round(base × insp-up)) */
 export function inspireGain(state: GameState, g: Game): number {
-  const base = INSPIRE_BY_RARITY[g.rarity] * (g.hidden ? INSPIRE_HIDDEN_MULT : 1);
-  return base * inspireMult(state);
+  const base = Math.max(1, Math.round(g.playTime / INSPIRE_MINUTES_DIV));
+  return Math.min(INSPIRE_MAX_PER_PLAY, Math.round(base * inspireMult(state)));
+}
+
+/** 灵感动态上限 = 100 + 每款已精通桌游 N1/R2/SR3/SR4（精通按周目计，转生后重新积累） */
+export function inspireCap(state: GameState): number {
+  let cap = INSPIRE_BASE_CAP;
+  for (const gm of GAMES) {
+    if (isMastered(state, gm.id)) cap += INSPIRE_CAP_BY_RARITY[gm.rarity];
+  }
+  return cap;
 }
 
 /** Q 乘区：score-up 每级 +8% */

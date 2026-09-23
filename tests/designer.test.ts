@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACTIVITY_DAILY_LIMIT, DAY_SECONDS, EXPOSURE_SOFTCAP, PREHEAT_MIN, SAVE_VERSION,
+  gameById, inspireCap, inspireGain,
   accumulateOffline, addExposure, boostCampaign, checkAchievements,
   convertRate, defaultState, demandParts, deliverDesign, doPrestige,
   foundPrototype, iterateProto, parseSave, playtestCost, promoCost,
@@ -42,7 +43,7 @@ function liveCampaign(s: GameState, opts: Partial<DesignCampaign> = {}): DesignC
     costPrice: opts.costPrice ?? 100, price: opts.price ?? 100,
     goal: opts.goal ?? 50, days: opts.days ?? 30, preheatDays: 0,
     platformId: opts.platformId ?? 'moudian', status: 'live',
-    watchers: 0, exposure: 0, watchersDays: 0, convertRate: 0,
+    watchers: 0, exposure: 0, watchersDays: 0, demandDays: 0, convertRate: 0,
     elapsedSec: 0, supporters: 0, flowMult: 1, eventTimer: 0,
     usedEvents: [], pendingEvents: [], eventHistory: [], milestonesHit: [], boostCount: 0,
     iter: { mech: 0, balance: 0, replay: 0, art: 0, rules: 0, theme: 0 },
@@ -67,28 +68,47 @@ describe('设计师：解锁与灵感（v1 保留）', () => {
     expect(s.designer.unlocked).toBe(true);
   });
 
-  it('settleRound 按稀有度入账灵感（N1/R2/SR4/SSR8，隐藏款 ×2），未解锁不加', () => {
+  it('灵感只看游玩时长：base = max(1, round(playTime/30))；稀有度/隐藏不影响，未解锁不加', () => {
     const s = unlocked(defaultState());
-    own(s, 'guoyuan'); own(s, 'yueliang'); own(s, 'tigemei'); own(s, 'lingji'); own(s, 'hezou');
-    expect(settleRound(s, 'guoyuan', uidOf(s, 'guoyuan'), 1, () => 0.99).inspiration).toBe(1);
-    expect(settleRound(s, 'yueliang', uidOf(s, 'yueliang'), 1, () => 0.99).inspiration).toBe(2);
-    expect(settleRound(s, 'tigemei', uidOf(s, 'tigemei'), 1, () => 0.99).inspiration).toBe(4);
-    expect(settleRound(s, 'lingji', uidOf(s, 'lingji'), 1, () => 0.99).inspiration).toBe(8);
-    expect(settleRound(s, 'hezou', uidOf(s, 'hezou'), 1, () => 0.99).inspiration).toBe(2);
+    expect(inspireGain(s, gameById('guoyuan'))).toBe(1); // 15 分钟
+    expect(inspireGain(s, gameById('zhitu'))).toBe(2);   // 45 分钟
+    expect(inspireGain(s, gameById('toumi'))).toBe(4);   // 120 分钟
+    expect(inspireGain(s, gameById('mofa'))).toBe(5);    // 150 分钟
+    // 同 playTime 的 N 与 SSR（含隐藏）获得相同灵感
+    const kafei = gameById('kafei'); // 30 分钟 N
+    expect(inspireGain(s, { ...kafei, rarity: 'SSR', hidden: true })).toBe(inspireGain(s, kafei));
     const s2 = defaultState();
     own(s2, 'guoyuan');
     expect(settleRound(s2, 'guoyuan', uidOf(s2, 'guoyuan'), 1, () => 0.99).inspiration).toBe(0);
   });
 
-  it('insp-up 乘区 +15%/级，灵感 cap 999', () => {
+  it('单局封顶 5：insp-up 乘区后仍 min(5, ·)', () => {
     const s = unlocked(defaultState());
-    s.prestige.shop['insp-up'] = 2;
-    own(s, 'guoyuan');
-    expect(settleRound(s, 'guoyuan', uidOf(s, 'guoyuan'), 1, () => 0.99).inspiration).toBeCloseTo(1.3, 10);
-    s.designer.inspiration = 998;
-    own(s, 'aoding');
-    expect(settleRound(s, 'aoding', uidOf(s, 'aoding'), 1, () => 0.99).inspiration).toBeCloseTo(1, 10);
-    expect(s.designer.inspiration).toBe(999);
+    s.prestige.shop['insp-up'] = 2; // ×1.3
+    expect(inspireGain(s, gameById('toumi'))).toBe(5); // base4×1.3=5.2 → 5
+    expect(inspireGain(s, gameById('mofa'))).toBe(5);  // base5×1.3=6.5 → 7 → 封顶 5
+    const s2 = unlocked(defaultState());
+    expect(inspireGain(s2, gameById('zhitu'))).toBe(2);
+    s2.prestige.shop['insp-up'] = 1;
+    expect(inspireGain(s2, gameById('zhitu'))).toBe(Math.round(2 * 1.15)); // 2.3 → 2
+  });
+
+  it('灵感动态上限：基础 100，精通按稀有度 +1~+4，到达上限截断，转生重置', () => {
+    const s = unlocked(defaultState());
+    expect(inspireCap(s)).toBe(100);
+    own(s, 'guoyuan', { prof: 20 });    // N 精通 +1
+    own(s, 'lingji', { prof: 160 });    // SSR 精通 +4
+    expect(inspireCap(s)).toBe(105);
+    // 截断：104 + 1（果园 15 分钟）→ 105；再玩不加
+    s.designer.inspiration = 104;
+    own(s, 'zhitu'); // 第二盒，未精通
+    expect(settleRound(s, 'zhitu', uidOf(s, 'zhitu'), 1, () => 0.99).inspiration).toBe(1);
+    expect(s.designer.inspiration).toBe(105);
+    expect(settleRound(s, 'zhitu', uidOf(s, 'zhitu'), 2, () => 0.99).inspiration).toBe(0);
+    // 转生重置：精通清空 → 上限回 100
+    for (const g of ['zongming', 'kafei', 'zhitu']) own(s, g, { prof: 20 });
+    expect(doPrestige(s).ok).toBe(true);
+    expect(inspireCap(s)).toBe(100);
   });
 });
 
@@ -244,14 +264,26 @@ describe('设计师：预热与时间池', () => {
 });
 
 describe('设计师：众筹期与平台结算（两阶段 + 抽成）', () => {
-  it('逐秒模拟确定性：p 必买 / p=0 不买（含事件干扰下的基本增长）', () => {
+  it('需求按游戏日结算（v5.1）：23 秒 0 次、第 24 秒一次判定，k×10 人数上界', () => {
     const s = unlocked(defaultState());
     const c = liveCampaign(s, { name: '必买船' }); // ratio 1 → p=0.4
-    tickCrowd(s, () => 0, 3);
-    expect(c.supporters).toBe(3);
+    tickCrowd(s, () => 0, 23);
+    expect(c.supporters).toBe(0); // 不足一整天不结算
+    tickCrowd(s, () => 0, 1);     // 第 24 秒：k=1 → 10 人判定
+    expect(c.demandDays).toBe(1);
+    expect(c.supporters).toBe(10); // rng 0 全买（10 人 × p>0）
+    // 批量跨天：一次推 48 秒 = 2 天
+    tickCrowd(s, () => 0, 48);
+    expect(c.demandDays).toBe(3);
+    expect(c.supporters).toBe(10 + 20); // 每天 k=1（支持<100）× 10 人
+    // k×10 上界：支持 ≥900 时 k=10 → 单日至多 100 人（调高目标避开里程碑加成）
+    c.supporters = 900;
+    c.goal = 1000;
+    tickCrowd(s, () => 0, 24);
+    expect(c.supporters - 900).toBeLessThanOrEqual(100);
     const s2 = unlocked(defaultState());
     const c2 = liveCampaign(s2, { name: '滞销书', price: 1000, costPrice: 100, goal: 50 }); // ratio 10 → p=0
-    tickCrowd(s2, () => 0.999, 5);
+    tickCrowd(s2, () => 0.999, 24);
     expect(c2.supporters).toBe(0);
   });
 
@@ -325,7 +357,7 @@ describe('设计师：众筹期与平台结算（两阶段 + 抽成）', () => {
     const milestones = c.eventHistory.filter(h => h.kind === 'milestone');
     expect(milestones.length).toBe(2);
     expect(milestones[0].result).toContain('解锁回报');
-    // 支持人数应高于纯逐秒累积（40×24=960）：960 + 里程碑加成
+    // 每日结算 k×10 人 + 支持/100 加速 + 里程碑加成，35 个众筹日远超原逐秒阈值
     expect(c.supporters).toBeGreaterThan(40 * DAY_SECONDS);
   });
 
@@ -514,6 +546,22 @@ describe('设计师：存档迁移（v15 → v16）', () => {
     expect(d.prototypes[0].exposure).toBe(0);
     expect(d.funded[0]).toMatchObject({ uid: 3, score: 80, rarity: 'SR', delivered: true, remainPayment: 0 });
     expect(d.nextUid).toBeGreaterThanOrEqual(4);
+  });
+
+  it('旧档高灵感库存按动态上限截断（4 款精通 N = 上限 104）', () => {
+    const s = defaultState();
+    const dirty = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+    dirty.saveVersion = 15;
+    dirty.designer = { unlocked: true, inspiration: 800, nextUid: 1 };
+    dirty.collections = {
+      guoyuan: { firstOpened: true, prof: 20, fatigue: 0, rulesRead: false },
+      zongming: { firstOpened: true, prof: 20, fatigue: 0, rulesRead: false },
+      kafei: { firstOpened: true, prof: 20, fatigue: 0, rulesRead: false },
+      zhitu: { firstOpened: true, prof: 20, fatigue: 0, rulesRead: false },
+    };
+    const m = parseSave(JSON.stringify(dirty));
+    expect(m).not.toBeNull();
+    expect(m!.designer.inspiration).toBe(104); // 100 + 4×N(1)
   });
 });
 

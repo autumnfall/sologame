@@ -6,7 +6,7 @@ import {
   DESIGN_DIMS, EXPOSURE_SOFTCAP, FOUND_COST,
   ITER_MAX, PLATFORMS, PREHEAT_MIN, PRICE_RATIO_MAX, PRICE_RATIO_MIN,
   SCALES, THEMES, attrLevel, convertRate, costPriceOf, dimByKey,
-  eventById, eventOptionCheck, fmt, iterCost, platformById, playtestCost,
+  eventById, eventOptionCheck, fmt, inspireCap, iterCost, platformById, playtestCost,
   preheatMax, promoCost, qualityOf, rarityOf, scaleById, themeById,
   themeDimKey, watcherDailyGain,
 } from '../../core';
@@ -116,11 +116,11 @@ function fmtEvent(e: { eventId: string; optionIdx: number; byDefault: boolean; r
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <span>💡 灵感：<b class="price" style="font-size:18px">{{ fmt(Math.floor(store.s.designer.inspiration)) }}</b>
-          <small class="mut">/ 999</small></span>
+          <small class="mut">/ {{ inspireCap(store.s) }}（基础 100，每精通一款按稀有度 +1~+4）</small></span>
         <span class="mut">原型 {{ store.s.designer.prototypes.length }} · 进行中 {{ store.s.designer.campaigns.length }} · 已成功 {{ store.s.designer.successCount }} 款</span>
       </div>
       <div class="mut" style="margin-top:6px;font-size:12px">
-        游玩攒灵感 → 立项 → 经营曝光（试玩/宣传/日记）+ 打磨 6 维度 → 选平台、分配预热/众筹时间 → 众筹期逐秒攒支持、应对事件 → 到期达标分两阶段回款（先收一半，交付垫资收尾款）。
+        游玩攒灵感（按时长，单局至多 5 点）→ 立项 → 经营曝光（试玩/宣传/日记）+ 打磨 6 维度 → 选平台、分配预热/众筹时间 → 众筹期按游戏日攒支持（每日 k×10 人判定）、应对事件 → 到期达标分两阶段回款（先收一半，交付垫资收尾款）。
       </div>
     </div>
 
