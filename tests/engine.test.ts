@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DURABILITY, HI_TICKET_SLEEVES, MARKET_SLOT_COSTS, ROTATION_MS,
+  DURABILITY, GAMES, HI_TICKET_SLEEVES, MARKET_SLOT_COSTS, REGULAR_GAMES, ROTATION_MS,
   SELL_FEE, SELL_SLOT_COSTS, STORE_WEAR_ONCE, XY_REFRESH_MS, XY_SELL_MS,
   accumulateOffline, applySleeve, applyStorage, buyTaobao, buyXianyu,
   copyValue, defaultState, exchangeHiTickets, expandMarketSlots, expandSellSlots, expMult, gachaDraw,
@@ -223,6 +223,29 @@ describe('某鱼：购买与出售', () => {
     own(s, 'guoyuan', { prof: 20 }); // N 精通
     const r = refreshXianyu(s, false, lcg(99), 0);
     expect(r.items!.every(i => i.gameId !== 'guoyuan')).toBe(true);
+  });
+
+  it('常规款全部精通、隐藏款未收集：刷新只出隐藏款且不抛错（含盲买）', () => {
+    const s = defaultState();
+    for (const g of REGULAR_GAMES) s.collections[g.id] = { firstOpened: true, prof: 99999, fatigue: 0, rulesRead: false };
+    const hiddenIds = GAMES.filter(g => g.hidden).map(g => g.id);
+    s.money = 1e6;
+    for (const seed of [1, 7, 42, 99, 12345]) {
+      const r = refreshXianyu(s, true, lcg(seed), 0);
+      expect(r.ok).toBe(true);
+      expect(r.items!.length).toBeGreaterThan(0);
+      expect(r.items!.every(i => hiddenIds.includes(i.gameId))).toBe(true);
+    }
+    expect(s.money).toBe(1e6 - 5 * 20);
+  });
+
+  it('全部桌游精通：付费刷新直接拒绝且不扣钱', () => {
+    const s = defaultState();
+    for (const g of GAMES) s.collections[g.id] = { firstOpened: true, prof: 99999, fatigue: 0, rulesRead: false };
+    s.money = 100;
+    const r = refreshXianyu(s, true, lcg(1), 0);
+    expect(r.ok).toBe(false);
+    expect(s.money).toBe(100); // 空池不扣钱
   });
 });
 

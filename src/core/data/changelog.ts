@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: 'v0.2.1',
+    date: '2026-09-23',
+    sections: {
+      fix: [
+        '修复常规款全部精通后某鱼刷新必然失败的问题：货源掷骰会掷进空数组导致刷新中断，表现为点击只扣钱不刷货、隐藏款永久无法收集；现常规款全精通时货源必出隐藏款，且全部精通后的刷新拒绝不再扣钱',
+      ],
+    },
+  },
+  {
     version: 'v0.2',
     date: '2026-09-22',
     sections: {

@@ -39,13 +39,18 @@ export function refreshXianyu(
   rng: () => number = Math.random,
   now: number = Date.now(),
 ): RefreshResult {
+  const hidden = GAMES.filter(g => g.hidden && !isMastered(state, g.id));
+  const normal = REGULAR_GAMES.filter(g => !isMastered(state, g.id));
+  if (!normal.length && !hidden.length) return { ok: false, reason: '所有桌游均已精通，暂无货源' };
   if (paid) {
     if (state.money < XY_REFRESH_COST) return { ok: false, reason: '钱不够刷新' };
     state.money -= XY_REFRESH_COST;
   }
-  const hidden = GAMES.filter(g => g.hidden && !isMastered(state, g.id));
-  const normal = REGULAR_GAMES.filter(g => !isMastered(state, g.id));
-  if (!normal.length && !hidden.length) return { ok: false, reason: '所有桌游均已精通，暂无货源' };
+  // 抽一件货源：常规款为空（全部已精通）时必出隐藏款，避免掷进空数组
+  const rollGame = (): Game =>
+    hidden.length && (!normal.length || rng() < 0.08)
+      ? hidden[Math.floor(rng() * hidden.length)]
+      : normal[Math.floor(rng() * normal.length)];
   // 挑战件数倍率（<1 更少 / >1 更多）作用于本批总件数（含 1 件一口价），clamp 1~15
   const total = Math.min(15, Math.max(1, Math.round((state.marketSlots + 1) * (challengeMods(state).xyCountMult ?? 1))));
   const n = Math.max(0, total - 1); // 普通货源件数 = 总件数 − 1 件必出的一口价
@@ -59,9 +64,7 @@ export function refreshXianyu(
     let g: Game;
     let tries = 0;
     do {
-      g = hidden.length && rng() < 0.08
-        ? hidden[Math.floor(rng() * hidden.length)]
-        : normal[Math.floor(rng() * normal.length)];
+      g = rollGame();
       tries++;
     } while (used.has(g.id) && tries < 30);
     if (used.has(g.id)) continue;
@@ -79,9 +82,7 @@ export function refreshXianyu(
     let g: Game;
     let tries = 0;
     do {
-      g = hidden.length && rng() < 0.08
-        ? hidden[Math.floor(rng() * hidden.length)]
-        : normal[Math.floor(rng() * normal.length)];
+      g = rollGame();
       tries++;
     } while (exclude && used.has(g.id) && tries < 30);
     return g;
