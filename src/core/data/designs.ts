@@ -73,9 +73,9 @@ export interface DesignScale {
 }
 
 export const SCALES: readonly DesignScale[] = [
-  { id: 'small', name: '小盒', costBase: 120, sleeveCost: 50 },
-  { id: 'standard', name: '标准', costBase: 300, sleeveCost: 150 },
-  { id: 'big', name: '大盒', costBase: 600, sleeveCost: 300 },
+  { id: 'small', name: '小盒', costBase: 30, sleeveCost: 50 },
+  { id: 'standard', name: '标准', costBase: 100, sleeveCost: 150 },
+  { id: 'big', name: '大盒', costBase: 300, sleeveCost: 300 },
 ];
 
 const SCALE_MAP = new Map(SCALES.map(s => [s.id, s]));
@@ -129,7 +129,7 @@ export const RARITY_DEMAND_BONUS: Record<Rarity, number> = { N: 0, R: 0.05, SR: 
 
 /** 众筹参数范围与节奏 */
 export const CROWD_GOAL_MIN = 50;
-export const CROWD_GOAL_MAX = 1000;
+export const CROWD_GOAL_MAX = 10000;
 export const CROWD_DAYS_MIN = 30;
 export const CROWD_DAYS_MAX = 120;
 /** 1 天 = 现实 24 秒 */

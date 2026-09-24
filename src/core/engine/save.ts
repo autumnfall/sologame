@@ -2,7 +2,7 @@ import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
-import { DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, PLATFORMS, SCALES, THEMES, rarityOf } from '../data/designs';
+import { CROWD_GOAL_MAX, DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, PLATFORMS, SCALES, THEMES, rarityOf } from '../data/designs';
 import { gameById } from '../data/games';
 import { inspireCap } from '../mechanics/design';
 import { defaultState, genClientId, isDesignedId } from '../state';
@@ -395,7 +395,7 @@ function normalize(data: Record<string, unknown>): GameState {
           scale: knownScales.has(String(c.scale)) ? String(c.scale) : 'standard',
           score, rarity: normRarity(c.rarity, score),
           costPrice: num(c.costPrice, 0), price: num(c.price, 0),
-          goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
+          goal: Math.min(CROWD_GOAL_MAX, Math.max(1, Math.floor(num(c.goal, 50)))),
           days,
           // v16 状态机：旧 campaign（无 status）视为已开众筹的 live，预热 0 天
           preheatDays,
@@ -423,7 +423,7 @@ function normalize(data: Record<string, unknown>): GameState {
     ? desRaw.failed.filter(isRecord).map(c => ({
         uid: num(c.uid, 0),
         name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 10) : `设计·${num(c.uid, 0)}号`,
-        goal: Math.min(1000, Math.max(1, Math.floor(num(c.goal, 50)))),
+        goal: Math.min(CROWD_GOAL_MAX, Math.max(1, Math.floor(num(c.goal, 50)))),
         days: Math.min(120, Math.max(1, Math.floor(num(c.days, 30)))),
         supporters: Math.floor(num(c.supporters, 0)),
       }))

@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: 'v0.3.2',
+    date: '2026-09-24',
+    sections: {
+      adjust: [
+        '平衡调整：设计成本基数大幅降低——小盒 ¥30 / 标准 ¥100 / 大盒 ¥300（原 120/300/600），定价幅度仍为成本价 100%~1000%',
+        '众筹目标人数上限放宽至 10000（原 1000，下限 50 不变）',
+      ],
+    },
+  },
+  {
     version: 'v0.3.1',
     date: '2026-09-23',
     sections: {
