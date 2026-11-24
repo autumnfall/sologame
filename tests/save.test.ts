@@ -239,3 +239,69 @@ describe('存档系统', () => {
     });
   });
 });
+
+describe('存档边界与恢复', () => {
+  it('未知 ID、重复 UID、越界耐久、失效上架引用和非法经验被清理', () => {
+    const s = parseSave(JSON.stringify({
+      saveVersion: SAVE_VERSION,
+      collections: { unknown: { firstOpened: true }, guoyuan: { firstOpened: true } },
+      copies: [
+        { uid: 5, gameId: 'unknown' },
+        { uid: 1, gameId: 'guoyuan', durability: 999 },
+        { uid: 1, gameId: 'guoyuan', durability: -1 },
+      ],
+      nextUid: 1,
+      listings: [{ copyUid: 1, price: 20 }, { copyUid: 1, price: 30 }, { copyUid: 99, price: 10 }],
+      xianyuBuys: [{ gameId: 'unknown', price: 1 }],
+      attrExp: { 演算: 'oops', 谋略: -5, 沉浸: 10, unknown: 20 },
+    }))!;
+    expect(s.collections.unknown).toBeUndefined();
+    expect(s.copies.map(c => c.uid)).toEqual([1, 2]);
+    expect(s.copies.map(c => c.durability)).toEqual([DURABILITY.N, 0]);
+    expect(s.nextUid).toBe(3);
+    expect(s.listings).toEqual([{ copyUid: 1, price: 20 }]);
+    expect(s.xianyuBuys).toEqual([]);
+    expect(s.attrExp['演算']).toBe(0);
+    expect(s.attrExp['谋略']).toBe(0);
+    expect(s.attrExp['沉浸']).toBe(10);
+    expect(Object.keys(s.attrExp)).toHaveLength(6);
+  });
+
+  it('非法迁移数据不会让解析抛异常', () => {
+    expect(() => parseSave(JSON.stringify({ saveVersion: 4, owned: { unknown: { count: 1 } } }))).not.toThrow();
+    expect(parseSave(JSON.stringify({ saveVersion: 15.5 }))).toBeNull();
+  });
+
+  it('存储读取或写入失败返回失败结果，写入失败不改变 lastSeen', () => {
+    const storage = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() {} };
+    expect(load(storage)).toBeNull();
+    const s = stateWithLastSeen(123);
+    expect(save(s, storage)).toBe(false);
+    expect(s.lastSeen).toBe(123);
+  });
+
+  it('主档损坏时恢复上一份有效备份，并保留损坏原文', () => {
+    const storage = memoryStorage();
+    const s = defaultState();
+    s.money = 500;
+    save(s, storage);
+    s.money = 600;
+    save(s, storage);
+    storage.setItem('bgcollector_save', '{broken');
+    expect(load(storage)!.money).toBe(500);
+    expect(storage.getItem('bgcollector_save_recovery')).toBe('{broken');
+    wipeSave(storage);
+    expect(storage.getItem('bgcollector_save_backup')).toBeNull();
+    expect(storage.getItem('bgcollector_save_recovery')).toBeNull();
+  });
+
+  it('更新版本的主档不回退到旧备份', () => {
+    const storage = memoryStorage();
+    save(defaultState(), storage);
+    save(defaultState(), storage);
+    const raw = JSON.stringify({ saveVersion: SAVE_VERSION + 1 });
+    storage.setItem('bgcollector_save', raw);
+    expect(load(storage)).toBeNull();
+    expect(storage.getItem('bgcollector_save')).toBe(raw);
+  });
+});

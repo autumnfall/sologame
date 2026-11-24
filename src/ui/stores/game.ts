@@ -44,7 +44,7 @@ import {
   autoHitChance,
   initTaobaoStock,
   listCopy,
-  load,
+  loadWithStatus,
   jobById,
   parseSave,
   perkLv,
@@ -173,6 +173,10 @@ export const useGameStore = defineStore('game', {
     nowMs: Date.now(),
     lastTick: 0,
     secAcc: 0,
+    suspendedAt: null as number | null,
+    saveBlocked: false,
+    saveNotice: '',
+    recoveryNotice: '',
     /** 多实体游戏开玩前的实体选择（gameId；null = 未在选择中） */
     pendingCopyPick: null as string | null,
     /** 收藏架「某鱼上架」跳转时预选的要上架实体 uid */
@@ -208,18 +212,52 @@ export const useGameStore = defineStore('game', {
       }, 2200);
     },
 
-    saveGame() {
-      save(this.s);
+    saveGame(): boolean {
+      if (this.saveBlocked || this.suspendedAt !== null) return false;
+      const ok = save(this.s);
+      this.saveNotice = ok ? '' : '进度保存失败，请导出存档备份，并检查浏览器存储空间。';
+      return ok;
+    },
+
+    suspendGame() {
+      if (this.suspendedAt !== null) return;
+      this.saveGame();
+      this.suspendedAt = Date.now();
+      this.lastTick = 0;
+    },
+
+    resumeGame() {
+      if (this.suspendedAt === null) return;
+      const elapsed = Math.max(0, Date.now() - this.suspendedAt);
+      this.suspendedAt = null;
+      // 保留当前阶段的前台进度；离开期间统一走离线结算。
+      if (this.session?.timing) this.session.timing.t0 += elapsed;
+      this.settleAway(elapsed);
+      if (this.session?.settled) this.beginRound(this.session.nextId || this.session.gameId);
+      this.lastTick = 0;
+      this.nowMs = Date.now();
     },
 
     /** 启动流程（对应原型 boot IIFE） */
     boot() {
-      this.s = load() ?? defaultState();
+      const loaded = loadWithStatus();
+      this.s = loaded.state ?? defaultState();
+      this.saveBlocked = loaded.status === 'invalid' || loaded.status === 'unavailable';
+      this.saveNotice = this.saveBlocked
+        ? '原存档无法读取，已暂停保存以保护原数据。请在教程页导入有效存档或选择重新开始。'
+        : '';
+      this.recoveryNotice = loaded.status === 'recovered'
+        ? '已从上一份有效备份恢复进度，损坏的原档已保留。请及时导出备份。' : '';
+      if (this.saveBlocked) {
+        this.tab = 'guide';
+        this.showStarter = false;
+        return;
+      }
       initTaobaoStock(this.s);
       tickRotation(this.s); // 补开轮换赏池（老存档 rotNext=0）
       if (!this.s.started) {
         refreshXianyu(this.s, false);
-        save(this.s);
+        if (!this.saveBlocked) this.saveGame();
         if (this.s.prestige.runs > 0) {
           // 转生后重进：先停留转生页投资阅历，手动开启新周目（老友馈赠等开局天赋需在三选一前持有）
           this.pendingStarter = true;
@@ -240,23 +278,26 @@ export const useGameStore = defineStore('game', {
      * 离屏结算：离开超过 1 分钟回来即累积离线收益并弹总结。
      * boot（重进页面）与 PWA 切后台回前台（visibilitychange，页面没死不会重走 boot）共用。
      */
-    settleAway() {
-      const away = Date.now() - this.s.lastSeen;
+    settleAway(elapsed?: number) {
+      const away = elapsed ?? Date.now() - this.s.lastSeen;
       if (away <= 60000) return;
       accumulateOffline(this.s, away);
       const b = this.s.offlineBank;
       if (b.workMoney > 0 || b.playRounds > 0) this.showOffline = true;
-      this.saveGame(); // 落档同时刷新 lastSeen，避免重复结算
+      this.s.lastSeen = Date.now(); // 即使存储失败也不能重复结算内存态
+      this.saveGame();
     },
 
     /** 每帧推进（rAF 主循环）：play session + 每秒 tick */
     advanceFrame(now: number) {
+      if (this.suspendedAt !== null) return;
       const dt = this.lastTick ? now - this.lastTick : 0;
       this.lastTick = now;
       const ps = this.session;
       if (ps && !ps.settled) this.advancePlay(ps, dt);
       this.secAcc += dt;
-      if (this.secAcc >= 1000) {
+      let ticks = 0;
+      while (this.secAcc >= 1000 && ticks++ < 60) {
         this.secAcc -= 1000;
         this.nowMs = Date.now();
         this.tickOnce();
@@ -515,8 +556,9 @@ export const useGameStore = defineStore('game', {
         }
       }
       this.logPlay(nextId !== ps.gameId ? `下一局换《${gameById(nextId).name}》……` : '下一局即将开始……', 'mut');
+      ps.nextId = nextId;
       ps.restartTimer = window.setTimeout(() => {
-        if (this.session === ps) this.beginRound(nextId);
+        if (this.session === ps && this.suspendedAt === null) this.beginRound(nextId);
       }, 1200);
     },
 
@@ -964,14 +1006,23 @@ export const useGameStore = defineStore('game', {
 
     /** 导入存档文件：校验并迁移后写入本地，刷新页面生效 */
     async importSaveFile(file: File) {
-      const text = await file.text();
+      let text: string;
+      try { text = await file.text(); } catch {
+        this.toast('无法读取存档文件，请重新选择文件。');
+        return;
+      }
       const s = parseSave(text);
       if (!s) {
         this.toast('存档文件无效或版本高于当前游戏');
         return;
       }
+      if (!save(s)) {
+        this.saveNotice = '导入未能保存，请检查浏览器存储空间后重试。';
+        return;
+      }
+      this.saveBlocked = false;
+      this.suspendedAt = null;
       this.s = s; // 先换内存态：否则 reload 触发的 beforeunload 自动保存会把旧档写回，覆盖导入的存档
-      save(s);
       window.location.reload();
     },
 
@@ -979,8 +1030,13 @@ export const useGameStore = defineStore('game', {
     resetGame() {
       if (!window.confirm('确定要清空当前存档、从头开始吗？此操作不可恢复！')) return;
       if (!window.confirm('再确认一次：所有收藏、实体、金钱、属性进度都将被删除。')) return;
+      if (!wipeSave()) {
+        this.saveNotice = '清空存档失败，请检查浏览器存储权限后重试。';
+        return;
+      }
+      this.saveBlocked = false;
+      this.suspendedAt = null;
       this.s = defaultState(); // 先换内存态：否则 reload 触发的 beforeunload 自动保存会把旧档写回，清档失效
-      wipeSave();
       window.location.reload();
     },
   },

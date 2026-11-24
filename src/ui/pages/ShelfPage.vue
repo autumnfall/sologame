@@ -7,7 +7,7 @@ import {
   SELL_PRICE_MIN,
   canStore,
   conditionText,
-  copiesOf,
+  isDesignedId,
   gainText,
   gameById,
   globalBonus,
@@ -30,20 +30,33 @@ const shelfCount = computed(
   () => `${kindCount(store.s)} 种 / ${GAMES.length} · 全局加成 +${(globalBonus(store.s) * 100).toFixed(1)}%`,
 );
 
+const copiesByGame = computed(() => {
+  const listed = new Set(store.s.listings.map(l => l.copyUid));
+  const groups = new Map<string, typeof store.s.copies>();
+  for (const copy of store.s.copies) {
+    if (listed.has(copy.uid)) continue;
+    const group = groups.get(copy.gameId) ?? [];
+    group.push(copy);
+    groups.set(copy.gameId, group);
+  }
+  return groups;
+});
+const copyCount = (id: string) => copiesByGame.value.get(id)?.length ?? 0;
+
 const ownedIds = computed(() => {
   const list = Object.keys(store.s.collections).filter(id => {
     const c = store.s.collections[id];
-    if (!c.firstOpened) return false;
+    if (!c.firstOpened || isDesignedId(id)) return false;
     const g = gameById(id);
     if (store.shelfFilter && !g.attrs.includes(store.shelfFilter)) return false;
     if (store.shelfRarity && g.rarity !== store.shelfRarity) return false;
     if (store.shelfMasteredOnly && !isMastered(store.s, id)) return false;
-    if (store.shelfOwnedOnly && copiesOf(store.s, id).length === 0) return false;
+    if (store.shelfOwnedOnly && copyCount(id) === 0) return false;
     return true;
   });
   if (store.shelfSort === 'copiesDesc') {
     // 实体数量降序（可用实体数，同数量按价值降序兜底）
-    list.sort((a, b) => copiesOf(store.s, b).length - copiesOf(store.s, a).length
+    list.sort((a, b) => copyCount(b) - copyCount(a)
       || gameById(b).marketPrice - gameById(a).marketPrice);
   } else if (store.shelfSort !== 'default') {
     const dir = store.shelfSort === 'valueAsc' ? 1 : -1;
@@ -60,22 +73,22 @@ function pageOf(id: string): number {
 }
 
 /** 当前页展示的实体（最多 COPIES_PER_PAGE 个） */
-function pageCopies(id: string) {
-  const all = copiesOf(store.s, id);
+const pagedCopies = computed(() => Object.fromEntries(ownedIds.value.map(id => {
+  const all = copiesByGame.value.get(id) ?? [];
   const pages = Math.max(1, Math.ceil(all.length / COPIES_PER_PAGE));
   const page = Math.min(pageOf(id), pages - 1);
-  return { list: all.slice(page * COPIES_PER_PAGE, (page + 1) * COPIES_PER_PAGE), page, pages };
-}
+  return [id, { list: all.slice(page * COPIES_PER_PAGE, (page + 1) * COPIES_PER_PAGE), page, pages }];
+})));
 
 function turnPage(id: string, delta: number) {
-  copyPage[id] = Math.max(0, pageOf(id) + delta);
+  copyPage[id] = Math.max(0, pagedCopies.value[id].page + delta);
 }
 
 /** 一键套牌套（成就 15 个解锁）：有可套实体时可用 */
 const sleeveAllUnlocked = computed(() => isFeatureUnlocked(store.s, 'sleeveAll'));
 const sleeveAllable = computed(() =>
   store.s.copies.some(c => {
-    if (c.sleeved || store.s.listings.some(l => l.copyUid === c.uid)) return false;
+    if (c.designed || c.sleeved || store.s.listings.some(l => l.copyUid === c.uid)) return false;
     const cards = gameById(c.gameId).cards;
     return !!cards && cards > 0;
   }),
@@ -150,16 +163,16 @@ function durText(n: number): string {
           ></i>
         </div>
         <!-- 实体列表：成色 / 耐久 / 牌套 / 收纳 / 某鱼上架（每页最多 5 个，超出分页） -->
-        <div v-if="copiesOf(store.s, id).length" style="margin-top:6px">
+        <div v-if="copyCount(id)" style="margin-top:6px">
           <div
-            v-for="(c, i) in pageCopies(id).list"
+            v-for="(c, i) in pagedCopies[id].list"
             :key="c.uid"
             class="panel"
             style="padding:8px;margin-bottom:6px"
           >
             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
               <span>
-                <b>实体{{ circled(pageCopies(id).page * COPIES_PER_PAGE + i) }}</b>{{ c.locked ? ' 🔒已锁定' : '' }} · {{ conditionText(c.durability, gameById(id).rarity) }}
+                <b>实体{{ circled(pagedCopies[id].page * COPIES_PER_PAGE + i) }}</b>{{ c.locked ? ' 🔒已锁定' : '' }} · {{ conditionText(c.durability, gameById(id).rarity) }}
                 {{ c.sleeved ? '🎴已套(×0.85)' : (gameById(id).cards ? `🎴未套（需 ${gameById(id).cards} 张）` : '🎴无卡牌') }}
                 {{ canStore(gameById(id)) ? (c.stored ? '📦已收纳(Setup×0.5·磨损×0.75)' : '📦未收纳') : '' }}
               </span>
@@ -195,10 +208,10 @@ function durText(n: number): string {
               }}{{ c.durability <= 0 ? '（已磨光，收益 ×0.5）' : '' }}
             </small>
           </div>
-          <div v-if="pageCopies(id).pages > 1" style="display:flex;gap:6px;align-items:center;justify-content:flex-end;font-size:12px">
-            <button style="padding:2px 8px;font-size:12px" :disabled="pageCopies(id).page <= 0" @click="turnPage(id, -1)">‹ 上一页</button>
-            <span class="mut">{{ pageCopies(id).page + 1 }} / {{ pageCopies(id).pages }} 页 · 共 {{ copiesOf(store.s, id).length }} 实体</span>
-            <button style="padding:2px 8px;font-size:12px" :disabled="pageCopies(id).page >= pageCopies(id).pages - 1" @click="turnPage(id, 1)">下一页 ›</button>
+          <div v-if="pagedCopies[id].pages > 1" style="display:flex;gap:6px;align-items:center;justify-content:flex-end;font-size:12px">
+            <button style="padding:2px 8px;font-size:12px" :disabled="pagedCopies[id].page <= 0" @click="turnPage(id, -1)">‹ 上一页</button>
+            <span class="mut">{{ pagedCopies[id].page + 1 }} / {{ pagedCopies[id].pages }} 页 · 共 {{ copyCount(id) }} 实体</span>
+            <button style="padding:2px 8px;font-size:12px" :disabled="pagedCopies[id].page >= pagedCopies[id].pages - 1" @click="turnPage(id, 1)">下一页 ›</button>
           </div>
         </div>
         <div v-else class="mut" style="margin-top:6px">实体已全部售出（收藏进度保留）。</div>

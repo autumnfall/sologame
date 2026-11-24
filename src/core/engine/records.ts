@@ -49,7 +49,7 @@ export function mergeBoard(entries: RunRecord[], n: number): RunRecord[] {
   for (const e of entries) {
     const key = e.clientId ?? `${e.name}@${e.at}`;
     const cur = best.get(key);
-    if (!cur || rankRatio(e) > rankRatio(cur)) best.set(key, e);
+    if (!cur || rankCmp(e, cur) < 0) best.set(key, e);
   }
   return [...best.values()].sort(rankCmp).slice(0, n);
 }

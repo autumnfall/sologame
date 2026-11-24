@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { useGameLifecycle } from './composables/useGameLifecycle';
 import { useGameStore } from './stores/game';
 import TopBar from './components/TopBar.vue';
 import Toast from './components/Toast.vue';
@@ -18,21 +18,7 @@ import ChangelogPage from './pages/ChangelogPage.vue';
 
 const store = useGameStore();
 
-let rafId = 0;
-let saveTimer = 0;
-
-function loop(now: number) {
-  store.advanceFrame(now);
-  rafId = requestAnimationFrame(loop);
-}
-
-const onUnload = () => store.saveGame();
-
-// 切后台立即存档，回前台补离线结算（PWA/手机端切后台页面仍存活，不会触发 boot）
-const onVis = () => {
-  if (document.hidden) store.saveGame();
-  else store.settleAway();
-};
+useGameLifecycle(store);
 
 // PWA 新版本刷新
 const applyUpdate = () => {
@@ -40,47 +26,16 @@ const applyUpdate = () => {
   store.pwaUpdate = null;
   f?.();
 };
-
-// 状态栏+标签页吸顶高度写入 --topbar-h，供 #play-panel 的 sticky top 避让
-function syncTopbarH() {
-  const el = document.getElementById('topbar');
-  if (el) document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`);
-}
-const onResize = () => syncTopbarH();
-
-// 时机条：空格判定（对应原型 runTimingBar 的 keydown 监听）
-const onKey = (e: KeyboardEvent) => {
-  const t = store.session?.timing;
-  if (e.code === 'Space' && t && !t.judged) {
-    e.preventDefault();
-    store.judgeTiming();
-  }
-};
-
-onMounted(() => {
-  store.boot();
-  syncTopbarH();
-  rafId = requestAnimationFrame(loop);
-  // 每 5 秒定时存档（正式版替代原型的 20% 概率随机存档）
-  saveTimer = window.setInterval(() => store.saveGame(), 5000);
-  window.addEventListener('beforeunload', onUnload);
-  window.addEventListener('keydown', onKey);
-  window.addEventListener('resize', onResize);
-  document.addEventListener('visibilitychange', onVis);
-});
-
-onUnmounted(() => {
-  cancelAnimationFrame(rafId);
-  clearInterval(saveTimer);
-  window.removeEventListener('beforeunload', onUnload);
-  window.removeEventListener('keydown', onKey);
-  window.removeEventListener('resize', onResize);
-  document.removeEventListener('visibilitychange', onVis);
-});
 </script>
 
 <template>
   <TopBar />
+  <div v-if="store.saveNotice" class="panel" role="alert">{{ store.saveNotice }}</div>
+  <div v-if="store.recoveryNotice" class="panel" role="status">
+    {{ store.recoveryNotice }}
+    <button @click="store.exportSave()">导出备份</button>
+    <button @click="store.recoveryNotice = ''">知道了</button>
+  </div>
   <div id="content">
     <PlayPage v-if="store.tab === 'play'" />
     <WorkPage v-else-if="store.tab === 'work'" />

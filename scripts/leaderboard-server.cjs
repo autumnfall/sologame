@@ -7,12 +7,13 @@
  * （如 http://your-host:8787），游戏端即可上传/拉取排行榜。
  * API：
  *   POST /submit  body = RunRecord JSON（按 clientId 去重，只保留最好成绩）
- *   GET  /board   -> RunRecord[]（耗时升序，前 10）
+ *   GET  /board   -> RunRecord[]（精通/耗时降序，前 10）
  * 数据持久化在同目录 leaderboard.json。
  */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { validRecord, merge } = require('./leaderboard-rules.cjs');
 
 const PORT = Number(process.argv[2]) || 8787;
 const FILE = path.join(__dirname, 'leaderboard.json');
@@ -28,17 +29,6 @@ function readBoard() {
 
 function writeBoard(list) {
   fs.writeFileSync(FILE, JSON.stringify(list, null, 2));
-}
-
-function merge(list, n = 10) {
-  const best = new Map();
-  for (const e of list) {
-    if (!e || typeof e.ms !== 'number' || typeof e.name !== 'string') continue;
-    const key = e.clientId || `${e.name}@${e.at ?? 0}`;
-    const cur = best.get(key);
-    if (!cur || e.ms < cur.ms) best.set(key, e);
-  }
-  return [...best.values()].sort((a, b) => a.ms - b.ms).slice(0, n);
 }
 
 http.createServer((req, res) => {
@@ -58,7 +48,7 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const rec = JSON.parse(body);
-        if (typeof rec.ms !== 'number' || typeof rec.name !== 'string') throw new Error('bad record');
+        if (!validRecord(rec)) throw new Error('bad record');
         rec.name = String(rec.name).slice(0, 24);
         writeBoard(merge([...readBoard(), rec], 1000));
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });

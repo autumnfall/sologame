@@ -25,7 +25,7 @@ export async function submitRun(rec: RunRecord): Promise<boolean> {
   }
 }
 
-/** 拉取在线榜（按 clientId 去重、耗时升序、前 10）；失败返回 null */
+/** 拉取在线榜（按 clientId 去重、精通/耗时降序、前 10）；失败返回 null */
 export async function fetchBoard(): Promise<RunRecord[] | null> {
   if (!LEADERBOARD_API) return null;
   try {
@@ -35,7 +35,9 @@ export async function fetchBoard(): Promise<RunRecord[] | null> {
     if (!Array.isArray(raw)) return null;
     const list = raw.filter((e): e is RunRecord =>
       typeof e === 'object' && e !== null &&
-      typeof (e as RunRecord).ms === 'number' &&
+      Number.isFinite((e as RunRecord).ms) && (e as RunRecord).ms > 0 &&
+      Number.isSafeInteger((e as RunRecord).mastered) && (e as RunRecord).mastered >= 0 &&
+      ((e as RunRecord).clientId === undefined || typeof (e as RunRecord).clientId === 'string') &&
       typeof (e as RunRecord).name === 'string');
     return mergeBoard(list, 10);
   } catch {

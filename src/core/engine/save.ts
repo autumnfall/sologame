@@ -1,9 +1,9 @@
-import { SAVE_KEY, SAVE_VERSION } from '../data/constants';
+import { ATTRS, SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import { DURABILITY, SELL_SLOTS_MAX } from '../data/balance';
 import { PERKS } from '../data/prestige';
 import { CHALLENGES, CHALLENGE_SHOP } from '../data/challenges';
 import { CROWD_GOAL_MAX, DESIGN_DIMS, DESIGN_DURABILITY, ITER_MAX, PLATFORMS, SCALES, THEMES, rarityOf } from '../data/designs';
-import { gameById } from '../data/games';
+import { GAMES, gameById } from '../data/games';
 import { inspireCap } from '../mechanics/design';
 import { defaultState, genClientId, isDesignedId } from '../state';
 import { rankCmp } from './records';
@@ -34,6 +34,8 @@ function defaultStorage(): StorageLike {
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
+
+const knownGames = new Set(GAMES.map(g => g.id));
 
 /**
  * 存档迁移链：MIGRATIONS[v] 把 v 版存档升级为 v+1 版。
@@ -108,8 +110,9 @@ function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
   let nextUid = 1;
   const owned = isRecord(raw.owned) ? raw.owned : {};
   for (const [id, v] of Object.entries(owned)) {
-    if (!isRecord(v)) continue;
-    const count = typeof v.count === 'number' && v.count > 0 ? Math.floor(v.count) : 0;
+    if (!isRecord(v) || !knownGames.has(id)) continue;
+    const count = typeof v.count === 'number' && Number.isFinite(v.count) && v.count > 0 ? Math.floor(v.count) : 0;
+    if (count > 100000) throw new Error('旧存档实体数量异常');
     if (count === 0) continue;
     collections[id] = {
       firstOpened: true,
@@ -187,28 +190,57 @@ export function parseSave(json: string): GameState | null {
   } catch {
     return null;
   }
-  let version = typeof data.saveVersion === 'number' ? data.saveVersion : 0;
-  if (version > SAVE_VERSION) {
-    console.warn(`存档版本 ${version} 高于当前支持的 ${SAVE_VERSION}，无法读取`);
+  try {
+    let version = typeof data.saveVersion === 'number' ? data.saveVersion : 0;
+    if (!Number.isSafeInteger(version) || version < 0) return null;
+    if (version > SAVE_VERSION) {
+      console.warn(`存档版本 ${version} 高于当前支持的 ${SAVE_VERSION}，无法读取`);
+      return null;
+    }
+    while (version < SAVE_VERSION) {
+      const migrate = MIGRATIONS[version];
+      if (!migrate) return null; // 迁移链断裂，视为损坏
+      data = migrate(data);
+      version++;
+    }
+    return normalize(data);
+  } catch {
     return null;
   }
-  while (version < SAVE_VERSION) {
-    const migrate = MIGRATIONS[version];
-    if (!migrate) return null; // 迁移链断裂，视为损坏
-    data = migrate(data);
-    version++;
-  }
-  return normalize(data);
 }
 
-/**
- * 读取并迁移存档；返回 null 表示无存档或已损坏（调用方应新开一局）。
- * 版本高于当前版本（来自更新版本的客户端）同样返回 null。
- */
-export function load(storage: StorageLike = defaultStorage()): GameState | null {
-  const raw = storage.getItem(SAVE_KEY);
-  if (!raw) return null;
-  return parseSave(raw);
+/** 读取结果区分空档与失败，避免失败时自动新建并覆盖原档。 */
+export interface SaveLoadResult {
+  state: GameState | null;
+  status: 'ok' | 'empty' | 'recovered' | 'invalid' | 'unavailable';
+}
+
+/** 读取失败时保留原始数据；只有有效的旧档才作为自动备份。 */
+export function loadWithStatus(storage?: StorageLike): SaveLoadResult {
+  try {
+    const target = storage ?? defaultStorage();
+    const raw = target.getItem(SAVE_KEY);
+    if (!raw) return { state: null, status: 'empty' };
+    const state = parseSave(raw);
+    if (state) return { state, status: 'ok' };
+    // 更新版本的存档不允许被旧客户端回退或覆盖。
+    try {
+      if (JSON.parse(raw)?.saveVersion > SAVE_VERSION) return { state: null, status: 'invalid' };
+    } catch { /* 尝试备份 */ }
+    const backup = target.getItem(`${SAVE_KEY}_backup`);
+    const recovered = backup ? parseSave(backup) : null;
+    if (recovered) {
+      target.setItem(`${SAVE_KEY}_recovery`, raw);
+      return { state: recovered, status: 'recovered' };
+    }
+    return { state: null, status: 'invalid' };
+  } catch {
+    return { state: null, status: 'unavailable' };
+  }
+}
+
+export function load(storage?: StorageLike): GameState | null {
+  return loadWithStatus(storage).state;
 }
 
 /** 以默认存档为底，把存档数据归一化：补新字段、剔脏字段、填充条目缺省值 */
@@ -217,7 +249,7 @@ function normalize(data: Record<string, unknown>): GameState {
   const collections: GameState['collections'] = {};
   const collRaw = isRecord(data.collections) ? data.collections : {};
   for (const [id, v] of Object.entries(collRaw)) {
-    if (!isRecord(v)) continue;
+    if (!isRecord(v) || (!knownGames.has(id) && !/^design-[1-9]\d*$/.test(id))) continue;
     collections[id] = {
       firstOpened: v.firstOpened === true,
       prof: num(v.prof, 0),
@@ -227,18 +259,29 @@ function normalize(data: Record<string, unknown>): GameState {
     };
   }
   const copies: Copy[] = [];
+  const usedUids = new Set<number>();
+  let repairedUid = 1;
+  const reservedUids = new Set(Array.isArray(data.copies)
+    ? data.copies.filter(isRecord).map(c => c.uid).filter((uid): uid is number => typeof uid === 'number' && Number.isSafeInteger(uid) && uid > 0)
+    : []);
   if (Array.isArray(data.copies)) {
     for (const c of data.copies) {
       if (!isRecord(c) || typeof c.gameId !== 'string') continue;
       const designed = c.designed === true && isDesignedId(c.gameId);
+      if (!designed && !knownGames.has(c.gameId)) continue;
       if (c.designed === true && !designed) continue; // 脏 designed 标记（id 不在 design-N 空间）剔除
       if (designed && !collections[c.gameId]) continue; // 自创实体必须有对应图鉴条目
+      let uid = typeof c.uid === 'number' ? c.uid : 0;
+      if (!Number.isSafeInteger(uid) || uid <= 0 || usedUids.has(uid)) {
+        while (usedUids.has(repairedUid) || reservedUids.has(repairedUid)) repairedUid++;
+        uid = repairedUid++;
+      }
+      usedUids.add(uid);
+      const maxDurability = designed ? DESIGN_DURABILITY : DURABILITY[gameById(c.gameId).rarity];
       copies.push({
-        uid: num(c.uid, 0),
+        uid,
         gameId: c.gameId,
-        durability: typeof c.durability === 'number'
-          ? Math.max(0, c.durability)
-          : designed ? DESIGN_DURABILITY : DURABILITY[gameById(c.gameId).rarity],
+        durability: Math.min(maxDurability, num(c.durability, maxDurability)),
         sleeved: !designed && c.sleeved === true,
         stored: !designed && c.stored === true,
         ...(c.locked === true ? { locked: true } : {}),
@@ -246,8 +289,14 @@ function normalize(data: Record<string, unknown>): GameState {
       });
     }
   }
+  const listedUids = new Set<number>();
   const listings: Listing[] = Array.isArray(data.listings)
     ? data.listings.filter(isRecord).map(l => ({ copyUid: num(l.copyUid, 0), price: num(l.price, 0) }))
+      .filter(l => {
+        if (!usedUids.has(l.copyUid) || listedUids.has(l.copyUid) || l.price <= 0) return false;
+        listedUids.add(l.copyUid);
+        return true;
+      })
     : [];
   const xianyuBuys: MarketItem[] = Array.isArray(data.xianyuBuys)
     ? data.xianyuBuys.filter(isRecord).map(it => ({
@@ -257,9 +306,10 @@ function normalize(data: Record<string, unknown>): GameState {
         sleeved: it.sleeved === true,
         stored: it.stored === true,
         ...(it.blind === true ? { blind: true } : {}),
-      })).filter(it => it.gameId && it.price > 0)
+      })).filter(it => knownGames.has(it.gameId) && it.price > 0)
     : [];
-  const attrExp = { ...s.attrExp, ...(isRecord(data.attrExp) ? data.attrExp : {}) };
+  const rawExp = isRecord(data.attrExp) ? data.attrExp : {};
+  const attrExp = Object.fromEntries(ATTRS.map(a => [a, num(rawExp[a], 0)]));
   const stats = isRecord(data.stats) ? data.stats : {};
   const bank = isRecord(data.offlineBank) ? data.offlineBank : {};
   const bankExp = isRecord(bank.exp) ? bank.exp : {};
@@ -467,7 +517,7 @@ function normalize(data: Record<string, unknown>): GameState {
     attrExp: attrExp as GameState['attrExp'],
     collections,
     copies,
-    nextUid: num(data.nextUid, copies.reduce((m, c) => Math.max(m, c.uid + 1), 1)),
+    nextUid: Math.max(Math.floor(num(data.nextUid, 1)), copies.reduce((m, c) => Math.max(m, c.uid + 1), 1)),
     taobaoStock: (isRecord(data.taobaoStock) ? data.taobaoStock : {}) as GameState['taobaoStock'],
     xianyuBuys,
     listings,
@@ -560,20 +610,29 @@ export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
 
-export function save(state: GameState, storage: StorageLike = defaultStorage()): void {
-  state.lastSeen = Date.now();
+/** 成功写入后才更新时间；失败由 UI 显示并保留内存中的进度。 */
+export function save(state: GameState, storage?: StorageLike): boolean {
   try {
-    storage.setItem(SAVE_KEY, serialize(state));
+    const target = storage ?? defaultStorage();
+    const lastSeen = Date.now();
+    const json = JSON.stringify({ ...state, lastSeen });
+    const previous = target.getItem(SAVE_KEY);
+    if (previous && parseSave(previous)) target.setItem(`${SAVE_KEY}_backup`, previous);
+    target.setItem(SAVE_KEY, json);
+    state.lastSeen = lastSeen;
+    return true;
   } catch {
-    // 存储满/隐私模式等：静默失败，不阻塞游戏
+    return false;
   }
 }
 
-/** 清档重开（重新开始） */
-export function wipeSave(storage: StorageLike = defaultStorage()): void {
+/** 清档重开（重新开始），同时清除自动备份与恢复文件。 */
+export function wipeSave(storage?: StorageLike): boolean {
   try {
-    storage.removeItem(SAVE_KEY);
+    const target = storage ?? defaultStorage();
+    for (const key of [SAVE_KEY, `${SAVE_KEY}_backup`, `${SAVE_KEY}_recovery`]) target.removeItem(key);
+    return true;
   } catch {
-    // 同上：静默失败
+    return false;
   }
 }
