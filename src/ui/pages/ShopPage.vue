@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { useGameStore } from '../stores/game';
 import type { ShopTabKey } from '../stores/game';
 import TaobaoPanel from './shop/TaobaoPanel.vue';
@@ -16,11 +17,13 @@ const SUBTABS: { key: ShopTabKey; label: string }[] = [
 
 <template>
   <div>
-    <div class="subtabs">
+    <PageHeading icon="shop" title="桌游商店" />
+    <div class="subtabs" role="group" aria-label="商店类型">
       <button
         v-for="t in SUBTABS"
         :key="t.key"
         :class="{ active: store.shopTab === t.key }"
+        :aria-pressed="store.shopTab === t.key"
         @click="store.shopTab = t.key"
       >
         {{ t.label }}

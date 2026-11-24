@@ -5,6 +5,7 @@ import type { useGameStore } from '../stores/game';
 export function useGameLifecycle(store: ReturnType<typeof useGameStore>) {
   let rafId = 0;
   let saveTimer = 0;
+  let headerObserver: ResizeObserver | undefined;
   function loop(now: number) {
     store.advanceFrame(now);
     rafId = requestAnimationFrame(loop);
@@ -17,7 +18,7 @@ export function useGameLifecycle(store: ReturnType<typeof useGameStore>) {
   const onKey = (e: KeyboardEvent) => {
     const target = e.target;
     if (target instanceof HTMLElement && target.closest('input, textarea, select, button, [contenteditable]')) return;
-    if (e.code === 'Space' && store.session?.timing && !e.repeat) {
+    if (e.code === 'Space' && store.session?.timing && !e.repeat && !document.querySelector('dialog:modal')) {
       e.preventDefault();
       store.judgeTiming();
     }
@@ -31,13 +32,17 @@ export function useGameLifecycle(store: ReturnType<typeof useGameStore>) {
     store.boot();
     onVis();
     syncTopbarH();
+    const topbar = document.getElementById('topbar');
+    if (topbar) {
+      headerObserver = new ResizeObserver(syncTopbarH);
+      headerObserver.observe(topbar);
+    }
     rafId = requestAnimationFrame(loop);
     saveTimer = window.setInterval(() => store.saveGame(), 5000);
     window.addEventListener('beforeunload', onUnload);
     window.addEventListener('pagehide', store.suspendGame);
     window.addEventListener('pageshow', onVis);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('resize', syncTopbarH);
     document.addEventListener('visibilitychange', onVis);
   });
   onUnmounted(() => {
@@ -48,7 +53,7 @@ export function useGameLifecycle(store: ReturnType<typeof useGameStore>) {
     window.removeEventListener('pagehide', store.suspendGame);
     window.removeEventListener('pageshow', onVis);
     window.removeEventListener('keydown', onKey);
-    window.removeEventListener('resize', syncTopbarH);
+    headerObserver?.disconnect();
     document.removeEventListener('visibilitychange', onVis);
   });
 }

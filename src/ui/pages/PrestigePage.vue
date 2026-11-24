@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { computed, onMounted, ref } from 'vue';
 import {
   ACHIEVEMENTS,
@@ -82,7 +83,7 @@ function boardName(r: RunRecord): string {
 
 <template>
   <div>
-    <h2>🌅 退坑转生</h2>
+    <PageHeading icon="prestige" title="退坑转生" />
 
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -132,38 +133,42 @@ function boardName(r: RunRecord): string {
       <div :class="LEADERBOARD_API ? 'two-col' : ''">
         <div>
           <h3 style="margin:0 0 6px;font-size:13px">本存档 <small class="mut">{{ store.s.localBoard.length }}/10</small></h3>
-          <table v-if="store.s.localBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
-            <tr class="mut" style="text-align:left">
-              <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
-            </tr>
-            <tr v-for="(r, i) in store.s.localBoard" :key="r.at + '-' + i" style="border-top:1px solid var(--line)">
-              <td style="padding:3px 4px">{{ i + 1 }}</td>
-              <td>{{ boardName(r) }}</td>
-              <td>{{ r.mastered }}</td>
-              <td>{{ fmtDuration(r.ms) }}</td>
-              <td>{{ r.runs }}</td>
-              <td>{{ r.insight }}</td>
-              <td>{{ r.achievements }}</td>
-            </tr>
-          </table>
+          <div class="table-scroll" v-if="store.s.localBoard.length" tabindex="0" role="region" aria-label="排行榜">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <tr class="mut" style="text-align:left">
+                <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+              </tr>
+              <tr v-for="(r, i) in store.s.localBoard" :key="r.at + '-' + i" style="border-top:1px solid var(--line)">
+                <td style="padding:3px 4px">{{ i + 1 }}</td>
+                <td>{{ boardName(r) }}</td>
+                <td>{{ r.mastered }}</td>
+                <td>{{ fmtDuration(r.ms) }}</td>
+                <td>{{ r.runs }}</td>
+                <td>{{ r.insight }}</td>
+                <td>{{ r.achievements }}</td>
+              </tr>
+            </table>
+          </div>
           <div v-else class="mut" style="font-size:12px">还没有完成的周目。</div>
         </div>
         <div v-if="LEADERBOARD_API">
           <h3 style="margin:0 0 6px;font-size:13px">在线 <small class="mut">全部玩家</small></h3>
-          <table v-if="onlineBoard && onlineBoard.length" style="width:100%;border-collapse:collapse;font-size:12px">
-            <tr class="mut" style="text-align:left">
-              <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
-            </tr>
-            <tr v-for="(r, i) in onlineBoard" :key="(r.clientId ?? r.at) + '-' + i" style="border-top:1px solid var(--line)">
-              <td style="padding:3px 4px">{{ i + 1 }}</td>
-              <td>{{ boardName(r) }}</td>
-              <td>{{ r.mastered }}</td>
-              <td>{{ fmtDuration(r.ms) }}</td>
-              <td>{{ r.runs }}</td>
-              <td>{{ r.insight }}</td>
-              <td>{{ r.achievements }}</td>
-            </tr>
-          </table>
+          <div class="table-scroll" v-if="onlineBoard && onlineBoard.length" tabindex="0" role="region" aria-label="排行榜">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <tr class="mut" style="text-align:left">
+                <th style="padding:3px 4px">#</th><th>名称</th><th>精通</th><th>耗时</th><th>周目</th><th>阅历</th><th>成就</th>
+              </tr>
+              <tr v-for="(r, i) in onlineBoard" :key="(r.clientId ?? r.at) + '-' + i" style="border-top:1px solid var(--line)">
+                <td style="padding:3px 4px">{{ i + 1 }}</td>
+                <td>{{ boardName(r) }}</td>
+                <td>{{ r.mastered }}</td>
+                <td>{{ fmtDuration(r.ms) }}</td>
+                <td>{{ r.runs }}</td>
+                <td>{{ r.insight }}</td>
+                <td>{{ r.achievements }}</td>
+              </tr>
+            </table>
+          </div>
           <div v-else class="mut" style="font-size:12px">{{ boardStatus || '加载中…' }}</div>
         </div>
       </div>
@@ -186,7 +191,7 @@ function boardName(r: RunRecord): string {
       <div v-if="nextUnlock" class="mut" style="font-size:12px;margin-bottom:8px">
         再达成 {{ nextUnlock.need - achCount }} 个成就解锁「{{ nextUnlock.name }}」：{{ nextUnlock.desc }}
       </div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+      <div class="grid dense-grid">
         <div
           v-for="a in achList"
           :key="a.id"

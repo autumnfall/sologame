@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GameDialog from './GameDialog.vue';
 import { gameById, gainText } from '../../core';
 import { useGameStore } from '../stores/game';
 import GameCard from './GameCard.vue';
@@ -11,11 +12,10 @@ const starters = STARTER_IDS.map(id => gameById(id));
 </script>
 
 <template>
-  <div v-if="store.showStarter" id="modal-mask">
-    <div id="modal">
-      <h2>🎁 欢迎来到桌游收藏家的世界！</h2>
-      <p class="mut" style="margin-bottom:12px">从朋友留下的三盒毛线桌游中选一盒作为你的起点——它将决定你前期的成长方向。</p>
-      <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+  <GameDialog v-if="store.showStarter" label="选择开局桌游" class="starter-dialog">
+      <h2>选一盒作为起点</h2>
+      <p class="mut" style="margin-bottom:12px">三盒桌游各有擅长的属性。选你最想开玩的那盒。</p>
+      <div class="grid starter-grid">
         <GameCard v-for="g in starters" :key="g.id" :game="g">
           <div>{{ g.tags.join(' · ') }}</div>
           <div class="tagline">每局 {{ gainText(g) }}</div>
@@ -26,6 +26,5 @@ const starters = STARTER_IDS.map(id => gameById(id));
           </template>
         </GameCard>
       </div>
-    </div>
-  </div>
+  </GameDialog>
 </template>

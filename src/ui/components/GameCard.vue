@@ -16,11 +16,6 @@ const ownInfo = computed(() => {
   return n > 0 ? `✔ 已拥有${n > 1 ? ` ×${n}` : ''}` : '↺ 无现货';
 });
 
-// 封面渐变底色（对应原型 coverStyle）
-const coverStyle = computed(() => {
-  const c = { N: '#4a453c', R: '#233a5c', SR: '#3d2a5c', SSR: '#5c3a14' }[props.game.rarity];
-  return { background: `linear-gradient(135deg,${c},#1a1712)` };
-});
 </script>
 
 <template>
@@ -31,13 +26,13 @@ const coverStyle = computed(() => {
       <span v-if="tired" class="fatigue-badge">玩腻了</span>
       <span v-if="game.hidden" class="fatigue-badge" style="border-color:#b04ce8;color:#d9a5f5">隐藏款</span>
     </div>
-    <div class="cover" :style="coverStyle">
-      {{ game.icon }}
+    <div class="cover">
+      <span class="cover-emblem" aria-hidden="true">{{ game.icon }}</span>
       <div class="cname">{{ game.name }}</div>
     </div>
     <div class="body">
-      <slot></slot>
-      <slot name="actions"></slot>
+      <slot />
     </div>
+    <div v-if="$slots.actions" class="card-actions"><slot name="actions" /></div>
   </div>
 </template>

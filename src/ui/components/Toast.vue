@@ -5,5 +5,5 @@ const store = useGameStore();
 </script>
 
 <template>
-  <div v-if="store.toastOn" id="toast">{{ store.toastMsg }}</div>
+  <div v-if="store.toastOn" id="toast" role="status">{{ store.toastMsg }}</div>
 </template>

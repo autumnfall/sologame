@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { computed } from 'vue';
 import {
   CHALLENGES,
@@ -102,7 +103,7 @@ const activeGoalText = computed(() => {
 
 <template>
   <div>
-    <h2>🎯 挑战场景</h2>
+    <PageHeading icon="challenge" title="挑战场景" />
 
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -122,7 +123,7 @@ const activeGoalText = computed(() => {
 
     <div v-for="n in LAYERS" :key="n" class="panel" style="margin-bottom:12px">
       <h3 style="margin:0 0 8px">第 {{ n }} 层 <small class="mut">{{ n === 1 ? '开局即可选择' : '需完成前置挑战' }}</small></h3>
-      <div class="grid">
+      <div class="grid dense-grid">
         <div
           v-for="c in challengesByLayer(n)"
           :key="c.id"
@@ -174,7 +175,7 @@ const activeGoalText = computed(() => {
 
     <div v-for="l in SHOP_LINES" :key="l" class="panel" style="margin-bottom:12px">
       <h3 style="margin:0 0 8px">{{ CHALLENGE_SHOP_LINE_NAME[l] }} <small class="mut">挑战币兑换，永久生效</small></h3>
-      <div class="grid">
+      <div class="grid dense-grid">
         <div
           v-for="p in shopByLine(l)"
           :key="p.id"

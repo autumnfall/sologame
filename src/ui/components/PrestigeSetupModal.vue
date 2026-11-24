@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GameDialog from './GameDialog.vue';
 import { computed } from 'vue';
 import {
   CHALLENGES,
@@ -51,8 +52,7 @@ function pickChallenge(id: string | null) {
 
 <template>
   <!-- 转生后强制弹窗：先投资阅历，点「开启新周目」才能继续（遮罩不可点击关闭） -->
-  <div v-if="store.pendingStarter" id="modal-mask">
-    <div id="modal" style="max-width:660px">
+  <GameDialog v-if="store.pendingStarter" label="新周目准备" class="prestige-dialog">
       <h3 style="margin-top:0">🌅 第 {{ store.s.prestige.runs + 1 }} 周目 · 投资阅历</h3>
       <p class="mut" style="margin-bottom:12px">
         本次退坑到账阅历已可使用（当前 <b class="price">{{ store.s.prestige.insight }}</b> 点）。
@@ -69,7 +69,7 @@ function pickChallenge(id: string | null) {
             <b style="font-size:13px">{{ p.name }}</b>
             <small class="mut" style="margin-left:6px">{{ lv(p.id) }}/{{ p.max }}</small>
           </span>
-          <small class="mut" style="flex:1;min-width:220px">{{ p.desc }}</small>
+          <small class="mut" style="flex:1;min-width:min(100%, 180px)">{{ p.desc }}</small>
           <small v-if="lockText(p.id)" class="mut" style="flex-shrink:0;color:var(--dim);font-size:11px">{{ lockText(p.id) }}</small>
           <button
             style="padding:3px 12px;font-size:12px;flex-shrink:0"
@@ -116,11 +116,10 @@ function pickChallenge(id: string | null) {
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button :disabled="insightSpent(store.s) === 0" @click="store.respec()">↺ 洗点（全额退还）</button>
-        <button class="primary" style="flex:1;min-width:220px" @click="store.startNewRun()">
+        <button class="primary" style="flex:1;min-width:min(100%, 180px)" @click="store.startNewRun()">
           🌅 开启新周目（三选一）
         </button>
       </div>
       <small class="mut" style="display:block;margin-top:6px">天赋与洗点仅在此界面可调整，开启新周目后本周目内锁定；挑战选择同样在开启新周目时锁定。</small>
-    </div>
-  </div>
+  </GameDialog>
 </template>

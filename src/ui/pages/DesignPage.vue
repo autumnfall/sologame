@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { computed, ref } from 'vue';
 import {
   ACTIVITY_DAILY_LIMIT, ATTR_ICON, CROWD_DAYS_MAX, CROWD_DAYS_MIN,
@@ -111,7 +112,7 @@ function fmtEvent(e: { eventId: string; optionIdx: number; byDefault: boolean; r
 
 <template>
   <div>
-    <h2>🎨 桌游设计师</h2>
+    <PageHeading icon="design" title="设计工坊" />
 
     <div class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -186,24 +187,26 @@ function fmtEvent(e: { eventId: string; optionIdx: number; byDefault: boolean; r
         </div>
 
         <!-- 6 维度迭代 -->
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
-          <tr v-for="d in DESIGN_DIMS" :key="d.key" style="border-top:1px solid var(--line)">
-            <td style="padding:4px">
-              {{ dimByKey(d.key).name }}{{ d.key === homeDim(p.themeId) ? ' ★' : '' }}
-              <small class="mut">{{ ATTR_ICON[d.attr] }}{{ d.attr }} Lv{{ attrLevel(store.s, d.attr) }}</small>
-            </td>
-            <td style="padding:4px" class="mut">{{ p.iter[d.key] }}/{{ ITER_MAX }} 次</td>
-            <td style="padding:4px" class="mut">本次增益 +{{ dimGain(p.themeId, d.key) }}</td>
-            <td style="padding:4px;text-align:right">
-              <button v-if="nextIterCost(p.iter[d.key]) !== null" style="padding:2px 10px;font-size:12px"
-                :disabled="store.s.designer.inspiration < nextIterCost(p.iter[d.key])!"
-                @click="store.iterateProto(p.uid, d.key)">
-                打磨 -{{ nextIterCost(p.iter[d.key]) }}💡
-              </button>
-              <span v-else class="ok" style="font-size:12px">已至极限</span>
-            </td>
-          </tr>
-        </table>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="设计资料">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
+            <tr v-for="d in DESIGN_DIMS" :key="d.key" style="border-top:1px solid var(--line)">
+              <td style="padding:4px">
+                {{ dimByKey(d.key).name }}{{ d.key === homeDim(p.themeId) ? ' ★' : '' }}
+                <small class="mut">{{ ATTR_ICON[d.attr] }}{{ d.attr }} Lv{{ attrLevel(store.s, d.attr) }}</small>
+              </td>
+              <td style="padding:4px" class="mut">{{ p.iter[d.key] }}/{{ ITER_MAX }} 次</td>
+              <td style="padding:4px" class="mut">本次增益 +{{ dimGain(p.themeId, d.key) }}</td>
+              <td style="padding:4px;text-align:right">
+                <button v-if="nextIterCost(p.iter[d.key]) !== null" style="padding:2px 10px;font-size:12px"
+                  :disabled="store.s.designer.inspiration < nextIterCost(p.iter[d.key])!"
+                  @click="store.iterateProto(p.uid, d.key)">
+                  打磨 -{{ nextIterCost(p.iter[d.key]) }}💡
+                </button>
+                <span v-else class="ok" style="font-size:12px">已至极限</span>
+              </td>
+            </tr>
+          </table>
+        </div>
 
         <div style="margin-top:8px">
           <button style="padding:3px 12px;font-size:12px" @click="launchFor = launchFor === p.uid ? null : p.uid">
@@ -317,32 +320,34 @@ function fmtEvent(e: { eventId: string; optionIdx: number; byDefault: boolean; r
           <small v-if="store.s.designer.successCount < CROWD_SUCCESS_LIMIT" class="mut">· 还差 {{ CROWD_SUCCESS_LIMIT - store.s.designer.successCount }} 款解锁出版玩法</small>
           <small v-else class="ok">· 出版玩法将在后续版本开放</small>
         </h3>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <tr class="mut" style="text-align:left">
-            <th style="padding:3px 4px">名称</th><th>稀有度</th><th>Q</th><th>支持</th><th>结算</th>
-          </tr>
-          <tr v-for="f in store.s.designer.funded" :key="f.uid" style="border-top:1px solid var(--line)">
-            <td style="padding:3px 4px">《{{ f.name }}》<small v-if="!f.delivered" class="warn"> 待交付</small></td>
-            <td>{{ f.rarity }}</td>
-            <td>{{ f.score }}</td>
-            <td>{{ f.supporters }}</td>
-            <td style="padding:3px 4px">
-              <small class="mut">
-                抽成 ¥{{ fmt(f.commission) }} · 已到账 ¥{{ fmt(f.firstPayment) }} · 尾款 ¥{{ fmt(f.remainPayment) }}
-              </small>
-              <template v-if="!f.delivered">
-                <small class="mut">· 交付垫资 ¥{{ fmt(f.cost) }}，</small>
-                <small :class="f.income - f.commission - f.cost >= 0 ? 'ok' : 'bad2'">
-                  净{{ f.income - f.commission - f.cost >= 0 ? '收益' : '亏损' }} ¥{{ fmt(Math.abs(f.income - f.commission - f.cost)) }}
+        <div class="table-scroll" tabindex="0" role="region" aria-label="设计资料">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <tr class="mut" style="text-align:left">
+              <th style="padding:3px 4px">名称</th><th>稀有度</th><th>Q</th><th>支持</th><th>结算</th>
+            </tr>
+            <tr v-for="f in store.s.designer.funded" :key="f.uid" style="border-top:1px solid var(--line)">
+              <td style="padding:3px 4px">《{{ f.name }}》<small v-if="!f.delivered" class="warn"> 待交付</small></td>
+              <td>{{ f.rarity }}</td>
+              <td>{{ f.score }}</td>
+              <td>{{ f.supporters }}</td>
+              <td style="padding:3px 4px">
+                <small class="mut">
+                  抽成 ¥{{ fmt(f.commission) }} · 已到账 ¥{{ fmt(f.firstPayment) }} · 尾款 ¥{{ fmt(f.remainPayment) }}
                 </small>
-                <button style="margin-left:6px;padding:2px 10px;font-size:12px" :disabled="store.s.money < f.cost"
-                  :title="store.s.money < f.cost ? `交付需垫资 ¥${fmt(f.cost)}，资金不足` : ''"
-                  @click="store.deliverDesign(f.uid)">📦 交付</button>
-              </template>
-              <small v-else :class="f.income - f.commission - f.cost >= 0 ? 'ok' : 'bad2'"> · 已交付</small>
-            </td>
-          </tr>
-        </table>
+                <template v-if="!f.delivered">
+                  <small class="mut">· 交付垫资 ¥{{ fmt(f.cost) }}，</small>
+                  <small :class="f.income - f.commission - f.cost >= 0 ? 'ok' : 'bad2'">
+                    净{{ f.income - f.commission - f.cost >= 0 ? '收益' : '亏损' }} ¥{{ fmt(Math.abs(f.income - f.commission - f.cost)) }}
+                  </small>
+                  <button style="margin-left:6px;padding:2px 10px;font-size:12px" :disabled="store.s.money < f.cost"
+                    :title="store.s.money < f.cost ? `交付需垫资 ¥${fmt(f.cost)}，资金不足` : ''"
+                    @click="store.deliverDesign(f.uid)">📦 交付</button>
+                </template>
+                <small v-else :class="f.income - f.commission - f.cost >= 0 ? 'ok' : 'bad2'"> · 已交付</small>
+              </td>
+            </tr>
+          </table>
+        </div>
       </div>
 
       <!-- 已失败 -->

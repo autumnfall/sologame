@@ -18,8 +18,8 @@ export default defineConfig({
         description: '放置类桌游收藏游戏：工作赚钱、买桌游、开盒收集、挂某鱼出二手，退坑转生越玩越强。',
         lang: 'zh-CN',
         display: 'standalone',
-        theme_color: '#16130f',
-        background_color: '#16130f',
+        theme_color: '#142019',
+        background_color: '#142019',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -28,8 +28,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: 'index.html',
-        // 默认 glob 不含 png，补上以预缓存应用图标
-        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        // 离线时同样提供应用图标和桌面插画
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
       },
     }),
   ],

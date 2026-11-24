@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { computed, reactive } from 'vue';
 import {
   DURABILITY,
@@ -115,7 +116,7 @@ function durText(n: number): string {
 
 <template>
   <div>
-    <h2>收藏架 <small>{{ shelfCount }}</small></h2>
+    <PageHeading icon="shelf" title="收藏架">{{ shelfCount }}</PageHeading>
     <FilterBar
       v-model="store.shelfFilter"
       v-model:mastered-only="store.shelfMasteredOnly"
@@ -149,7 +150,7 @@ function durText(n: number): string {
       <small v-if="store.s.settings.quickList" class="mut">开启中：点「某鱼上架」直接按行情价 {{ store.s.settings.quickListPct }}% 上架，不再跳转</small>
     </div>
     <div v-if="!ownedIds.length" class="mut">收藏架空空的。</div>
-    <div v-else class="grid">
+    <div v-else class="grid dense-grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
         <div>{{ masteryText(store.s, gameById(id)) }}</div>
         <div class="tagline">每局 {{ gainText(gameById(id)) }}</div>

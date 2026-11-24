@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { computed } from 'vue';
 import { ATTR_ICON, JOBS, jobById, jobCyclePayExpected, jobUnlocked } from '../../core';
 import { useGameStore } from '../stores/game';
@@ -36,8 +37,8 @@ function switchJob(id: string) {
 
 <template>
   <div>
-    <h2>职业阶梯</h2>
-    <div v-if="curJob?.auto" class="panel" style="margin-bottom:12px;padding:10px">
+    <PageHeading icon="work" title="职业阶梯" />
+    <div v-if="curJob?.auto" class="panel job-summary">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <b>▶ {{ curJob.name }}</b>
         <span class="mut">周期进度（走满自动结算 ¥{{ curJob ? Math.round(jobCyclePayExpected(store.s, curJob)) : 0 }}{{ curJob?.volatile ? '±' : '' }}）</span>
@@ -47,7 +48,7 @@ function switchJob(id: string) {
       </div>
       <small class="mut">工作自动进行，与玩桌游并行结算；离线也按整周期累积（50% 折算）。</small>
     </div>
-    <div>
+    <div class="job-grid">
       <div
         v-for="j in JOBS"
         :key="j.id"

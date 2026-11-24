@@ -132,8 +132,8 @@ const listingRows = computed(() =>
 <template>
   <div>
     <!-- ========== 买 ========== -->
-    <h4 style="margin:0 0 8px">🛍️ 淘货</h4>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+    <h2>二手货架</h2>
+    <div class="market-intro">
       <button @click="store.refreshXy(true)">🔄 刷新货源（¥20）</button>
       <small class="mut">
         每批 {{ store.s.marketSlots }} 件普通货源 + <b>1 件一口价盲买</b>（只看名字，成色/牌套/收纳未知，价格 = 总价值 80%~120%）。普通货源均为带成色的实体（3~10成新，可能带牌套/收纳），价格为总价值 50%~200%；可跨级别刷出高级桌游，偶见隐藏款！每 5 分钟自动到货（<b>{{ store.xyCd }}</b>）
@@ -147,7 +147,7 @@ const listingRows = computed(() =>
         <div class="tagline">只看名字不看货：成色、牌套、收纳全隐藏</div>
         <div class="tagline">价格为总价值 80%~120%，每局 {{ gainText(gameById(it.gameId)) }}</div>
         <template #actions>
-          <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <div class="shop-card-action">
             <span class="price">¥{{ it.price }}</span>
             <button class="primary" :disabled="store.s.money < it.price" @click="store.buyXy(store.s.xianyuBuys.indexOf(it))">盲狙</button>
           </div>
@@ -163,7 +163,7 @@ const listingRows = computed(() =>
           总价值 ¥{{ marketItemValue(it) }}（本件 {{ ratioPct(it) }}%）· 每局 {{ gainText(gameById(it.gameId)) }}
         </div>
         <template #actions>
-          <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <div class="shop-card-action">
             <span class="price" :class="ratioCls(ratioPct(it))">¥{{ it.price }}</span>
             <button class="primary" :disabled="store.s.money < it.price" @click="store.buyXy(store.s.xianyuBuys.indexOf(it))">拿下</button>
           </div>
@@ -172,12 +172,12 @@ const listingRows = computed(() =>
     </div>
 
     <!-- ========== 卖 ========== -->
-    <h4 style="margin:18px 0 8px">📤 出售上架（{{ store.s.listings.length }}/{{ store.s.sellSlots }} 槽位）</h4>
+    <h2 class="market-sale-heading">出售上架 <small>{{ store.s.listings.length }}/{{ store.s.sellSlots }} 槽位</small></h2>
     <div class="panel">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <label>
           选择实体：
-          <select v-model.number="sellUid" style="margin-left:4px;max-width:280px">
+          <select v-model.number="sellUid" class="market-inventory">
             <option :value="null" disabled>— 选择要上架的实体 —</option>
             <optgroup v-for="grp in sellGroups" :key="grp.gameId" :label="`《${groupName(grp.gameId)}》`">
               <option v-for="c in grp.copies" :key="c.uid" :value="c.uid">

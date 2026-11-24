@@ -43,10 +43,6 @@ function stockLeft(id: string): number {
   return store.s.taobaoStock[id] ?? TAOBAO_STOCK[gameById(id).rarity];
 }
 
-function chipStyle(on: boolean): Record<string, string> {
-  return on ? { borderColor: 'var(--gold)', color: 'var(--gold)' } : {};
-}
-
 const headerText = computed(() => {
   const parts = [
     `已解锁级别：${unlockedTiers.value.join(' · ')}`,
@@ -61,10 +57,9 @@ const headerText = computed(() => {
 
 <template>
   <div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+    <div class="filter-bar" role="group" aria-label="筛选在售桌游">
       <button
-        style="padding:3px 10px;font-size:12px"
-        :style="chipStyle(rarityFilter === null)"
+        :aria-pressed="rarityFilter === null"
         @click="rarityFilter = null"
       >
         全部级别
@@ -72,20 +67,18 @@ const headerText = computed(() => {
       <button
         v-for="r in TIER_ORDER"
         :key="r"
-        style="padding:3px 10px;font-size:12px"
-        :style="chipStyle(rarityFilter === r)"
+        :aria-pressed="rarityFilter === r"
         :disabled="!unlockedTiers.includes(r)"
         :title="unlockedTiers.includes(r) ? '' : '该级别尚未解锁'"
         @click="rarityFilter = rarityFilter === r ? null : r"
       >
         {{ r }}
       </button>
-      <span style="width:1px;height:16px;background:var(--line);margin:0 4px"></span>
+      <span class="filter-divider" aria-hidden="true"></span>
       <button
         v-for="a in ATTRS"
         :key="a"
-        style="padding:3px 10px;font-size:12px"
-        :style="chipStyle(attrFilter === a)"
+        :aria-pressed="attrFilter === a"
         @click="attrFilter = attrFilter === a ? null : a"
       >
         {{ ATTR_ICON[a] }}{{ a }}
@@ -104,7 +97,7 @@ const headerText = computed(() => {
         <template #actions>
           <div
             v-if="stockLeft(g.id) > 0"
-            style="margin-top:6px;display:flex;justify-content:space-between;align-items:center"
+            class="shop-card-action"
           >
             <span class="price">¥{{ taobaoPrice(store.s, g) }}</span>
             <button

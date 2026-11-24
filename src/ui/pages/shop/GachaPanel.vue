@@ -45,10 +45,10 @@ const tenUnlocked = computed(() => isFeatureUnlocked(store.s, 'tenPull'));
 
 <template>
   <div>
-    <div class="subtabs">
-      <button :class="{ active: sub === 'perm' }" @click="sub = 'perm'">🎁 常驻池</button>
-      <button :class="{ active: sub === 'rot' }" @click="sub = 'rot'">🎮 桌游池</button>
-      <button :class="{ active: sub === 'master' }" @click="sub = 'master'">🎯 精通池</button>
+    <div class="subtabs" role="group" aria-label="选择奖池">
+      <button :class="{ active: sub === 'perm' }" :aria-pressed="sub === 'perm'" @click="sub = 'perm'">🎁 常驻池</button>
+      <button :class="{ active: sub === 'rot' }" :aria-pressed="sub === 'rot'" @click="sub = 'rot'">🎮 桌游池</button>
+      <button :class="{ active: sub === 'master' }" :aria-pressed="sub === 'master'" @click="sub = 'master'">🎯 精通池</button>
     </div>
 
     <!-- ========== 常驻池 ========== -->

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GameDialog from './GameDialog.vue';
 import { computed } from 'vue';
 import { ATTR_ICON, OFFLINE_CAP_MS, conditionText, fmt, gameById } from '../../core';
 import type { Attr } from '../../core';
@@ -37,8 +38,7 @@ const hasPlay = computed(() => b.value.playRounds > 0);
 </script>
 
 <template>
-  <div v-if="store.showOffline" id="modal-mask">
-    <div id="modal" style="max-width:520px">
+  <GameDialog v-if="store.showOffline" label="离线收益">
       <h3 style="margin-top:0">🌙 欢迎回来</h3>
       <p class="mut" style="margin:0 0 8px">你离线了 <b>{{ store.offlineTime }}</b>，收益已自动入账：</p>
       <div class="bar" style="height:10px;margin-bottom:12px">
@@ -66,6 +66,5 @@ const hasPlay = computed(() => b.value.playRounds > 0);
       </div>
 
       <button class="primary" style="width:100%" @click="store.closeOffline()">收下，继续玩</button>
-    </div>
-  </div>
+  </GameDialog>
 </template>

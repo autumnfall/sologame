@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { ref } from 'vue';
 import { ATTR_ICON, ATTRS } from '../../core';
 import type { Attr } from '../../core';
@@ -38,7 +39,7 @@ function onImportPicked(e: Event) {
 
 <template>
   <div>
-    <h2>📖 新手指引</h2>
+    <PageHeading icon="guide" title="新手指引" />
     <div class="panel" style="margin-bottom:12px">
       <h3>🎯 核心循环</h3>
       <p class="mut">玩桌游获得属性经验 → 属性达标解锁更高级的工作 → 工作赚钱 →

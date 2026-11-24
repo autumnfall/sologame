@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeading from '../components/PageHeading.vue';
 import { CHANGELOG } from '../../core';
 import type { ChangelogEntry } from '../../core';
 
@@ -13,12 +14,8 @@ const SECTION_META: { key: keyof ChangelogEntry['sections']; icon: string; label
 
 <template>
   <div>
-    <h2>📝 版本更新</h2>
+    <PageHeading icon="changelog" title="版本更新" />
 
-    <div class="panel" style="margin-bottom:12px">
-      当前版本：<b class="price" style="font-size:18px">{{ current }}</b>
-      <span class="mut" style="margin-left:8px">每次版本的功能增加、调整与 bug 修复记录如下（新在前）。</span>
-    </div>
 
     <div v-for="e in CHANGELOG" :key="e.version" class="panel" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">

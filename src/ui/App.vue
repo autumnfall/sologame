@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch } from 'vue';
 import { useGameLifecycle } from './composables/useGameLifecycle';
 import { useGameStore } from './stores/game';
 import TopBar from './components/TopBar.vue';
@@ -19,6 +20,7 @@ import ChangelogPage from './pages/ChangelogPage.vue';
 const store = useGameStore();
 
 useGameLifecycle(store);
+watch(() => store.tab, () => window.scrollTo(0, 0), { flush: 'post' });
 
 // PWA 新版本刷新
 const applyUpdate = () => {
@@ -29,23 +31,25 @@ const applyUpdate = () => {
 </script>
 
 <template>
-  <TopBar />
-  <div v-if="store.saveNotice" class="panel" role="alert">{{ store.saveNotice }}</div>
-  <div v-if="store.recoveryNotice" class="panel" role="status">
-    {{ store.recoveryNotice }}
-    <button @click="store.exportSave()">导出备份</button>
-    <button @click="store.recoveryNotice = ''">知道了</button>
-  </div>
-  <div id="content">
-    <PlayPage v-if="store.tab === 'play'" />
-    <WorkPage v-else-if="store.tab === 'work'" />
-    <ShopPage v-else-if="store.tab === 'shop'" />
-    <ShelfPage v-else-if="store.tab === 'shelf'" />
-    <ChallengePage v-else-if="store.tab === 'challenge'" />
-    <DesignPage v-else-if="store.tab === 'design' && store.s.designer.unlocked" />
-    <PrestigePage v-else-if="store.tab === 'prestige'" />
-    <GuidePage v-else-if="store.tab === 'guide' || store.tab === 'design'" />
-    <ChangelogPage v-else />
+  <div class="app-shell">
+    <TopBar />
+    <div v-if="store.saveNotice" class="panel app-notice" role="alert">{{ store.saveNotice }}</div>
+    <div v-if="store.recoveryNotice" class="panel app-notice" role="status">
+      {{ store.recoveryNotice }}
+      <button @click="store.exportSave()">导出备份</button>
+      <button @click="store.recoveryNotice = ''">知道了</button>
+    </div>
+    <main id="content" :data-page="store.tab">
+      <PlayPage v-if="store.tab === 'play'" />
+      <WorkPage v-else-if="store.tab === 'work'" />
+      <ShopPage v-else-if="store.tab === 'shop'" />
+      <ShelfPage v-else-if="store.tab === 'shelf'" />
+      <ChallengePage v-else-if="store.tab === 'challenge'" />
+      <DesignPage v-else-if="store.tab === 'design' && store.s.designer.unlocked" />
+      <PrestigePage v-else-if="store.tab === 'prestige'" />
+      <GuidePage v-else-if="store.tab === 'guide' || store.tab === 'design'" />
+      <ChangelogPage v-else />
+    </main>
   </div>
   <StarterModal />
   <OfflineModal />

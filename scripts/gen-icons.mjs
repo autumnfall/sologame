@@ -93,11 +93,11 @@ function createCanvas(size) {
 }
 
 // 主题色（与 style.css 变量一致）
-const BG_TOP = [43, 36, 27]; // --panel2 #2b241b
-const BG_BOT = [22, 19, 15]; // --bg #16130f
-const GOLD = [232, 182, 76]; // --gold #e8b64c
-const CREAM = [240, 228, 198];
-const INK = [36, 28, 12];
+const BG_TOP = [34, 52, 42]; // --panel2 #22342a
+const BG_BOT = [16, 26, 22]; // --bg #101a16
+const GOLD = [231, 189, 114]; // --gold #e7bd72
+const CREAM = [243, 237, 223];
+const INK = [35, 26, 11];
 
 /** 画一颗骰子：圆角底色 + 5 点；safe = 内容区占比（maskable 需留边） */
 function drawDie(size, safe) {

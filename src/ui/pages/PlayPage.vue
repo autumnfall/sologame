@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { DURABILITY, conditionText, copiesOf, copyByUid, gainText, gameById, isFeatureUnlocked, isMastered, masteryText } from '../../core';
+import { DURABILITY, GAMES, kindCount, isDesignedId, conditionText, copiesOf, copyByUid, gainText, gameById, isFeatureUnlocked, isMastered, masteryText } from '../../core';
 import { useGameStore } from '../stores/game';
 import FilterBar from '../components/FilterBar.vue';
 import GameCard from '../components/GameCard.vue';
+import DeskHero from '../components/DeskHero.vue';
+import GameDialog from '../components/GameDialog.vue';
 
 const store = useGameStore();
 const ps = computed(() => store.session);
+const libraryHeading = ref<HTMLElement | null>(null);
+const hasGames = computed(() => store.s.copies.some(c => !c.designed && !store.s.listings.some(l => l.copyUid === c.uid)));
+function browseGames() {
+  if (!hasGames.value) {
+    store.tab = 'shop';
+    return;
+  }
+  libraryHeading.value?.scrollIntoView({ block: 'start' });
+  libraryHeading.value?.focus({ preventScroll: true });
+}
 
 /** 面板收起态：收起后只剩标题栏，不再遮挡下方的筛选与桌游列表 */
 const panelCollapsed = ref(false);
@@ -17,7 +29,7 @@ watch(ps, (v, old) => {
 const ownedIds = computed(() =>
   Object.keys(store.s.collections).filter(
     id =>
-      store.s.collections[id].firstOpened &&
+      !isDesignedId(id) && store.s.collections[id].firstOpened &&
       copiesOf(store.s, id).length > 0 &&
       (!store.playFilter || gameById(id).attrs.includes(store.playFilter)) &&
       (!store.playNotTiredOnly || store.s.collections[id].fatigue < 7) &&
@@ -77,12 +89,13 @@ watch(
 </script>
 
 <template>
-  <div>
+  <div class="play-page">
+    <DeskHero v-if="!ps" :count="kindCount(store.s)" :total="GAMES.length" :has-games="hasGames" @action="browseGames" />
     <!-- 游玩中：进度面板吸顶但可收起，选游戏列表在下方 -->
     <div v-if="ps" id="play-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <h3 style="margin:0">{{ panelTitle }}</h3>
-        <button style="padding:2px 10px;font-size:12px;flex-shrink:0" @click="panelCollapsed = !panelCollapsed">
+        <h1 class="session-title">{{ panelTitle }}</h1>
+        <button class="session-toggle" :aria-expanded="!panelCollapsed" @click="panelCollapsed = !panelCollapsed">
           {{ panelCollapsed ? '⤵ 展开面板' : '⤒ 收起面板' }}
         </button>
       </div>
@@ -90,23 +103,26 @@ watch(
       <div>
         <div v-for="(p, i) in ps.phases" :key="p.key" class="phase-row">
           <span class="plabel">{{ p.name }}</span>
-          <div
+          <component
+            :is="isTimingActive(i) ? 'button' : 'div'"
             class="pbar"
+            :type="isTimingActive(i) ? 'button' : undefined"
+            :aria-label="isTimingActive(i) ? p.name + '，判定时机' : undefined"
             :class="{ active: isTimingActive(i), done: p.done || p.total <= 0 }"
-            @click="store.judgeTiming()"
+            @click="isTimingActive(i) && store.judgeTiming()"
           >
-            <div class="fill" :style="{ width: p.pct + '%' }"></div>
-            <div
+            <span class="fill" :style="{ width: p.pct + '%' }"></span>
+            <span
               v-if="isTimingActive(i) && ps.timing"
               class="gzone"
               :style="{ left: ps.timing.zl + '%', width: ps.timing.zw + '%' }"
-            ></div>
-            <div
+            ></span>
+            <span
               v-if="isTimingActive(i) && ps.timing"
               class="cursor"
               :style="{ left: ps.timing.pos + '%' }"
-            ></div>
-          </div>
+            ></span>
+          </component>
           <span class="presult">
             <span v-if="p.total <= 0" class="mut">跳过</span>
             <template v-else-if="p.done || p.hit !== null">
@@ -119,7 +135,7 @@ watch(
       <div ref="logEl" class="logbox">
         <div v-for="(line, i) in store.playLog" :key="i" :class="line.cls">{{ line.text }}</div>
       </div>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <div class="play-actions">
         <button :disabled="ps.stopAfter" @click="store.stopAfterRound()">⏹ 本轮结算后停止</button>
         <button class="danger" @click="store.cancelPlay()">立即放弃本轮（无收益）</button>
         <small class="mut">连刷中：在下方列表点「下轮换它」即可在本轮结束后换游戏</small>
@@ -127,7 +143,7 @@ watch(
       </template>
     </div>
 
-    <h2>选择一款桌游开玩</h2>
+    <h2 ref="libraryHeading" class="library-heading" tabindex="-1">选择一款桌游开玩</h2>
     <FilterBar
       v-model="store.playFilter"
       v-model:not-tired-only="store.playNotTiredOnly"
@@ -152,10 +168,10 @@ watch(
       <small v-if="autoMode !== 'off'" class="mut">已开启；再点一次关闭</small>
     </div>
 
-    <div v-if="!ownedIds.length" class="mut">
+    <div v-if="!ownedIds.length" class="empty-state">
       {{ store.playFilter || store.playNotTiredOnly || store.playUnmasteredOnly ? '没有符合筛选的可玩桌游，换个筛选看看。' : '还没有桌游，先去商店看看吧。' }}
     </div>
-    <div v-else class="grid">
+    <div v-else class="grid play-grid">
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
         <div>复杂度 {{ gameById(id).weight }} · {{ gameById(id).playTime }}分钟 · 每局 {{ gainText(gameById(id)) }}</div>
         <div class="tagline">
@@ -192,20 +208,19 @@ watch(
     </div>
 
     <!-- 多实体选择器 -->
-    <div v-if="store.pendingCopyPick" id="modal-mask" @click.self="store.cancelCopyPick()">
-      <div id="modal">
+    <GameDialog v-if="store.pendingCopyPick" label="选择要玩的实体" dismissible @dismiss="store.cancelCopyPick()">
         <h3>选择要玩的实体</h3>
         <p class="mut" style="margin-bottom:10px">
           《{{ gameById(store.pendingCopyPick).name }}》有多个实体，成色与耐久各不相同：
         </p>
-        <div
+        <button
           v-for="(c, i) in pendingCopies"
           :key="c.uid"
-          class="panel"
-          style="margin-bottom:8px;cursor:pointer"
+          type="button"
+          class="copy-choice"
           @click="store.pickCopy(c.uid)"
         >
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="copy-choice-info">
             <span>
               <b>实体{{ circled(i) }}</b> · {{ conditionText(c.durability, gameById(c.gameId).rarity) }}
               {{ c.sleeved ? ' · 🎴已套牌套' : '' }}{{ c.stored ? ' · 📦已收纳' : '' }}
@@ -213,10 +228,8 @@ watch(
             <small class="mut">
               耐久 {{ durText(c.durability) }}/{{ DURABILITY[gameById(c.gameId).rarity] }}
             </small>
-          </div>
-          <div
-            style="height:5px;background:#111;border-radius:3px;overflow:hidden;margin-top:6px"
-          >
+          </span>
+          <span class="bar">
             <i
               style="display:block;height:100%"
               :style="{
@@ -224,10 +237,9 @@ watch(
                 background: c.durability <= 0 ? 'var(--red)' : 'var(--green)',
               }"
             ></i>
-          </div>
-        </div>
+          </span>
+        </button>
         <button style="margin-top:6px" @click="store.cancelCopyPick()">取消</button>
-      </div>
-    </div>
+    </GameDialog>
   </div>
 </template>
