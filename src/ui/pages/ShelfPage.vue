@@ -154,7 +154,7 @@ function durText(n: number): string {
       <GameCard v-for="id in ownedIds" :key="id" :game="gameById(id)">
         <div>{{ masteryText(store.s, gameById(id)) }}</div>
         <div class="tagline">每局 {{ gainText(gameById(id)) }}</div>
-        <div v-if="gameById(id).affix" class="tagline" style="color:#d9a5f5">✦ {{ gameById(id).affix?.desc }}</div>
+        <div v-if="gameById(id).affix" class="tagline game-affix">✦ {{ gameById(id).affix?.desc }}</div>
         <div class="bar" title="疲劳（变红 = 玩腻了）">
           <i
             :style="{

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import tabletop from '../assets/tabletop.webp';
+import tabletop from '../assets/tabletop-daylight.webp';
 import UiIcon from './UiIcon.vue';
 
 defineProps<{ count: number; total: number; hasGames: boolean }>();

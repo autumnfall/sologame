@@ -24,7 +24,7 @@ const ownInfo = computed(() => {
     <div class="badges">
       <span v-if="ownInfo" class="own-badge">{{ ownInfo }}</span>
       <span v-if="tired" class="fatigue-badge">玩腻了</span>
-      <span v-if="game.hidden" class="fatigue-badge" style="border-color:#b04ce8;color:#d9a5f5">隐藏款</span>
+      <span v-if="game.hidden" class="fatigue-badge hidden-badge">隐藏款</span>
     </div>
     <div class="cover">
       <span class="cover-emblem" aria-hidden="true">{{ game.icon }}</span>

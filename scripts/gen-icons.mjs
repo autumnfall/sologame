@@ -93,11 +93,10 @@ function createCanvas(size) {
 }
 
 // 主题色（与 style.css 变量一致）
-const BG_TOP = [34, 52, 42]; // --panel2 #22342a
-const BG_BOT = [16, 26, 22]; // --bg #101a16
-const GOLD = [231, 189, 114]; // --gold #e7bd72
-const CREAM = [243, 237, 223];
-const INK = [35, 26, 11];
+const BG_TOP = [255, 253, 248]; // --panel #fffdf8
+const BG_BOT = [245, 236, 223]; // --panel2 #f5ecdf
+const GOLD = [245, 190, 114]; // --amber #f5be72
+const INK = [61, 37, 22]; // --gold-ink #3d2516
 
 /** 画一颗骰子：圆角底色 + 5 点；safe = 内容区占比（maskable 需留边） */
 function drawDie(size, safe) {
@@ -120,8 +119,7 @@ function drawDie(size, safe) {
   const hi = off + area * 0.73;
   const mid = off + area * 0.5;
   const pip = (x, y) => {
-    c.fillCircle(x + pipR * 0.18, y + pipR * 0.22, pipR, INK, 0.35); // 投影
-    c.fillCircle(x, y, pipR, CREAM);
+    c.fillCircle(x, y, pipR, INK);
   };
   pip(lo, lo);
   pip(hi, lo);

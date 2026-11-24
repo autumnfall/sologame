@@ -23,10 +23,10 @@ const permPrice = computed(() => gachaMoneyPrice(store.s, 'perm'));
 const rotPrice = computed(() => gachaMoneyPrice(store.s, 'rot'));
 
 const RAR_COLOR: Record<string, string> = {
-  N: 'var(--N)',
-  R: 'var(--R)',
-  SR: 'var(--SR)',
-  SSR: 'var(--SSR)',
+  N: 'var(--N-ink)',
+  R: 'var(--R-ink)',
+  SR: 'var(--SR-ink)',
+  SSR: 'var(--SSR-ink)',
 };
 
 // ---------- 精通池 ----------

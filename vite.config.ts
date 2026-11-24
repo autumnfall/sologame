@@ -18,8 +18,8 @@ export default defineConfig({
         description: '放置类桌游收藏游戏：工作赚钱、买桌游、开盒收集、挂某鱼出二手，退坑转生越玩越强。',
         lang: 'zh-CN',
         display: 'standalone',
-        theme_color: '#142019',
-        background_color: '#142019',
+        theme_color: '#fffdf8',
+        background_color: '#f9f3e9',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
